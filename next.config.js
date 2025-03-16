@@ -1,11 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-	transpilePackages: ['framer-motion'],
-	experimental: {
-		optimizeCss: true,
-	},
+	output: 'standalone',
 	images: {
-		domains: ['i.postimg.cc', 'images.pexels.com'],
+		domains: ['localhost'],
+	},
+	experimental: {
+		// Enable if needed for streaming features
+		// serverActions: true,
 	},
 }
 
