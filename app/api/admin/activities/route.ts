@@ -15,6 +15,17 @@ export async function GET() {
 	try {
 		console.log("Fetching guest activities...");
 		
+		// Ensure database connection
+		try {
+			await prisma.$connect();
+		} catch (error) {
+			console.error("Failed to connect to database:", error);
+			return NextResponse.json(
+				{ error: "Database connection failed" },
+				{ status: 500 }
+			);
+		}
+		
 		const activities = await prisma.guestActivity.findMany({
 			include: {
 				guest: {
@@ -49,8 +60,17 @@ export async function GET() {
 				return true;
 			})
 			.map((activity: ActivityWithRelations) => ({
-				...activity,
-				createdAt: new Date(activity.createdAt).toISOString()
+				id: activity.id,
+				guestId: activity.guestId,
+				action: activity.action,
+				details: activity.details,
+				createdAt: activity.createdAt.toISOString(),
+				guest: {
+					name: activity.guest?.name || 'Unknown Guest',
+					household: {
+						name: activity.guest?.household?.name || 'Unknown Household'
+					}
+				}
 			}));
 
 		console.log(`Returning ${formattedActivities.length} valid activities`);
@@ -61,5 +81,7 @@ export async function GET() {
 			{ error: error instanceof Error ? error.message : "Failed to fetch guest activities" },
 			{ status: 500 }
 		);
+	} finally {
+		await prisma.$disconnect();
 	}
 }
