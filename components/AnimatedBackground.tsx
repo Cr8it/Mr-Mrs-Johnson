@@ -2,18 +2,30 @@
 
 import { useEffect, useRef } from "react"
 
+interface Particle {
+  x: number
+  y: number
+  radius: number
+  speed: number
+  angle: number
+}
+
 export default function AnimatedBackground() {
-  const canvasRef = useRef(null)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
   useEffect(() => {
     const canvas = canvasRef.current
+    if (!canvas) return
+
     const ctx = canvas.getContext("2d")
-    let animationFrameId
+    if (!ctx) return
+
+    let animationFrameId: number
 
     canvas.width = window.innerWidth
     canvas.height = window.innerHeight
 
-    const particles = []
+    const particles: Particle[] = []
     const particleCount = 100
 
     for (let i = 0; i < particleCount; i++) {

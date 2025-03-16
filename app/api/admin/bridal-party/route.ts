@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 
 export async function GET() {
 	try {
-		const members = await prisma.BridalPartyMember.findMany({
+		const members = await prisma.bridalPartyMember.findMany({
 			orderBy: [
 				{ type: 'asc' },
 				{ order: 'asc' }
@@ -11,48 +11,48 @@ export async function GET() {
 		});
 		return NextResponse.json(members);
 	} catch (error) {
-		console.error('Error fetching members:', error);
-		return NextResponse.json({ error: 'Failed to fetch bridal party members' }, { status: 500 });
+		console.error('Error fetching bridal party:', error);
+		return NextResponse.json(
+			{ error: 'Failed to fetch bridal party' },
+			{ status: 500 }
+		);
 	}
 }
 
 export async function POST(request: Request) {
 	try {
-		const body = await request.json();
-		
-		// Get max order for the specific type
-		const maxOrder = await prisma.BridalPartyMember.findFirst({
-			where: { type: body.type },
-			orderBy: { order: 'desc' }
-		});
-		
-		const newMember = await prisma.BridalPartyMember.create({
+		const data = await request.json();
+		const member = await prisma.bridalPartyMember.create({
 			data: {
-				...body,
-				order: maxOrder ? maxOrder.order + 1 : 1
+				...data,
+				order: data.order || 0
 			}
 		});
-		
-		return NextResponse.json(newMember);
+		return NextResponse.json(member);
 	} catch (error) {
 		console.error('Error creating member:', error);
-		return NextResponse.json({ error: 'Failed to create bridal party member' }, { status: 500 });
+		return NextResponse.json(
+			{ error: 'Failed to create member' },
+			{ status: 500 }
+		);
 	}
 }
 
 export async function PUT(request: Request) {
 	try {
-		const body = await request.json();
-		
-		const updatedMember = await prisma.BridalPartyMember.update({
-			where: { id: body.id },
-			data: body
+		const data = await request.json();
+		const { id, ...updateData } = data;
+		const member = await prisma.bridalPartyMember.update({
+			where: { id },
+			data: updateData
 		});
-		
-		return NextResponse.json(updatedMember);
+		return NextResponse.json(member);
 	} catch (error) {
 		console.error('Error updating member:', error);
-		return NextResponse.json({ error: 'Failed to update bridal party member' }, { status: 500 });
+		return NextResponse.json(
+			{ error: 'Failed to update member' },
+			{ status: 500 }
+		);
 	}
 }
 
@@ -60,18 +60,21 @@ export async function DELETE(request: Request) {
 	try {
 		const { searchParams } = new URL(request.url);
 		const id = searchParams.get('id');
-		
 		if (!id) {
-			return NextResponse.json({ error: 'ID is required' }, { status: 400 });
+			return NextResponse.json(
+				{ error: 'Member ID is required' },
+				{ status: 400 }
+			);
 		}
-
-		await prisma.BridalPartyMember.delete({
+		await prisma.bridalPartyMember.delete({
 			where: { id }
 		});
-		
-		return NextResponse.json({ message: 'Member deleted successfully' });
+		return NextResponse.json({ success: true });
 	} catch (error) {
 		console.error('Error deleting member:', error);
-		return NextResponse.json({ error: 'Failed to delete bridal party member' }, { status: 500 });
+		return NextResponse.json(
+			{ error: 'Failed to delete member' },
+			{ status: 500 }
+		);
 	}
 }

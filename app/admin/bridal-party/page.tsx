@@ -42,9 +42,13 @@ const MemberCard = ({ member, onEdit, onDelete, moveCard, index }: any) => {
 		}),
 	});
 
+	const dragDropRef = (node: HTMLDivElement | null) => {
+		drag(drop(node));
+	};
+
 	return (
 		<div
-			ref={(node) => drag(drop(node))}
+			ref={dragDropRef}
 			className={`relative p-6 bg-white rounded-xl border ${
 				isOver 
 					? 'border-gold/50 bg-white' 

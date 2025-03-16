@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import { QuestionType } from "./types"
+import { QuestionType, QUESTION_TYPES } from "./types"
 import { 
   Select,
   SelectContent,
@@ -33,7 +33,7 @@ interface QuestionFormProps {
 export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
   const [formData, setFormData] = useState({
     question: "",
-    type: QuestionType.TEXT,
+    type: "TEXT" as QuestionType,
     options: "",
     isRequired: false,
     perGuest: false,
@@ -48,7 +48,7 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
     try {
       await onSubmit({
         ...formData,
-        options: formData.type === QuestionType.MULTIPLE_CHOICE 
+        options: formData.type === "MULTIPLE_CHOICE"
           ? formData.options.split(",").map(opt => opt.trim())
           : []
       })
@@ -59,10 +59,10 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
 
   const getTypeIcon = (type: QuestionType) => {
     switch (type) {
-      case QuestionType.TEXT: return <Type className="h-4 w-4" />
-      case QuestionType.MULTIPLE_CHOICE: return <ListOrdered className="h-4 w-4" />
-      case QuestionType.BOOLEAN: return <ToggleLeft className="h-4 w-4" />
-      case QuestionType.DATE: return <Calendar className="h-4 w-4" />
+      case "TEXT": return <Type className="h-4 w-4" />
+      case "MULTIPLE_CHOICE": return <ListOrdered className="h-4 w-4" />
+      case "BOOLEAN": return <ToggleLeft className="h-4 w-4" />
+      case "DATE": return <Calendar className="h-4 w-4" />
       default: return <HelpCircle className="h-4 w-4" />
     }
   }
@@ -95,10 +95,10 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="dark:bg-gray-800">
-              {Object.values(QuestionType).map((type) => (
+              {QUESTION_TYPES.map((type) => (
                 <SelectItem key={type} value={type}>
                   <div className="flex items-center gap-2">
-                    {getTypeIcon(type as QuestionType)}
+                    {getTypeIcon(type)}
                     <span>{type}</span>
                   </div>
                 </SelectItem>
@@ -107,7 +107,7 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
           </Select>
         </div>
 
-        {formData.type === QuestionType.MULTIPLE_CHOICE && (
+        {formData.type === "MULTIPLE_CHOICE" && (
           <div className="space-y-2">
             <Label className="text-sm font-medium">
               Options

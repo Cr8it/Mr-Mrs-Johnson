@@ -13,8 +13,14 @@ interface Guest {
   name: string
   email?: string
   isAttending: boolean | null
-  mealChoice: string | null
-  dessertChoice: string | null
+  mealChoice: {
+    id: string
+    name: string
+  } | null
+  dessertChoice: {
+    id: string
+    name: string
+  } | null
   dietaryNotes: string | null
   responses: Response[]
 }

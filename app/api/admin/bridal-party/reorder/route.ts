@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 		// Update all members in a transaction
 		await prisma.$transaction(
 			members.map(member => 
-				prisma.BridalPartyMember.update({
+				prisma.bridalPartyMember.update({
 					where: { id: member.id },
 					data: { order: member.order }
 				})
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 		);
 
 		// Fetch and return updated members
-		const updatedMembers = await prisma.BridalPartyMember.findMany({
+		const updatedMembers = await prisma.bridalPartyMember.findMany({
 			where: {
 				id: {
 					in: members.map(m => m.id)

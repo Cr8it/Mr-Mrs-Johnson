@@ -1,7 +1,10 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 
-export async function GET({ params }: { params: { code: string } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { code: string } }
+) {
   try {
     const household = await prisma.household.findFirst({
       where: {

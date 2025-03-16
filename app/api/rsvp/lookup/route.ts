@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/db"
+import prisma from "@/lib/prisma"
 
 export async function POST(request: Request) {
   try {
@@ -18,10 +18,7 @@ export async function POST(request: Request) {
 
     const household = await prisma.household.findFirst({
       where: {
-        code: {
-          equals: normalizedCode,
-          mode: 'insensitive' // Case insensitive search
-        }
+        code: normalizedCode
       },
       include: {
         guests: {

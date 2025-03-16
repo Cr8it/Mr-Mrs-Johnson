@@ -27,7 +27,7 @@ interface Question {
   id: string
   type: "TEXT" | "MULTIPLE_CHOICE" | "BOOLEAN" | "DATE"
   question: string
-  options: string[] | string
+  options: string
   isRequired: boolean
   perGuest: boolean
   isActive: boolean
@@ -217,11 +217,18 @@ export default function RSVPForm() {
                                 <SelectValue placeholder="Select an option" />
                               </SelectTrigger>
                               <SelectContent>
-                                {question.options.map((option) => (
-                                  <SelectItem key={option} value={option}>
-                                    {option}
-                                  </SelectItem>
-                                ))}
+                                {(() => {
+                                  try {
+                                    const parsedOptions = JSON.parse(question.options);
+                                    return parsedOptions.map((option: string) => (
+                                      <SelectItem key={option} value={option}>
+                                        {option}
+                                      </SelectItem>
+                                    ));
+                                  } catch {
+                                    return null;
+                                  }
+                                })()}
                               </SelectContent>
                             </Select>
                           ) : question.type === "TEXT" ? (
@@ -272,24 +279,18 @@ export default function RSVPForm() {
                           <SelectValue placeholder="Select an option" />
                         </SelectTrigger>
                         <SelectContent>
-                            {Array.isArray(question.options) ? 
-                            question.options.map((option) => (
-                              <SelectItem key={option} value={option}>
-                              {option}
-                              </SelectItem>
-                            )) : 
-                            (() => {
+                            {(() => {
                               try {
-                              return JSON.parse(question.options).map((option: string) => (
-                                <SelectItem key={option} value={option}>
-                                {option}
-                                </SelectItem>
-                              ))
+                                const parsedOptions = JSON.parse(question.options);
+                                return parsedOptions.map((option: string) => (
+                                  <SelectItem key={option} value={option}>
+                                    {option}
+                                  </SelectItem>
+                                ));
                               } catch {
-                              return null
+                                return null;
                               }
-                            })()
-                            }
+                            })()}
                         </SelectContent>
                       </Select>
                     ) : question.type === "TEXT" ? (

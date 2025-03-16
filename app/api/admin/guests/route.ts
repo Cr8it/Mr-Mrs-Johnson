@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/db"
+import prisma from "@/lib/prisma"
 
 export async function GET() {
 	try {
@@ -59,8 +59,8 @@ export async function POST(request: Request) {
 				email,
 				isAttending,
 				dietaryNotes,
-				mealChoice: mealChoice ? { connect: { id: mealChoice.id } } : undefined,
-				dessertChoice: dessertChoice ? { connect: { id: dessertChoice.id } } : undefined,
+				mealOptionId: mealChoice?.id,
+				dessertOptionId: dessertChoice?.id,
 				householdId: household.id,
 			},
 			include: {

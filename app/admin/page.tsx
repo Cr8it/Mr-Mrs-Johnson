@@ -17,6 +17,7 @@ import {
   CakeSlice,
   Coffee
 } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface Stats {
   totalGuests: number
@@ -157,13 +158,13 @@ export default function AdminDashboard() {
                   </div>
                   <Progress 
                     value={percentage} 
-                    className="h-2" 
-                    indicatorClassName={`bg-gradient-to-r ${
-                    index === 0 ? 'from-blue-500 to-blue-600' :
-                    index === 1 ? 'from-emerald-500 to-emerald-600' :
-                    index === 2 ? 'from-amber-500 to-amber-600' :
-                    'from-violet-500 to-violet-600'
-                    }`}
+                    className={cn(
+                      "h-2",
+                      index === 0 ? '[--tw-progress-bar-color:theme(colors.blue.500)]' :
+                      index === 1 ? '[--tw-progress-bar-color:theme(colors.emerald.500)]' :
+                      index === 2 ? '[--tw-progress-bar-color:theme(colors.amber.500)]' :
+                      '[--tw-progress-bar-color:theme(colors.violet.500)]'
+                    )}
                   />
                   </div>
                 )
@@ -193,13 +194,13 @@ export default function AdminDashboard() {
                   </div>
                   <Progress 
                     value={percentage} 
-                    className="h-2" 
-                    indicatorClassName={`bg-gradient-to-r ${
-                    index === 0 ? 'from-pink-500 to-pink-600' :
-                    index === 1 ? 'from-purple-500 to-purple-600' :
-                    index === 2 ? 'from-indigo-500 to-indigo-600' :
-                    'from-cyan-500 to-cyan-600'
-                    }`}
+                    className={cn(
+                      "h-2",
+                      index === 0 ? '[--tw-progress-bar-color:theme(colors.pink.500)]' :
+                      index === 1 ? '[--tw-progress-bar-color:theme(colors.purple.500)]' :
+                      index === 2 ? '[--tw-progress-bar-color:theme(colors.indigo.500)]' :
+                      '[--tw-progress-bar-color:theme(colors.cyan.500)]'
+                    )}
                   />
                   </div>
                 )

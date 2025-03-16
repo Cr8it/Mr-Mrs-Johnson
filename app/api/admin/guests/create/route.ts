@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/db"
+import prisma from "@/lib/prisma"
 
 export async function POST(request: Request) {
   console.log("Starting guest creation...")
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     } catch (dbError) {
       console.error("Database connection error:", dbError)
       return NextResponse.json(
-        { error: `Database connection failed: ${dbError.message}` },
+        { error: "Database connection failed" },
         { status: 500 }
       )
     }
@@ -48,24 +48,25 @@ export async function POST(request: Request) {
     // Create guest
     try {
       const guest = await prisma.guest.create({
-      data: {
-        name,
-        email,
-        householdId: household.id,
-      },
-      include: {
-        household: true,
-      }
+        data: {
+          name,
+          email,
+          householdId: household.id,
+          isAttending: null,
+        },
+        include: {
+          household: true,
+        }
       })
       console.log("Created guest:", guest)
 
       // Log guest creation activity
       await prisma.guestActivity.create({
-      data: {
-        guestId: guest.id,
-        action: 'GUEST_CREATED',
-        details: `Added to household: ${household.name}`
-      }
+        data: {
+          guestId: guest.id,
+          action: 'GUEST_CREATED',
+          details: `Added to household: ${household.name}`
+        }
       })
 
       return NextResponse.json(guest)
