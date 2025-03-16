@@ -1,62 +1,163 @@
 import { NextResponse } from 'next/server'
-import { writeFile, readdir, unlink, readFile } from 'fs/promises'
-import { join } from 'path'
+import { supabase, getPublicUrl } from '@/lib/supabase'
 import { v4 as uuidv4 } from 'uuid'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+export const maxDuration = 300 // 5 minutes timeout
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 
 export async function POST(request: Request) {
   try {
+    console.log('Starting image upload process...')
+    
     const formData = await request.formData()
     const files = formData.getAll('files') as File[]
-
+    console.log(`Processing ${files.length} files...`)
+    
     const uploadedImages = []
 
+    // Validate files
     for (const file of files) {
-      const bytes = await file.arrayBuffer()
-      const buffer = Buffer.from(bytes)
+      if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+        console.log(`Invalid file type: ${file.type}`)
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: `File type ${file.type} is not supported. Allowed types: ${ALLOWED_FILE_TYPES.join(', ')}` 
+          },
+          { status: 400 }
+        )
+      }
 
-      // Generate unique filename
-      const uniqueId = uuidv4()
-      const extension = file.name.split('.').pop()
-      const filename = `${uniqueId}.${extension}`
+      if (file.size > MAX_FILE_SIZE) {
+        console.log(`File too large: ${file.size} bytes`)
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: `File size exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB limit` 
+          },
+          { status: 400 }
+        )
+      }
+    }
 
-      // Save to public directory
-      const path = join(process.cwd(), 'public', 'gallery', filename)
-      await writeFile(path, buffer)
+    // Ensure images folder exists
+    const { data: folders } = await supabase.storage.from('gallery').list()
+    if (!folders?.find(f => f.name === 'images')) {
+      console.log('Creating images folder...')
+      await supabase.storage
+        .from('gallery')
+        .upload('images/.keep', new Uint8Array(0), {
+          contentType: 'text/plain'
+        })
+    }
 
-      // Add to uploaded images array
-      uploadedImages.push({
-        id: uniqueId,
-        url: `/gallery/${filename}`,
-        alt: file.name,
-        order: 9999 // New images go to the end
-      })
+    // Process each file
+    for (const file of files) {
+      try {
+        console.log(`Processing file: ${file.name}`)
+        const bytes = await file.arrayBuffer()
+        const buffer = Buffer.from(bytes)
+        
+        // Generate unique filename with original extension
+        const uniqueId = uuidv4()
+        const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+        const filename = `${uniqueId}.${extension}`
+        const filepath = `images/${filename}`
+
+        console.log(`Uploading to Supabase: ${filepath}`)
+        
+        // Upload to Supabase Storage
+        const { error: uploadError } = await supabase.storage
+          .from('gallery')
+          .upload(filepath, buffer, {
+            contentType: file.type,
+            cacheControl: '3600',
+            upsert: false
+          })
+
+        if (uploadError) {
+          console.error('Supabase storage error:', uploadError)
+          throw uploadError
+        }
+
+        // Get the public URL
+        console.log('Getting public URL...')
+        const publicUrl = getPublicUrl(filepath)
+        console.log('Public URL:', publicUrl)
+
+        // Add to uploaded images array
+        uploadedImages.push({
+          id: uniqueId,
+          url: publicUrl,
+          alt: file.name,
+          order: 9999 // New images go to the end
+        })
+      } catch (error) {
+        console.error(`Error uploading file ${file.name}:`, error)
+        throw error
+      }
     }
 
     // Update order.json with new images
-    const galleryPath = join(process.cwd(), 'public', 'gallery')
-    const orderFilePath = join(galleryPath, 'order.json')
-    
     try {
-      const orderData = await readFile(orderFilePath, 'utf-8')
-      const currentOrder = JSON.parse(orderData)
-      
-      // Filter out any placeholder images (those with external URLs)
-      const localImages = currentOrder.filter((img: any) => img.url.startsWith('/gallery/'))
-      
-      // Add new images
-      const newOrder = [...localImages, ...uploadedImages]
+      console.log('Updating order.json...')
+      const { data: orderFile, error: fetchError } = await supabase.storage
+        .from('gallery')
+        .download('order.json')
+
+      let currentOrder = []
+      if (!fetchError && orderFile) {
+        const text = await orderFile.text()
+        try {
+          currentOrder = JSON.parse(text)
+          // Verify all images in currentOrder still exist
+          const { data: files } = await supabase.storage
+            .from('gallery')
+            .list('images')
+
+          const existingFiles = new Set(files?.map(f => f.name) || [])
+          currentOrder = currentOrder.filter(img => {
+            const filename = img.url.split('/').pop()
+            return existingFiles.has(filename)
+          })
+        } catch (parseError) {
+          console.error('Error parsing order.json:', parseError)
+          currentOrder = []
+        }
+      }
+
+      // Add new images to the order
+      const newOrder = [...currentOrder, ...uploadedImages]
       
       // Update order numbers
       newOrder.forEach((img: any, index: number) => {
         img.order = index
       })
-      
-      await writeFile(orderFilePath, JSON.stringify(newOrder, null, 2))
-    } catch {
-      // If order.json doesn't exist, create it with just the new images
-      await writeFile(orderFilePath, JSON.stringify(uploadedImages, null, 2))
+
+      // Save updated order.json
+      const { error: uploadError } = await supabase.storage
+        .from('gallery')
+        .upload('order.json', JSON.stringify(newOrder, null, 2), {
+          contentType: 'application/json',
+          upsert: true
+        })
+
+      if (uploadError) {
+        console.error('Error updating order.json:', uploadError)
+      }
+    } catch (error) {
+      console.error('Error updating order.json:', error)
     }
 
+    if (uploadedImages.length === 0) {
+      throw new Error('No images were uploaded successfully')
+    }
+
+    console.log(`Successfully uploaded ${uploadedImages.length} images`)
     return NextResponse.json({ 
       success: true, 
       images: uploadedImages 
@@ -64,7 +165,11 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error uploading images:', error)
     return NextResponse.json(
-      { success: false, error: 'Failed to upload images' },
+      { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to upload images',
+        details: error instanceof Error ? error.stack : undefined
+      },
       { status: 500 }
     )
   }
@@ -72,101 +177,86 @@ export async function POST(request: Request) {
 
 export async function GET() {
   try {
-    const galleryPath = join(process.cwd(), 'public', 'gallery')
-    const orderFilePath = join(galleryPath, 'order.json')
+    console.log('Fetching gallery images...')
     
-    let orderedImages: any[] = []
-    
-    try {
-      // Try to read the order file
-      const orderData = await readFile(orderFilePath, 'utf-8')
-      orderedImages = JSON.parse(orderData)
-      
-      // Check if we have any local images
-      const hasLocalImages = orderedImages.some((img: any) => img.url.startsWith('/gallery/'))
-      
-      if (!hasLocalImages) {
-        // If we only have placeholder images, scan directory for actual uploads
-        const files = await readdir(galleryPath)
-        const localImages = files
-          .filter(file => /\.(jpg|jpeg|png|gif)$/i.test(file))
-          .map((file, index) => ({
-            id: file.split('.')[0],
-            url: `/gallery/${file}`,
-            alt: file,
-            order: index
-          }))
-        
-        if (localImages.length > 0) {
-          // If we found local images, use those instead of placeholders
-          orderedImages = localImages
-          await writeFile(orderFilePath, JSON.stringify(localImages, null, 2))
-        }
+    // List all files in the images folder
+    const { data: files, error: listError } = await supabase.storage
+      .from('gallery')
+      .list('images')
+
+    if (listError) {
+      console.error('Error listing files:', listError)
+      throw listError
+    }
+
+    // Get order.json if it exists
+    const { data: orderFile, error: orderError } = await supabase.storage
+      .from('gallery')
+      .download('order.json')
+
+    let currentOrder = []
+    if (!orderError && orderFile) {
+      try {
+        const text = await orderFile.text()
+        currentOrder = JSON.parse(text)
+      } catch (parseError) {
+        console.error('Error parsing order.json:', parseError)
       }
-    } catch {
-      // If order file doesn't exist, create it from existing files
-      const files = await readdir(galleryPath)
-      orderedImages = files
-        .filter(file => /\.(jpg|jpeg|png|gif)$/i.test(file))
-        .map((file, index) => ({
-          id: file.split('.')[0],
-          url: `/gallery/${file}`,
-          alt: file,
-          order: index
+    }
+
+    // Filter out the .keep file and get valid image files
+    const imageFiles = files?.filter(file => 
+      file.name !== '.keep' && 
+      !file.name.endsWith('order.json')
+    ) || []
+
+    // Create URLs for all images
+    const images = imageFiles.map(file => ({
+      id: file.name.split('.')[0],
+      url: getPublicUrl(`images/${file.name}`),
+      alt: file.name,
+      order: 9999 // Default order for new images
+    }))
+
+    // Merge with order data
+    let orderedImages = images
+    if (currentOrder.length > 0) {
+      // Create a map of existing images by ID
+      const imageMap = new Map(images.map(img => [img.id, img]))
+      
+      // First, include all images that have an order
+      orderedImages = currentOrder
+        .filter(item => imageMap.has(item.id))
+        .map(item => ({
+          ...imageMap.get(item.id)!,
+          order: item.order
         }))
       
-      // Save the initial order
-      await writeFile(orderFilePath, JSON.stringify(orderedImages, null, 2))
+      // Then add any new images that aren't in the order
+      const orderedIds = new Set(currentOrder.map(item => item.id))
+      const newImages = images.filter(img => !orderedIds.has(img.id))
+      orderedImages = [...orderedImages, ...newImages]
     }
 
     // Sort images by order
-    orderedImages.sort((a, b) => a.order - b.order)
+    orderedImages.sort((a, b) => (a.order || 0) - (b.order || 0))
 
+    console.log(`Returning ${orderedImages.length} images`)
     return NextResponse.json({ 
       success: true, 
       images: orderedImages 
     })
   } catch (error) {
-    console.error('Error fetching images:', error)
+    console.error('Error in gallery GET:', error)
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch images' },
+      { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to fetch gallery images',
+        images: [] // Always return an array even in error case
+      },
       { status: 500 }
     )
   }
 }
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const id = params.id
-    const galleryPath = join(process.cwd(), 'public', 'gallery')
-    const orderFilePath = join(galleryPath, 'order.json')
-    
-    // Remove from order.json first
-    try {
-      const orderData = await readFile(orderFilePath, 'utf-8')
-      const currentOrder = JSON.parse(orderData)
-      const newOrder = currentOrder.filter((img: any) => img.id !== id)
-      await writeFile(orderFilePath, JSON.stringify(newOrder, null, 2))
-    } catch (error) {
-      console.error('Error updating order.json:', error)
-    }
-    
-    // Then try to delete the file
-    const files = await readdir(galleryPath)
-    const fileToDelete = files.find(file => file.startsWith(id))
-    if (fileToDelete) {
-      await unlink(join(galleryPath, fileToDelete))
-    }
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error deleting image:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete image' },
-      { status: 500 }
-    )
-  }
-} 
+// DELETE handler has been moved to [id]/route.ts 

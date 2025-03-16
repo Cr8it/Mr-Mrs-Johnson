@@ -39,7 +39,8 @@ export async function GET() {
 
 		console.log(`Found ${activities.length} activities`);
 
-		const formattedActivities = activities
+		// Ensure we always return an array
+		const formattedActivities = Array.isArray(activities) ? activities
 			.filter((activity: ActivityWithRelations) => {
 				if (!activity.guest) {
 					console.warn(`Activity ${activity.id} has no guest relation`);
@@ -63,7 +64,7 @@ export async function GET() {
 						name: activity.guest?.household?.name || 'Unknown Household'
 					}
 				}
-			}));
+			})) : [];
 
 		console.log(`Returning ${formattedActivities.length} valid activities`);
 		return NextResponse.json(
@@ -75,7 +76,8 @@ export async function GET() {
 		return NextResponse.json(
 			{ 
 				success: false, 
-				error: error instanceof Error ? error.message : "Failed to fetch guest activities"
+				error: error instanceof Error ? error.message : "Failed to fetch guest activities",
+				activities: [] // Always return an array even in error case
 			},
 			{ status: 500 }
 		);

@@ -2,22 +2,13 @@
 
 import { useEffect, useState } from "react"
 import { format } from "date-fns"
-import { 
-	CheckCircle2, 
-	XCircle, 
-	Clock, 
-	Mail, 
-	Calendar, 
-	User, 
-	Settings,
-	AlertCircle,
-	Loader2
-} from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Loader2 } from "lucide-react"
 
 interface Activity {
 	id: string
 	action: string
-	details: string | null
+	details: string
 	createdAt: string
 	guest: {
 		name: string
@@ -27,31 +18,49 @@ interface Activity {
 	}
 }
 
-const getActivityIcon = (action: string) => {
-	switch (action.toLowerCase()) {
-		case 'rsvp_confirmed': return <CheckCircle2 className="h-5 w-5 text-green-500" />
-		case 'rsvp_declined': return <XCircle className="h-5 w-5 text-red-500" />
-		case 'rsvp_pending': return <Clock className="h-5 w-5 text-orange-500" />
-		case 'email_sent': return <Mail className="h-5 w-5 text-blue-500" />
-		case 'guest_updated': return <User className="h-5 w-5 text-purple-500" />
-		case 'date_changed': return <Calendar className="h-5 w-5 text-indigo-500" />
-		default: return <Settings className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+interface ActivityLogProps {
+	className?: string
+}
+
+function getActivityColor(action: string) {
+	switch (action) {
+		case 'RSVP_YES':
+			return 'border-green-200 dark:border-green-800'
+		case 'RSVP_NO':
+			return 'border-red-200 dark:border-red-800'
+		case 'GUEST_CREATED':
+			return 'border-blue-200 dark:border-blue-800'
+		case 'UPDATE_MEAL':
+			return 'border-purple-200 dark:border-purple-800'
+		case 'UPDATE_DESSERT':
+			return 'border-pink-200 dark:border-pink-800'
+		case 'UPDATE_DETAILS':
+			return 'border-yellow-200 dark:border-yellow-800'
+		default:
+			return 'border-gray-200 dark:border-gray-700'
 	}
 }
 
-const getActivityColor = (action: string) => {
-	switch (action.toLowerCase()) {
-		case 'rsvp_confirmed': return 'bg-green-50 border-green-100'
-		case 'rsvp_declined': return 'bg-red-50 border-red-100'
-		case 'rsvp_pending': return 'bg-orange-50 border-orange-100'
-		case 'email_sent': return 'bg-blue-50 border-blue-100'
-		case 'guest_updated': return 'bg-purple-50 border-purple-100'
-		case 'date_changed': return 'bg-indigo-50 border-indigo-100'
-		default: return 'bg-gray-50 border-gray-100'
+function getActivityBadge(action: string) {
+	switch (action) {
+		case 'RSVP_YES':
+			return { label: 'RSVP Yes', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100' }
+		case 'RSVP_NO':
+			return { label: 'RSVP No', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100' }
+		case 'GUEST_CREATED':
+			return { label: 'New Guest', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100' }
+		case 'UPDATE_MEAL':
+			return { label: 'Meal Update', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100' }
+		case 'UPDATE_DESSERT':
+			return { label: 'Dessert Update', color: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-100' }
+		case 'UPDATE_DETAILS':
+			return { label: 'Details Update', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100' }
+		default:
+			return { label: 'Activity', color: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100' }
 	}
 }
 
-export function ActivityLog({ className = "" }: { className?: string }) {
+export function ActivityLog({ className = "" }: ActivityLogProps) {
 	const [activities, setActivities] = useState<Activity[]>([])
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
@@ -60,34 +69,29 @@ export function ActivityLog({ className = "" }: { className?: string }) {
 		const fetchActivities = async () => {
 			try {
 				const response = await fetch('/api/admin/activities')
-				if (!response.ok) {
-					const errorData = await response.json()
-					throw new Error(errorData.error || 'Failed to fetch activities')
-				}
 				const data = await response.json()
-				setActivities(data)
-				setError(null)
+				
+				if (data.success && Array.isArray(data.activities)) {
+					setActivities(data.activities)
+				} else {
+					setError(data.error || 'Failed to load activities')
+					setActivities([])
+				}
 			} catch (error) {
-				setError(error instanceof Error ? error.message : 'Failed to fetch activities')
+				console.error('Error fetching activities:', error)
+				setError('Failed to load activities')
+				setActivities([])
 			} finally {
 				setLoading(false)
 			}
 		}
 
 		fetchActivities()
-		const interval = setInterval(fetchActivities, 60000)
-		return () => clearInterval(interval)
 	}, [])
-
-	const formatAction = (action: string) => {
-		return action.split('_').map(word => 
-			word.charAt(0) + word.slice(1).toLowerCase()
-		).join(' ')
-	}
 
 	if (loading) {
 		return (
-			<div className="flex items-center justify-center h-[400px]">
+			<div className="flex items-center justify-center p-8">
 				<Loader2 className="h-8 w-8 animate-spin text-gold" />
 			</div>
 		)
@@ -95,9 +99,16 @@ export function ActivityLog({ className = "" }: { className?: string }) {
 
 	if (error) {
 		return (
-			<div className="flex items-center justify-center h-[400px] text-red-500">
-				<AlertCircle className="h-6 w-6 mr-2" />
-				<span>Error: {error}</span>
+			<div className="text-center p-8 text-red-500 dark:text-red-400">
+				{error}
+			</div>
+		)
+	}
+
+	if (!activities.length) {
+		return (
+			<div className="text-center p-8 text-gray-500 dark:text-gray-400">
+				No activities to display
 			</div>
 		)
 	}
@@ -109,37 +120,31 @@ export function ActivityLog({ className = "" }: { className?: string }) {
 					key={activity.id} 
 					className={`rounded-lg border p-4 transition-all hover:shadow-md bg-white dark:bg-gray-800 ${getActivityColor(activity.action)}`}
 				>
-					<div className="flex items-start gap-4">
-						<div className="mt-1">
-							{getActivityIcon(activity.action)}
-						</div>
-						<div className="flex-1 space-y-1">
-							<div className="flex items-center justify-between">
-								<p className="font-medium text-gray-900 dark:text-gray-100">{activity.guest.name}</p>
-								<time className="text-sm text-gray-500 dark:text-gray-400">
-									{format(new Date(activity.createdAt), 'MMM d, h:mm a')}
-								</time>
+					<div className="flex items-start justify-between gap-4">
+						<div>
+							<div className="flex items-center gap-2 mb-1">
+								<Badge className={getActivityBadge(activity.action).color}>
+									{getActivityBadge(activity.action).label}
+								</Badge>
+								<span className="text-sm text-gray-500 dark:text-gray-400">
+									{format(new Date(activity.createdAt), 'MMM d, yyyy h:mm a')}
+								</span>
 							</div>
+							<p className="font-medium text-gray-900 dark:text-gray-100">
+								{activity.guest.name}
+							</p>
 							<p className="text-sm text-gray-500 dark:text-gray-400">
-								from {activity.guest.household.name}
+								{activity.guest.household.name}
 							</p>
-							<p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-								{formatAction(activity.action)}
-								{activity.details && (
-									<span className="text-gray-500 dark:text-gray-400"> - {activity.details}</span>
-								)}
-							</p>
+							{activity.details && (
+								<p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+									{activity.details}
+								</p>
+							)}
 						</div>
 					</div>
 				</div>
 			))}
-			{activities.length === 0 && (
-				<div className="flex flex-col items-center justify-center h-[400px] text-gray-500 dark:text-gray-400">
-					<Calendar className="h-12 w-12 mb-4 text-gray-400 dark:text-gray-500" />
-					<p className="text-lg font-medium dark:text-gray-300">No activities recorded yet</p>
-					<p className="text-sm">Recent guest activities will appear here</p>
-				</div>
-			)}
 		</div>
 	)
 }
