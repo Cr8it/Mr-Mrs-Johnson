@@ -11,6 +11,9 @@ type ActivityWithRelations = GuestActivity & {
 	} | null;
 };
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
 	try {
 		console.log("Fetching guest activities...");
@@ -63,11 +66,17 @@ export async function GET() {
 			}));
 
 		console.log(`Returning ${formattedActivities.length} valid activities`);
-		return NextResponse.json(formattedActivities);
+		return NextResponse.json(
+			{ success: true, activities: formattedActivities },
+			{ status: 200 }
+		);
 	} catch (error) {
 		console.error("Error fetching guest activities:", error);
 		return NextResponse.json(
-			{ error: error instanceof Error ? error.message : "Failed to fetch guest activities" },
+			{ 
+				success: false, 
+				error: error instanceof Error ? error.message : "Failed to fetch guest activities"
+			},
 			{ status: 500 }
 		);
 	}
