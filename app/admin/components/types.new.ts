@@ -1,0 +1,6 @@
+export enum QuestionType {
+	TEXT = "TEXT",
+	MULTIPLE_CHOICE = "MULTIPLE_CHOICE",
+	BOOLEAN = "BOOLEAN",
+	DATE = "DATE"
+}
