@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import prisma from "@/lib/prisma";
 import { GuestActivity } from "@prisma/client";
 
 type ActivityWithRelations = GuestActivity & {
@@ -14,17 +14,6 @@ type ActivityWithRelations = GuestActivity & {
 export async function GET() {
 	try {
 		console.log("Fetching guest activities...");
-		
-		// Ensure database connection
-		try {
-			await prisma.$connect();
-		} catch (error) {
-			console.error("Failed to connect to database:", error);
-			return NextResponse.json(
-				{ error: "Database connection failed" },
-				{ status: 500 }
-			);
-		}
 		
 		const activities = await prisma.guestActivity.findMany({
 			include: {
@@ -81,7 +70,5 @@ export async function GET() {
 			{ error: error instanceof Error ? error.message : "Failed to fetch guest activities" },
 			{ status: 500 }
 		);
-	} finally {
-		await prisma.$disconnect();
 	}
 }
