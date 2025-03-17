@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
-export const maxDuration = 300 // 5 minutes timeout
+export const maxDuration = 60 // Maximum allowed duration for Hobby plan (60 seconds)
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']

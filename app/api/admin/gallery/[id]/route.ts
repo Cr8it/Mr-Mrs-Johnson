@@ -3,6 +3,7 @@ import { supabase } from '@/app/lib/supabase'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+export const maxDuration = 60 // Maximum allowed duration for Hobby plan (60 seconds)
 
 interface GalleryImage {
   id: string
