@@ -133,10 +133,10 @@ export function generateInviteEmailTemplate(guest: { name: string, household: { 
 						To RSVP, please visit our wedding website using the unlock code:<br>
 						<strong style="font-size: 20px; color: #d4af37;">010424</strong>
 					</p>
-					<a href="https://your-wedding-website.com" class="button">Visit Wedding Website</a>
+					<a href="https://mrandmrsjohnson.co.uk" class="button">Visit Wedding Website</a>
 					<p class="note">
 						Please note: Unfortunately, we cannot accommodate any children.<br>
-						Only the names on the invites will be permitted entry.
+						Only named guests will be permitted entry.
 					</p>
 				</div>
 				<div class="footer">
