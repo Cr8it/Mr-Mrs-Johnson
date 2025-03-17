@@ -4,6 +4,13 @@ import { supabase } from '@/lib/supabase'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+interface GalleryImage {
+  id: string
+  url: string
+  alt: string
+  order: number
+}
+
 export async function DELETE(
   request: Request,
   { params }: { params: { id: string } }
@@ -32,8 +39,8 @@ export async function DELETE(
     }
 
     const text = await orderFile.text()
-    const images = JSON.parse(text)
-    const image = images.find((img: any) => img.id === id)
+    const images = JSON.parse(text) as GalleryImage[]
+    const image = images.find((img: GalleryImage) => img.id === id)
     
     if (!image) {
       return NextResponse.json(
@@ -57,7 +64,7 @@ export async function DELETE(
 
     // Update order.json
     console.log('Updating order.json...')
-    const newOrder = images.filter((img: any) => img.id !== id)
+    const newOrder = images.filter((img: GalleryImage) => img.id !== id)
     
     const { error: updateError } = await supabase.storage
       .from('gallery')
