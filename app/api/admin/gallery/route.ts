@@ -9,6 +9,17 @@ export const maxDuration = 300 // 5 minutes timeout
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 
+interface GalleryImage {
+  id: string
+  url: string
+  alt: string
+  order: number
+}
+
+interface OrderedImage extends GalleryImage {
+  order: number
+}
+
 export async function POST(request: Request) {
   try {
     console.log('Starting image upload process...')
@@ -17,7 +28,7 @@ export async function POST(request: Request) {
     const files = formData.getAll('files') as File[]
     console.log(`Processing ${files.length} files...`)
     
-    const uploadedImages = []
+    const uploadedImages: GalleryImage[] = []
 
     // Validate files
     for (const file of files) {
@@ -109,7 +120,7 @@ export async function POST(request: Request) {
         .from('gallery')
         .download('order.json')
 
-      let currentOrder = []
+      let currentOrder: GalleryImage[] = []
       if (!fetchError && orderFile) {
         const text = await orderFile.text()
         try {
@@ -120,9 +131,9 @@ export async function POST(request: Request) {
             .list('images')
 
           const existingFiles = new Set(files?.map(f => f.name) || [])
-          currentOrder = currentOrder.filter(img => {
+          currentOrder = currentOrder.filter((img: GalleryImage) => {
             const filename = img.url.split('/').pop()
-            return existingFiles.has(filename)
+            return existingFiles.has(filename || '')
           })
         } catch (parseError) {
           console.error('Error parsing order.json:', parseError)
@@ -134,7 +145,7 @@ export async function POST(request: Request) {
       const newOrder = [...currentOrder, ...uploadedImages]
       
       // Update order numbers
-      newOrder.forEach((img: any, index: number) => {
+      newOrder.forEach((img: GalleryImage, index: number) => {
         img.order = index
       })
 
@@ -194,7 +205,7 @@ export async function GET() {
       .from('gallery')
       .download('order.json')
 
-    let currentOrder = []
+    let currentOrder: GalleryImage[] = []
     if (!orderError && orderFile) {
       try {
         const text = await orderFile.text()
@@ -211,7 +222,7 @@ export async function GET() {
     ) || []
 
     // Create URLs for all images
-    const images = imageFiles.map(file => ({
+    const images: GalleryImage[] = imageFiles.map(file => ({
       id: file.name.split('.')[0],
       url: getPublicUrl(`images/${file.name}`),
       alt: file.name,
@@ -226,14 +237,14 @@ export async function GET() {
       
       // First, include all images that have an order
       orderedImages = currentOrder
-        .filter(item => imageMap.has(item.id))
-        .map(item => ({
+        .filter((item: GalleryImage) => imageMap.has(item.id))
+        .map((item: GalleryImage) => ({
           ...imageMap.get(item.id)!,
           order: item.order
         }))
       
       // Then add any new images that aren't in the order
-      const orderedIds = new Set(currentOrder.map(item => item.id))
+      const orderedIds = new Set(currentOrder.map((item: GalleryImage) => item.id))
       const newImages = images.filter(img => !orderedIds.has(img.id))
       orderedImages = [...orderedImages, ...newImages]
     }
