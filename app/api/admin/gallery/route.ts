@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabase, getPublicUrl } from '@/lib/supabase'
+import { supabase, getPublicUrl } from '@/app/lib/supabase'
 import { v4 as uuidv4 } from 'uuid'
 
 export const dynamic = 'force-dynamic'
