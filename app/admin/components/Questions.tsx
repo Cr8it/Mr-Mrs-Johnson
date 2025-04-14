@@ -104,29 +104,6 @@ export default function Questions() {
 
   const saveQuestions = async () => {
     try {
-      // Validate questions before sending to API
-      const validationErrors: string[] = [];
-      questions.forEach((q, idx) => {
-        if (!q.question || q.question.trim() === '') {
-          validationErrors.push(`Question ${idx + 1} has an empty question text`);
-        }
-        
-        if ((q.type === "MULTIPLE_CHOICE" || q.type === "MULTIPLE_SELECT") && 
-            (!q.options || q.options.length === 0 || q.options.every(opt => opt === ''))) {
-          validationErrors.push(`Question ${idx + 1} (${q.type}) requires at least one option`);
-        }
-      });
-      
-      if (validationErrors.length > 0) {
-        console.error("Validation errors:", validationErrors);
-        toast({
-          variant: "destructive",
-          title: "Validation Error",
-          description: validationErrors[0] // Show first error
-        });
-        return;
-      }
-      
       const questionsToSave = questions.map(q => ({
         ...q,
         // Process options for both MULTIPLE_CHOICE and MULTIPLE_SELECT
@@ -135,7 +112,7 @@ export default function Questions() {
           : []
       }));
       
-      console.log("Saving questions:", JSON.stringify(questionsToSave).substring(0, 200) + "...");
+      console.log("Saving questions:", JSON.stringify(questionsToSave, null, 2));
       
       const response = await fetch('/api/admin/questions', {
         method: 'POST',
@@ -143,14 +120,15 @@ export default function Questions() {
         body: JSON.stringify(questionsToSave)
       });
       
-      const responseData = await response.json();
-      
       if (!response.ok) {
-        console.error("Error response:", responseData);
-        throw new Error(responseData.message || 'Failed to save questions');
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        console.error("Server response:", response.status, errorData);
+        throw new Error(`Failed to save questions: ${errorData.error || response.statusText}`);
       }
       
-      console.log("Questions saved successfully");
+      const savedQuestions = await response.json();
+      console.log("Questions saved successfully:", savedQuestions.length);
+      
       await fetchQuestions(); // Refresh the list after saving
       
       toast({
@@ -158,7 +136,7 @@ export default function Questions() {
         description: "Questions saved successfully"
       });
     } catch (error) {
-      console.error("Error saving questions:", error);
+      console.error("Error in saveQuestions:", error);
       toast({
         variant: "destructive",
         title: "Error",

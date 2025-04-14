@@ -65,6 +65,8 @@ export default function QuestionManager() {
 
   const handleAddQuestion = async (questionData: Partial<Question>) => {
     try {
+      console.log("Adding question:", JSON.stringify(questionData, null, 2));
+      
       const response = await fetch("/api/admin/questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -73,23 +75,29 @@ export default function QuestionManager() {
           // Don't JSON.stringify the options as they're already in the correct format
           order: questions.length,
         }),
-      })
+      });
 
-      if (!response.ok) throw new Error("Failed to create question")
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        console.error("Server response:", response.status, errorData);
+        throw new Error(`Failed to create question: ${errorData.error || response.statusText}`);
+      }
       
-      const newQuestion = await response.json()
-      setQuestions([...questions, newQuestion])
-      setShowForm(false)
+      const newQuestion = await response.json();
+      console.log("New question created:", newQuestion);
+      setQuestions([...questions, newQuestion]);
+      setShowForm(false);
       toast({
         title: "Success",
         description: "Question added successfully",
-      })
+      });
     } catch (error) {
+      console.error("Error in handleAddQuestion:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to add question",
-      })
+        description: error instanceof Error ? error.message : "Failed to add question",
+      });
     }
   }
 
