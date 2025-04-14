@@ -26,10 +26,10 @@ export default function Modal({ isOpen, onClose, children, allowClose = false, a
   }, [isOpen]);
 
   const handleClose = () => {
-    // Only allow closing if either:
+    // Only allow closing if:
     // 1. allowClose is true (has RSVPed) AND not everyone is not attending
-    // 2. allowClose is false (hasn't RSVPed yet)
-    if (onClose && (!allNotAttending || !allowClose)) {
+    // 2. OR if allowClose is false (hasn't RSVPed yet)
+    if (onClose && (allowClose ? !allNotAttending : true)) {
       onClose();
     }
   };
@@ -45,10 +45,13 @@ export default function Modal({ isOpen, onClose, children, allowClose = false, a
               exit={{ opacity: 0, scale: 0.8 }}
               className="w-full max-w-4xl"
             >
-              {(!allNotAttending || !allowClose) && onClose && (
+              {/* Show close button if:
+                  1. We have an onClose handler AND
+                  2. Either allowClose is false (hasn't RSVPed) OR (has RSVPed AND not everyone is not attending) */}
+              {onClose && (allowClose ? !allNotAttending : true) && (
                 <button
                   onClick={handleClose}
-                  className="absolute top-4 right-4 text-white hover:text-gray-300 z-50"
+                  className="absolute top-4 right-4 text-white hover:text-gray-300 z-50 bg-black/50 px-4 py-2 rounded-lg"
                 >
                   Close
                 </button>
