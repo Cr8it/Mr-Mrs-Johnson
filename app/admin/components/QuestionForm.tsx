@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -54,7 +54,7 @@ interface DraggableOptionProps {
 }
 
 const DraggableOption = ({ option, index, moveOption, onDelete }: DraggableOptionProps) => {
-  const [{ isDragging }, dragRef] = useDrag({
+  const [{ isDragging }, drag] = useDrag({
     type: 'OPTION',
     item: { index },
     collect: (monitor) => ({
@@ -62,7 +62,7 @@ const DraggableOption = ({ option, index, moveOption, onDelete }: DraggableOptio
     }),
   })
 
-  const [, dropRef] = useDrop({
+  const [, drop] = useDrop({
     accept: 'OPTION',
     hover: (item: { index: number }) => {
       if (item.index !== index) {
@@ -72,15 +72,14 @@ const DraggableOption = ({ option, index, moveOption, onDelete }: DraggableOptio
     },
   })
 
-  // Combine the refs
-  const ref = (node: HTMLDivElement | null) => {
-    dragRef(node)
-    dropRef(node)
-  }
+  const elementRef = useRef<HTMLDivElement>(null)
+  
+  // Connect the drag and drop refs to our element
+  drag(drop(elementRef))
 
   return (
     <div
-      ref={ref}
+      ref={elementRef}
       className={`flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-md ${
         isDragging ? 'opacity-50' : ''
       }`}
@@ -101,7 +100,8 @@ const DraggableOption = ({ option, index, moveOption, onDelete }: DraggableOptio
 }
 
 export function QuestionForm({ onSubmit, onCancel, initialData }: QuestionFormProps) {
-  const [formData, setFormData] = useState({
+  // Initialize form data with proper typing
+  const initialFormData = {
     question: "",
     type: "TEXT" as QuestionType,
     options: [] as string[],
@@ -109,13 +109,15 @@ export function QuestionForm({ onSubmit, onCancel, initialData }: QuestionFormPr
     perGuest: false,
     isActive: true,
     order: 0,
-    ...initialData,
-    options: initialData ? 
-      (typeof initialData.options === 'string' ? 
-        JSON.parse(initialData.options) : 
-        initialData.options) : 
-      []
-  })
+    ...(initialData && {
+      ...initialData,
+      options: typeof initialData.options === 'string' 
+        ? JSON.parse(initialData.options) 
+        : initialData.options
+    })
+  }
+
+  const [formData, setFormData] = useState(initialFormData)
   const [newOption, setNewOption] = useState("")
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -167,7 +169,7 @@ export function QuestionForm({ onSubmit, onCancel, initialData }: QuestionFormPr
   const removeOption = (indexToRemove: number) => {
     setFormData({
       ...formData,
-      options: formData.options.filter((_, index) => index !== indexToRemove)
+      options: formData.options.filter((_: string, index: number) => index !== indexToRemove)
     })
   }
 
