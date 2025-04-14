@@ -355,7 +355,7 @@ export default function BridalPartyAdmin() {
 									required
 								>
 									<option value="">Select Role</option>
-									<option value="Maid of Honour">Maid of Honour</option>
+									<option value="Maid of Honour">Maid of Honor</option>
 									<option value="Matron of Honor">Matron of Honor</option>
 									<option value="Bridesmaid">Bridesmaid</option>									
 									<option value="Best Man">Best Man</option>
