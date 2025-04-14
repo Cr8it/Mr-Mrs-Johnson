@@ -14,25 +14,38 @@ interface HouseholdGroups {
   [key: string]: GuestRecord[]
 }
 
+const normalizeHeaders = (record: any): GuestRecord => {
+  // Create a normalized version of the record with correct casing
+  const normalized: any = {};
+  Object.keys(record).forEach(key => {
+    // Remove extra spaces and convert to proper case
+    const cleanKey = key.trim();
+    const properKey = cleanKey.charAt(0).toUpperCase() + cleanKey.slice(1).toLowerCase();
+    normalized[properKey] = record[key];
+  });
+  return normalized as GuestRecord;
+};
+
 const validateCsvRow = (row: any): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
+  const normalizedRow = normalizeHeaders(row);
 
   // Check if required fields exist
-  if (!row.Name || typeof row.Name !== "string" || row.Name.trim() === "") {
+  if (!normalizedRow.Name || typeof normalizedRow.Name !== "string" || normalizedRow.Name.trim() === "") {
     errors.push("Name is required and cannot be empty");
   }
-  if (!row.Household || typeof row.Household !== "string" || row.Household.trim() === "") {
+  if (!normalizedRow.Household || typeof normalizedRow.Household !== "string" || normalizedRow.Household.trim() === "") {
     errors.push("Household is required and cannot be empty");
   }
 
   // Optional fields validation
-  if (row.Email && typeof row.Email !== "string") {
+  if (normalizedRow.Email && typeof normalizedRow.Email !== "string") {
     errors.push("Email must be a string if provided");
   }
-  if (row.Child && !["yes", "no", "true", "false", ""].includes(row.Child.toLowerCase().trim())) {
+  if (normalizedRow.Child && !["yes", "no", "true", "false", ""].includes(normalizedRow.Child.toLowerCase().trim())) {
     errors.push("Child must be 'yes', 'no', 'true', 'false', or empty");
   }
-  if (row.Teenager && !["yes", "no", "true", "false", ""].includes(row.Teenager.toLowerCase().trim())) {
+  if (normalizedRow.Teenager && !["yes", "no", "true", "false", ""].includes(normalizedRow.Teenager.toLowerCase().trim())) {
     errors.push("Teenager must be 'yes', 'no', 'true', 'false', or empty");
   }
 
@@ -48,7 +61,7 @@ export async function POST(request: Request) {
     const file = data.get('file') as File
     const content = await file.text()
     
-    let records: GuestRecord[];
+    let records: any[];
     try {
       records = parse(content, {
         columns: true,
@@ -57,16 +70,22 @@ export async function POST(request: Request) {
         delimiter: '\t' // Use tab as delimiter
       });
 
+      // Normalize headers for all records
+      records = records.map(normalizeHeaders);
+
       // Check if required columns exist
       const requiredColumns = ['Name', 'Household'];
-      const missingColumns = requiredColumns.filter(col => !records[0] || !(col in records[0]));
+      const missingColumns = requiredColumns.filter(col => 
+        !records[0] || !(col in records[0])
+      );
       
       if (missingColumns.length > 0) {
         return NextResponse.json(
           {
             error: "Missing required columns",
             details: `Missing columns: ${missingColumns.join(', ')}. Required columns are: Name, Household`,
-            example: "Your TSV should have headers: Name\tEmail\tHousehold\tChild\tTeenager"
+            example: "Your TSV should have headers: Name\tEmail\tHousehold\tChild\tTeenager",
+            foundColumns: Object.keys(records[0] || {})
           },
           { status: 400 }
         );
@@ -105,10 +124,11 @@ export async function POST(request: Request) {
 
     // Group records by household
     const householdGroups = records.reduce<HouseholdGroups>((acc, record) => {
-      if (!acc[record.Household]) {
-        acc[record.Household] = []
+      const normalizedRecord = normalizeHeaders(record);
+      if (!acc[normalizedRecord.Household]) {
+        acc[normalizedRecord.Household] = []
       }
-      acc[record.Household].push(record)
+      acc[normalizedRecord.Household].push(normalizedRecord)
       return acc
     }, {})
 

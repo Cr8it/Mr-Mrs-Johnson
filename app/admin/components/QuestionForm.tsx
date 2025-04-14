@@ -22,7 +22,8 @@ import {
   ListOrdered, 
   Calendar, 
   ToggleLeft,
-  Loader2 
+  Loader2,
+  CheckSquare
 } from "lucide-react"
 
 interface QuestionFormProps {
@@ -61,6 +62,7 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
     switch (type) {
       case "TEXT": return <Type className="h-4 w-4" />
       case "MULTIPLE_CHOICE": return <ListOrdered className="h-4 w-4" />
+      case "MULTIPLE_SELECT": return <CheckSquare className="h-4 w-4" />
       case "BOOLEAN": return <ToggleLeft className="h-4 w-4" />
       case "DATE": return <Calendar className="h-4 w-4" />
       default: return <HelpCircle className="h-4 w-4" />
@@ -107,7 +109,7 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
           </Select>
         </div>
 
-        {formData.type === "MULTIPLE_CHOICE" && (
+        {(formData.type === "MULTIPLE_CHOICE" || formData.type === "MULTIPLE_SELECT") && (
           <div className="space-y-2">
             <Label className="text-sm font-medium">
               Options
@@ -115,8 +117,8 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
             <Textarea
               value={formData.options}
               onChange={(e) => setFormData({ ...formData, options: e.target.value })}
-                placeholder="Enter options separated by commas..."
-                className="min-h-[80px] resize-none dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+              placeholder="Enter options separated by commas..."
+              className="min-h-[80px] resize-none dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
               required
             />
             <p className="text-xs text-gray-500 dark:text-gray-400">

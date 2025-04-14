@@ -8,13 +8,14 @@ import { ChevronLeft } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
+import { Checkbox } from "@/components/ui/checkbox"
 // Motion components
 const MotionDiv = motion.div
 
 interface Question {
   id: string
   question: string
-  type: "TEXT" | "MULTIPLE_CHOICE" | "BOOLEAN" | "DATE"
+  type: "TEXT" | "MULTIPLE_CHOICE" | "MULTIPLE_SELECT" | "BOOLEAN" | "DATE"
   options: string
   isRequired: boolean
   perGuest: boolean
@@ -560,38 +561,83 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                     {question.question}
                     {question.isRequired && <span className="text-red-500 ml-1">*</span>}
                   </label>
-                    {question.type === "MULTIPLE_CHOICE" ? (
-                    <>
-                    <Select
-                      value={guest.responses?.find(r => r.questionId === question.id)?.answer || ""}
-                      onValueChange={(value) => handleQuestionResponse(guest.id, question.id, value)}
-                    >
-                      <SelectTrigger 
-                      className={`bg-transparent border-white border-opacity-20 text-white h-12 ${
-                      validationErrors[guest.id]?.includes(question.question) ? 'border-red-500' : ''
-                      }`}
-                      >
-                      <SelectValue placeholder="Select an option" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-black border-white border-opacity-20">
-                      {(() => {
-                      try {
-                        const options = typeof question.options === 'string' ? 
-                        JSON.parse(question.options) : 
-                        question.options;
-                        return Array.isArray(options) ? options.map((option: string) => (
-                        <SelectItem key={option} value={option}>{option}</SelectItem>
-                        )) : [];
-                      } catch {
-                        return [];
-                      }
-                      })()}
-                      </SelectContent>
-                    </Select>
-                    {validationErrors[guest.id]?.includes(question.question) && (
-                      <p className="text-red-500 text-sm mt-1">Please select an option</p>
-                    )}
-                    </>
+                    {question.type === "MULTIPLE_SELECT" ? (
+                      <div className="space-y-3">
+                        {(() => {
+                          try {
+                            const options = typeof question.options === 'string' ? 
+                              JSON.parse(question.options) : 
+                              question.options;
+                            const selectedOptions = guest.responses?.find(r => r.questionId === question.id)?.answer || "[]";
+                            const selectedValues = JSON.parse(selectedOptions);
+                            
+                            return Array.isArray(options) ? options.map((option: string) => (
+                              <div key={option} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`${guest.id}-${question.id}-${option}`}
+                                  checked={selectedValues.includes(option)}
+                                  onCheckedChange={(checked) => {
+                                    const currentValues = [...selectedValues];
+                                    if (checked) {
+                                      currentValues.push(option);
+                                    } else {
+                                      const index = currentValues.indexOf(option);
+                                      if (index > -1) {
+                                        currentValues.splice(index, 1);
+                                      }
+                                    }
+                                    handleQuestionResponse(guest.id, question.id, JSON.stringify(currentValues));
+                                  }}
+                                  className="data-[state=checked]:bg-gold data-[state=checked]:border-gold"
+                                />
+                                <label
+                                  htmlFor={`${guest.id}-${question.id}-${option}`}
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-white"
+                                >
+                                  {option}
+                                </label>
+                              </div>
+                            )) : [];
+                          } catch {
+                            return [];
+                          }
+                        })()}
+                        {validationErrors[guest.id]?.includes(question.question) && (
+                          <p className="text-red-500 text-sm mt-1">Please select at least one option</p>
+                        )}
+                      </div>
+                    ) : question.type === "MULTIPLE_CHOICE" ? (
+                      <>
+                        <Select
+                          value={guest.responses?.find(r => r.questionId === question.id)?.answer || ""}
+                          onValueChange={(value) => handleQuestionResponse(guest.id, question.id, value)}
+                        >
+                          <SelectTrigger 
+                            className={`bg-transparent border-white border-opacity-20 text-white h-12 ${
+                              validationErrors[guest.id]?.includes(question.question) ? 'border-red-500' : ''
+                            }`}
+                          >
+                            <SelectValue placeholder="Select an option" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-black border-white border-opacity-20">
+                            {(() => {
+                              try {
+                                const options = typeof question.options === 'string' ? 
+                                  JSON.parse(question.options) : 
+                                  question.options;
+                                return Array.isArray(options) ? options.map((option: string) => (
+                                  <SelectItem key={option} value={option}>{option}</SelectItem>
+                                )) : [];
+                              } catch {
+                                return [];
+                              }
+                            })()}
+                          </SelectContent>
+                        </Select>
+                        {validationErrors[guest.id]?.includes(question.question) && (
+                          <p className="text-red-500 text-sm mt-1">Please select an option</p>
+                        )}
+                      </>
                     ) : (
                     <>
                     <Textarea
