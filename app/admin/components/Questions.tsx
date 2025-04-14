@@ -36,13 +36,26 @@ export default function Questions() {
     try {
       const response = await fetch('/api/admin/questions')
       if (!response.ok) throw new Error('Failed to fetch questions')
+      
       const data = await response.json()
       const questionsWithArrayOptions = data.map((q: any) => ({
         ...q,
-        options: q.options ? q.options.split(',').filter(Boolean) : []
+        options: q.options 
+          ? (typeof q.options === 'string' 
+              ? (
+                  // Try to parse as JSON
+                  q.options.startsWith('[') 
+                    ? JSON.parse(q.options) 
+                    : q.options.split(',').filter(Boolean)
+                )
+              : q.options
+            )
+          : []
       }))
+      
       setQuestions(questionsWithArrayOptions.sort((a: Question, b: Question) => a.order - b.order))
     } catch (error) {
+      console.error('Failed to load questions:', error)
       toast({
         variant: "destructive",
         title: "Error",

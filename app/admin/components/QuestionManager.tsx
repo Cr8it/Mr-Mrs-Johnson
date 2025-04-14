@@ -36,9 +36,23 @@ export default function QuestionManager() {
     try {
       const response = await fetch("/api/admin/questions")
       if (!response.ok) throw new Error("Failed to fetch questions")
+      
       const data = await response.json()
-      setQuestions(data)
+      
+      // Process options for each question
+      const processedQuestions = data.map((q: any) => ({
+        ...q,
+        // Ensure options is properly parsed if it's a JSON string
+        options: typeof q.options === 'string' && q.options
+          ? q.options.trim() !== '' 
+            ? q.options 
+            : '[]'
+          : '[]'
+      }))
+      
+      setQuestions(processedQuestions)
     } catch (error) {
+      console.error("Error fetching questions:", error)
       toast({
         variant: "destructive",
         title: "Error",
