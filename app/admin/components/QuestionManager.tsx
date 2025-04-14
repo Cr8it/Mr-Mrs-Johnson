@@ -178,7 +178,7 @@ export default function QuestionManager() {
                 </Badge>
               </dd>
               </div>
-              {question.type === "MULTIPLE_CHOICE" && (
+              {(question.type === "MULTIPLE_CHOICE" || question.type === "MULTIPLE_SELECT") && (
               <div className="space-y-1">
                 <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Options</dt>
                 <dd className="text-sm">
