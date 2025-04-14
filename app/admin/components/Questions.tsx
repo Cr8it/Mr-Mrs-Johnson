@@ -105,7 +105,7 @@ export default function Questions() {
   const saveQuestions = async () => {
     try {
       // Validate questions before sending to API
-      const validationErrors = [];
+      const validationErrors: string[] = [];
       questions.forEach((q, idx) => {
         if (!q.question || q.question.trim() === '') {
           validationErrors.push(`Question ${idx + 1} has an empty question text`);
