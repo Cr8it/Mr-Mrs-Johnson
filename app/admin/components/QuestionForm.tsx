@@ -47,16 +47,10 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
     e.preventDefault()
     setLoading(true)
     try {
-      // Clean up options - trim whitespace and filter out empty items
-      const cleanedOptions = formData.options
-        .split(",")
-        .map(opt => opt.trim())
-        .filter(opt => opt !== "");
-        
       await onSubmit({
         ...formData,
         options: (formData.type === "MULTIPLE_CHOICE" || formData.type === "MULTIPLE_SELECT")
-          ? cleanedOptions
+          ? formData.options.split(",").map(opt => opt.trim())
           : []
       })
     } finally {

@@ -36,23 +36,9 @@ export default function QuestionManager() {
     try {
       const response = await fetch("/api/admin/questions")
       if (!response.ok) throw new Error("Failed to fetch questions")
-      
       const data = await response.json()
-      
-      // Process options for each question
-      const processedQuestions = data.map((q: any) => ({
-        ...q,
-        // Ensure options is properly parsed if it's a JSON string
-        options: typeof q.options === 'string' && q.options
-          ? q.options.trim() !== '' 
-            ? q.options 
-            : '[]'
-          : '[]'
-      }))
-      
-      setQuestions(processedQuestions)
+      setQuestions(data)
     } catch (error) {
-      console.error("Error fetching questions:", error)
       toast({
         variant: "destructive",
         title: "Error",
@@ -65,8 +51,6 @@ export default function QuestionManager() {
 
   const handleAddQuestion = async (questionData: Partial<Question>) => {
     try {
-      console.log("Adding question:", JSON.stringify(questionData, null, 2));
-      
       const response = await fetch("/api/admin/questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -75,29 +59,23 @@ export default function QuestionManager() {
           // Don't JSON.stringify the options as they're already in the correct format
           order: questions.length,
         }),
-      });
+      })
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-        console.error("Server response:", response.status, errorData);
-        throw new Error(`Failed to create question: ${errorData.error || response.statusText}`);
-      }
+      if (!response.ok) throw new Error("Failed to create question")
       
-      const newQuestion = await response.json();
-      console.log("New question created:", newQuestion);
-      setQuestions([...questions, newQuestion]);
-      setShowForm(false);
+      const newQuestion = await response.json()
+      setQuestions([...questions, newQuestion])
+      setShowForm(false)
       toast({
         title: "Success",
         description: "Question added successfully",
-      });
+      })
     } catch (error) {
-      console.error("Error in handleAddQuestion:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to add question",
-      });
+        description: "Failed to add question",
+      })
     }
   }
 
