@@ -23,9 +23,7 @@ import {
   Calendar, 
   ToggleLeft,
   Loader2,
-  CheckSquare,
-  Plus,
-  Trash
+  CheckSquare
 } from "lucide-react"
 
 interface QuestionFormProps {
@@ -37,13 +35,12 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
   const [formData, setFormData] = useState({
     question: "",
     type: "TEXT" as QuestionType,
-    options: [] as string[],
+    options: "",
     isRequired: false,
     perGuest: false,
     isActive: true,
     order: 0
   })
-  const [newOption, setNewOption] = useState("")
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -52,30 +49,13 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
     try {
       await onSubmit({
         ...formData,
-        options: (formData.type === "MULTIPLE_CHOICE" || formData.type === "MULTIPLE_SELECT")
-          ? formData.options
+        options: formData.type === "MULTIPLE_CHOICE"
+          ? formData.options.split(",").map(opt => opt.trim())
           : []
       })
     } finally {
       setLoading(false)
     }
-  }
-
-  const addOption = () => {
-    if (newOption.trim()) {
-      setFormData({
-        ...formData,
-        options: [...formData.options, newOption.trim()]
-      })
-      setNewOption("")
-    }
-  }
-
-  const removeOption = (indexToRemove: number) => {
-    setFormData({
-      ...formData,
-      options: formData.options.filter((_, index) => index !== indexToRemove)
-    })
   }
 
   const getTypeIcon = (type: QuestionType) => {
@@ -89,23 +69,12 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
     }
   }
 
-  const getQuestionTypeDescription = (type: QuestionType) => {
-    switch (type) {
-      case "TEXT": return "Free text response"
-      case "MULTIPLE_CHOICE": return "Single selection from a list of options"
-      case "MULTIPLE_SELECT": return "Multiple selections from a list of options"
-      case "BOOLEAN": return "Yes/No response"
-      case "DATE": return "Date selection"
-      default: return ""
-    }
-  }
-
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid gap-6">
         <div className="space-y-2">
           <Label className="text-sm font-medium">
-            Question Text <span className="text-red-500">*</span>
+            Question Text
           </Label>
           <Input
             value={formData.question}
@@ -118,15 +87,11 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
 
         <div className="space-y-2">
           <Label className="text-sm font-medium">
-            Question Type <span className="text-red-500">*</span>
+            Question Type
           </Label>
           <Select
             value={formData.type}
-            onValueChange={(value) => setFormData({ 
-              ...formData, 
-              type: value as QuestionType,
-              options: [] // Reset options when type changes
-            })}
+            onValueChange={(value) => setFormData({ ...formData, type: value as QuestionType })}
           >
             <SelectTrigger className="h-9">
               <SelectValue />
@@ -136,10 +101,7 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
                 <SelectItem key={type} value={type}>
                   <div className="flex items-center gap-2">
                     {getTypeIcon(type)}
-                    <div>
-                      <span>{type}</span>
-                      <p className="text-xs text-gray-500">{getQuestionTypeDescription(type)}</p>
-                    </div>
+                    <span>{type}</span>
                   </div>
                 </SelectItem>
               ))}
@@ -148,52 +110,20 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
         </div>
 
         {(formData.type === "MULTIPLE_CHOICE" || formData.type === "MULTIPLE_SELECT") && (
-          <div className="space-y-4">
+          <div className="space-y-2">
             <Label className="text-sm font-medium">
-              Options <span className="text-red-500">*</span>
+              Options
             </Label>
-            
-            <div className="space-y-2">
-              {formData.options.map((option, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <div className="flex-1 p-2 bg-gray-50 dark:bg-gray-800 rounded-md">
-                    {option}
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeOption(index)}
-                    className="h-8 w-8 text-red-500 hover:text-red-600"
-                  >
-                    <Trash className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex gap-2">
-              <Input
-                value={newOption}
-                onChange={(e) => setNewOption(e.target.value)}
-                placeholder="Enter a new option..."
-                className="flex-1"
-              />
-              <Button
-                type="button"
-                onClick={addOption}
-                disabled={!newOption.trim()}
-                className="bg-gold hover:bg-[#c19b2f] text-white"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-            
-            {formData.options.length === 0 && (
-              <p className="text-sm text-red-500">
-                At least one option is required
-              </p>
-            )}
+            <Textarea
+              value={formData.options}
+              onChange={(e) => setFormData({ ...formData, options: e.target.value })}
+              placeholder="Enter options separated by commas..."
+              className="min-h-[80px] resize-none dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+              required
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Enter options separated by commas (e.g., "Option 1, Option 2, Option 3")
+            </p>
           </div>
         )}
 
@@ -243,7 +173,7 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
 
         <div className="space-y-2">
           <Label className="text-sm font-medium">
-            Display Order <span className="text-red-500">*</span>
+            Display Order
           </Label>
           <Input
             type="number"
@@ -253,7 +183,7 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
             min="0"
             required
           />
-          <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
             Questions are displayed in ascending order
           </p>
         </div>
@@ -271,10 +201,7 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
         </Button>
         <Button 
           type="submit"
-          disabled={loading || (
-            (formData.type === "MULTIPLE_CHOICE" || formData.type === "MULTIPLE_SELECT") && 
-            formData.options.length === 0
-          )}
+          disabled={loading}
           className="flex-1 sm:flex-none bg-gold hover:bg-[#c19b2f] text-white"
         >
           {loading ? (
