@@ -6,6 +6,8 @@ interface GuestRecord {
   name: string
   email?: string
   household: string
+  child?: string
+  teenager?: string
 }
 
 interface HouseholdGroups {
@@ -29,8 +31,21 @@ export async function POST(request: Request) {
     
     const records = parse(content, {
       columns: true,
-      skip_empty_lines: true
+      skip_empty_lines: true,
+      trim: true
     }) as GuestRecord[]
+
+    // Validate records
+    const invalidRecords = records.filter(record => !validateCsvRow(record))
+    if (invalidRecords.length > 0) {
+      return NextResponse.json(
+        { 
+          error: "Invalid records found in CSV",
+          details: invalidRecords
+        },
+        { status: 400 }
+      )
+    }
 
     // Group records by household
     const householdGroups = records.reduce<HouseholdGroups>((acc, record) => {
@@ -52,6 +67,8 @@ export async function POST(request: Request) {
               create: guests.map(guest => ({
                 name: guest.name,
                 email: guest.email || null,
+                isChild: guest.child?.toLowerCase() === 'yes' || guest.child?.toLowerCase() === 'true',
+                isTeenager: guest.teenager?.toLowerCase() === 'yes' || guest.teenager?.toLowerCase() === 'true',
                 mealChoice: null,
                 dietaryNotes: null
               }))
