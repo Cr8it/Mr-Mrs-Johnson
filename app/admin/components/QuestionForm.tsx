@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -15,25 +15,86 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { 
-  HelpCircle, 
   Save, 
   X, 
   Type, 
   ListOrdered, 
   Calendar, 
   ToggleLeft,
-  Loader2,
   CheckSquare,
   Plus,
-  Trash
+  Trash,
+  Loader2,
+  AlertCircle,
+  GripVertical
 } from "lucide-react"
+import { DndProvider, useDrag, useDrop } from 'react-dnd'
+import { HTML5Backend } from 'react-dnd-html5-backend'
 
 interface QuestionFormProps {
   onSubmit: (data: any) => void
   onCancel: () => void
+  initialData?: {
+    id?: string
+    question: string
+    type: QuestionType
+    options: string
+    isRequired: boolean
+    perGuest: boolean
+    isActive: boolean
+    order: number
+  }
 }
 
-export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
+interface DraggableOptionProps {
+  option: string
+  index: number
+  moveOption: (dragIndex: number, hoverIndex: number) => void
+  onDelete: () => void
+}
+
+const DraggableOption = ({ option, index, moveOption, onDelete }: DraggableOptionProps) => {
+  const [{ isDragging }, drag] = useDrag({
+    type: 'OPTION',
+    item: { index },
+    collect: (monitor) => ({
+      isDragging: monitor.isDragging(),
+    }),
+  })
+
+  const [, drop] = useDrop({
+    accept: 'OPTION',
+    hover: (item: { index: number }) => {
+      if (item.index !== index) {
+        moveOption(item.index, index)
+        item.index = index
+      }
+    },
+  })
+
+  return (
+    <div
+      ref={(node) => drag(drop(node))}
+      className={`flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-md ${
+        isDragging ? 'opacity-50' : ''
+      }`}
+    >
+      <GripVertical className="h-4 w-4 text-gray-400 cursor-move" />
+      <span className="flex-1">{option}</span>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        onClick={onDelete}
+        className="h-8 w-8 text-red-500 hover:text-red-600"
+      >
+        <Trash className="h-4 w-4" />
+      </Button>
+    </div>
+  )
+}
+
+export function QuestionForm({ onSubmit, onCancel, initialData }: QuestionFormProps) {
   const [formData, setFormData] = useState({
     question: "",
     type: "TEXT" as QuestionType,
@@ -41,20 +102,45 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
     isRequired: false,
     perGuest: false,
     isActive: true,
-    order: 0
+    order: 0,
+    ...initialData,
+    options: initialData ? 
+      (typeof initialData.options === 'string' ? 
+        JSON.parse(initialData.options) : 
+        initialData.options) : 
+      []
   })
   const [newOption, setNewOption] = useState("")
   const [loading, setLoading] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {}
+
+    if (!formData.question.trim()) {
+      newErrors.question = "Question text is required"
+    }
+
+    if ((formData.type === "MULTIPLE_CHOICE" || formData.type === "MULTIPLE_SELECT") && formData.options.length === 0) {
+      newErrors.options = "At least one option is required"
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!validateForm()) {
+      return
+    }
+
     setLoading(true)
     try {
       await onSubmit({
         ...formData,
-        options: (formData.type === "MULTIPLE_CHOICE" || formData.type === "MULTIPLE_SELECT")
-          ? formData.options
-          : []
+        options: JSON.stringify(formData.options)
       })
     } finally {
       setLoading(false)
@@ -68,6 +154,7 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
         options: [...formData.options, newOption.trim()]
       })
       setNewOption("")
+      setErrors({ ...errors, options: "" })
     }
   }
 
@@ -78,6 +165,17 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
     })
   }
 
+  const moveOption = (dragIndex: number, hoverIndex: number) => {
+    const newOptions = [...formData.options]
+    const draggedOption = newOptions[dragIndex]
+    newOptions.splice(dragIndex, 1)
+    newOptions.splice(hoverIndex, 0, draggedOption)
+    setFormData({
+      ...formData,
+      options: newOptions
+    })
+  }
+
   const getTypeIcon = (type: QuestionType) => {
     switch (type) {
       case "TEXT": return <Type className="h-4 w-4" />
@@ -85,11 +183,11 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
       case "MULTIPLE_SELECT": return <CheckSquare className="h-4 w-4" />
       case "BOOLEAN": return <ToggleLeft className="h-4 w-4" />
       case "DATE": return <Calendar className="h-4 w-4" />
-      default: return <HelpCircle className="h-4 w-4" />
+      default: return <AlertCircle className="h-4 w-4" />
     }
   }
 
-  const getQuestionTypeDescription = (type: QuestionType) => {
+  const getTypeDescription = (type: QuestionType) => {
     switch (type) {
       case "TEXT": return "Free text response"
       case "MULTIPLE_CHOICE": return "Single selection from a list of options"
@@ -104,16 +202,21 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid gap-6">
         <div className="space-y-2">
-          <Label className="text-sm font-medium">
+          <Label className={`text-sm font-medium ${errors.question ? 'text-red-500' : ''}`}>
             Question Text <span className="text-red-500">*</span>
           </Label>
           <Input
             value={formData.question}
-            onChange={(e) => setFormData({ ...formData, question: e.target.value })}
-            className="h-9 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+            onChange={(e) => {
+              setFormData({ ...formData, question: e.target.value })
+              setErrors({ ...errors, question: "" })
+            }}
+            className={`h-9 ${errors.question ? 'border-red-500' : ''}`}
             placeholder="Enter your question here..."
-            required
           />
+          {errors.question && (
+            <p className="text-sm text-red-500">{errors.question}</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -131,14 +234,14 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
             <SelectTrigger className="h-9">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="dark:bg-gray-800">
+            <SelectContent>
               {QUESTION_TYPES.map((type) => (
                 <SelectItem key={type} value={type}>
                   <div className="flex items-center gap-2">
                     {getTypeIcon(type)}
                     <div>
                       <span>{type}</span>
-                      <p className="text-xs text-gray-500">{getQuestionTypeDescription(type)}</p>
+                      <p className="text-xs text-gray-500">{getTypeDescription(type)}</p>
                     </div>
                   </div>
                 </SelectItem>
@@ -149,28 +252,23 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
 
         {(formData.type === "MULTIPLE_CHOICE" || formData.type === "MULTIPLE_SELECT") && (
           <div className="space-y-4">
-            <Label className="text-sm font-medium">
+            <Label className={`text-sm font-medium ${errors.options ? 'text-red-500' : ''}`}>
               Options <span className="text-red-500">*</span>
             </Label>
             
-            <div className="space-y-2">
-              {formData.options.map((option, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <div className="flex-1 p-2 bg-gray-50 dark:bg-gray-800 rounded-md">
-                    {option}
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeOption(index)}
-                    className="h-8 w-8 text-red-500 hover:text-red-600"
-                  >
-                    <Trash className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
+            <DndProvider backend={HTML5Backend}>
+              <div className="space-y-2">
+                {formData.options.map((option, index) => (
+                  <DraggableOption
+                    key={index}
+                    option={option}
+                    index={index}
+                    moveOption={moveOption}
+                    onDelete={() => removeOption(index)}
+                  />
+                ))}
+              </div>
+            </DndProvider>
 
             <div className="flex gap-2">
               <Input
@@ -178,6 +276,12 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
                 onChange={(e) => setNewOption(e.target.value)}
                 placeholder="Enter a new option..."
                 className="flex-1"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    addOption()
+                  }
+                }}
               />
               <Button
                 type="button"
@@ -189,11 +293,13 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
               </Button>
             </div>
             
-            {formData.options.length === 0 && (
-              <p className="text-sm text-red-500">
-                At least one option is required
-              </p>
+            {errors.options && (
+              <p className="text-sm text-red-500">{errors.options}</p>
             )}
+
+            <p className="text-sm text-gray-500">
+              Drag and drop to reorder options. Press Enter to quickly add multiple options.
+            </p>
           </div>
         )}
 
@@ -249,11 +355,10 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
             type="number"
             value={formData.order}
             onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) || 0 })}
-            className="h-9 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+            className="h-9"
             min="0"
-            required
           />
-          <p className="text-xs text-gray-500 dark:text-gray-400">
+          <p className="text-xs text-gray-500">
             Questions are displayed in ascending order
           </p>
         </div>
@@ -271,10 +376,7 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
         </Button>
         <Button 
           type="submit"
-          disabled={loading || (
-            (formData.type === "MULTIPLE_CHOICE" || formData.type === "MULTIPLE_SELECT") && 
-            formData.options.length === 0
-          )}
+          disabled={loading}
           className="flex-1 sm:flex-none bg-gold hover:bg-[#c19b2f] text-white"
         >
           {loading ? (
@@ -285,7 +387,7 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
           ) : (
             <>
               <Save className="mr-2 h-4 w-4" />
-              Save Question
+              {initialData ? 'Update Question' : 'Save Question'}
             </>
           )}
         </Button>
