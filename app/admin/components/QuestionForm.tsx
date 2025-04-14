@@ -49,7 +49,7 @@ export function QuestionForm({ onSubmit, onCancel }: QuestionFormProps) {
     try {
       await onSubmit({
         ...formData,
-        options: (formData.type === "MULTIPLE_CHOICE" || formData.type === "MULTIPLE_SELECT")
+        options: formData.type === "MULTIPLE_CHOICE"
           ? formData.options.split(",").map(opt => opt.trim())
           : []
       })

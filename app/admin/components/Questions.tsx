@@ -93,10 +93,8 @@ export default function Questions() {
     try {
       const questionsToSave = questions.map(q => ({
         ...q,
-        // Process options for both MULTIPLE_CHOICE and MULTIPLE_SELECT
-        options: (q.type === "MULTIPLE_CHOICE" || q.type === "MULTIPLE_SELECT") 
-          ? q.options.filter(Boolean) 
-          : []
+        // Only join options for multiple choice questions
+        options: q.type === "MULTIPLE_CHOICE" ? q.options.filter(Boolean) : []
       }))
       
       const response = await fetch('/api/admin/questions', {
@@ -243,7 +241,7 @@ export default function Questions() {
                                     </Select>
 
                                 </div>
-                                {(question.type === "MULTIPLE_CHOICE" || question.type === "MULTIPLE_SELECT") && (
+                                {question.type === "MULTIPLE_CHOICE" && (
                                   <div className="space-y-2 border-l-2 pl-4">
                                     <label className="text-sm font-medium">Answer Options</label>
                                     {question.options.map((option, optionIndex) => (
