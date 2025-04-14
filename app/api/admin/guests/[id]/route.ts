@@ -12,22 +12,28 @@ export async function DELETE(
 			include: { household: true }
 		})
 
-		// Create activity log before deletion
-		if (guest) {
-			await prisma.guestActivity.create({
-				data: {
-					guestId: params.id,
-					action: 'GUEST_DELETED',
-					details: `Guest removed from ${guest.household.name}`
-				}
-			})
+		if (!guest) {
+			return NextResponse.json(
+				{ error: "Guest not found" },
+				{ status: 404 }
+			)
 		}
 
-		await prisma.guest.delete({
-			where: {
-				id: params.id,
-			},
-		})
+		// Delete all related records first
+		await prisma.$transaction([
+			// Delete question responses
+			prisma.questionResponse.deleteMany({
+				where: { guestId: params.id }
+			}),
+			// Delete guest activities
+			prisma.guestActivity.deleteMany({
+				where: { guestId: params.id }
+			}),
+			// Finally delete the guest
+			prisma.guest.delete({
+				where: { id: params.id }
+			})
+		])
 
 		return NextResponse.json({ success: true })
 	} catch (error) {
