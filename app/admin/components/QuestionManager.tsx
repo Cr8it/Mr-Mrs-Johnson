@@ -6,31 +6,34 @@ import { Button } from "@/components/ui/button"
 import { 
   Plus, 
   Loader2, 
+  HelpCircle, 
   Settings2, 
-  ArrowUpDown, 
+  ArrowUp, 
+  ArrowDown, 
   Edit, 
   Trash2, 
+  CheckSquare, 
   Type, 
-  ListOrdered, 
   Calendar, 
   ToggleLeft,
-  CheckSquare,
-  AlertCircle
+  ListOrdered,
+  List 
 } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { QuestionType } from "./types"
-import { Card } from "@/components/ui/card"
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle, 
+  CardDescription,
+  CardFooter 
+} from "@/components/ui/card"
 import { QuestionForm } from "./QuestionForm"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
+import { Separator } from "@/components/ui/separator"
+import { 
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -45,7 +48,7 @@ interface Question {
   id: string
   question: string
   type: QuestionType
-  options: string
+  options: string // This is a JSON string
   isRequired: boolean
   isActive: boolean
   order: number
@@ -56,8 +59,8 @@ export default function QuestionManager() {
   const [questions, setQuestions] = useState<Question[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
-  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null)
-  const [deleteQuestion, setDeleteQuestion] = useState<Question | null>(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [questionToDelete, setQuestionToDelete] = useState<string | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -69,7 +72,7 @@ export default function QuestionManager() {
       const response = await fetch("/api/admin/questions")
       if (!response.ok) throw new Error("Failed to fetch questions")
       const data = await response.json()
-      setQuestions(data.sort((a: Question, b: Question) => a.order - b.order))
+      setQuestions(data)
     } catch (error) {
       toast({
         variant: "destructive",
@@ -94,7 +97,8 @@ export default function QuestionManager() {
 
       if (!response.ok) throw new Error("Failed to create question")
       
-      await fetchQuestions()
+      const newQuestion = await response.json()
+      setQuestions([...questions, newQuestion])
       setShowForm(false)
       toast({
         title: "Success",
@@ -109,45 +113,16 @@ export default function QuestionManager() {
     }
   }
 
-  const handleEditQuestion = async (questionData: Partial<Question>) => {
-    if (!editingQuestion) return
-
+  const handleDeleteQuestion = async (id: string) => {
     try {
-      const response = await fetch(`/api/admin/questions/${editingQuestion.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(questionData),
-      })
-
-      if (!response.ok) throw new Error("Failed to update question")
-      
-      await fetchQuestions()
-      setEditingQuestion(null)
-      toast({
-        title: "Success",
-        description: "Question updated successfully",
-      })
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to update question",
-      })
-    }
-  }
-
-  const handleDeleteQuestion = async () => {
-    if (!deleteQuestion) return
-
-    try {
-      const response = await fetch(`/api/admin/questions/${deleteQuestion.id}`, {
+      setQuestionToDelete(null)
+      const response = await fetch(`/api/admin/questions/${id}`, {
         method: "DELETE",
       })
 
       if (!response.ok) throw new Error("Failed to delete question")
       
-      await fetchQuestions()
-      setDeleteQuestion(null)
+      setQuestions(questions.filter(q => q.id !== id))
       toast({
         title: "Success",
         description: "Question deleted successfully",
@@ -161,29 +136,6 @@ export default function QuestionManager() {
     }
   }
 
-  const handleToggleActive = async (question: Question) => {
-    try {
-      const response = await fetch(`/api/admin/questions/${question.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...question,
-          isActive: !question.isActive,
-        }),
-      })
-
-      if (!response.ok) throw new Error("Failed to update question")
-      
-      await fetchQuestions()
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to update question status",
-      })
-    }
-  }
-
   const getTypeIcon = (type: QuestionType) => {
     switch (type) {
       case "TEXT": return <Type className="h-4 w-4" />
@@ -191,19 +143,13 @@ export default function QuestionManager() {
       case "MULTIPLE_SELECT": return <CheckSquare className="h-4 w-4" />
       case "BOOLEAN": return <ToggleLeft className="h-4 w-4" />
       case "DATE": return <Calendar className="h-4 w-4" />
-      default: return <AlertCircle className="h-4 w-4" />
+      default: return <HelpCircle className="h-4 w-4" />
     }
   }
 
-  const getTypeLabel = (type: QuestionType) => {
-    switch (type) {
-      case "TEXT": return "Text Response"
-      case "MULTIPLE_CHOICE": return "Single Choice"
-      case "MULTIPLE_SELECT": return "Multiple Choice"
-      case "BOOLEAN": return "Yes/No"
-      case "DATE": return "Date"
-      default: return type
-    }
+  const confirmDelete = (id: string) => {
+    setQuestionToDelete(id)
+    setDeleteConfirmOpen(true)
   }
 
   if (loading) {
@@ -218,178 +164,194 @@ export default function QuestionManager() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Custom Questions</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Manage your RSVP form questions. Questions will be shown in the order specified.
-          </p>
+    <>
+      <div className="grid gap-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Custom Questions</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Create and manage questions for your RSVP form
+            </p>
+          </div>
+          
+          <Button 
+            onClick={() => setShowForm(true)}
+            className="bg-gold hover:bg-[#c19b2f] text-white"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Question
+          </Button>
         </div>
-        <Button 
-          onClick={() => setShowForm(true)}
-          className="bg-gold hover:bg-[#c19b2f] text-white"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add Question
-        </Button>
-      </div>
 
-      {questions.length === 0 ? (
-        <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
-          <div className="flex flex-col items-center gap-2">
-            <AlertCircle className="h-8 w-8 text-gray-400" />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">No Questions Yet</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Get started by adding your first question to the RSVP form.
+        <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete this question and all responses to it.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={() => questionToDelete && handleDeleteQuestion(questionToDelete)}
+                className="bg-red-500 hover:bg-red-600"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AnimatePresence>
+          {showForm && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <Card className="border-gold/20 bg-white">
+                <CardHeader className="bg-gold/10 border-b">
+                  <CardTitle className="flex items-center gap-2">
+                    <HelpCircle className="h-5 w-5 text-gold" />
+                    New Question
+                  </CardTitle>
+                  <CardDescription>
+                    Add a new question to your RSVP form
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <QuestionForm
+                    onSubmit={handleAddQuestion}
+                    onCancel={() => setShowForm(false)}
+                  />
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {questions.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg border border-dashed border-gray-300 dark:border-gray-700">
+            <HelpCircle className="h-12 w-12 mx-auto text-gray-400" />
+            <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-gray-100">No questions yet</h3>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              Get started by adding your first question.
             </p>
             <Button 
               onClick={() => setShowForm(true)}
               className="mt-4 bg-gold hover:bg-[#c19b2f] text-white"
             >
               <Plus className="mr-2 h-4 w-4" />
-              Add Your First Question
+              Add Question
             </Button>
           </div>
-        </div>
-      ) : (
-        <div className="grid gap-4">
-          {questions.map((question, index) => (
-            <motion.div
-              key={question.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <Card className="group hover:shadow-md transition-all bg-white dark:bg-gray-800 p-6">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1 flex-1">
-                    <div className="flex items-center gap-3">
-                      <span className="flex items-center justify-center w-8 h-8 rounded-full bg-gold/10 text-gold">
-                        {index + 1}
-                      </span>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+        ) : (
+          <div className="space-y-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+              <div className="grid grid-cols-12 gap-4 p-4 border-b font-medium text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900">
+                <div className="col-span-5">Question</div>
+                <div className="col-span-2">Type</div>
+                <div className="col-span-2">Settings</div>
+                <div className="col-span-1">Order</div>
+                <div className="col-span-2 text-right">Actions</div>
+              </div>
+              
+              {questions.map((question, index) => (
+                <div key={question.id} className="border-b last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                  <div className="grid grid-cols-12 gap-4 p-4 items-center">
+                    <div className="col-span-5">
+                      <div className="font-medium text-gray-900 dark:text-gray-100 line-clamp-1">
                         {question.question}
-                      </h3>
+                      </div>
+                      <div className="flex mt-1 items-center gap-2">
+                        {question.isRequired && (
+                          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-xs">
+                            Required
+                          </Badge>
+                        )}
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                          {question.perGuest ? "Per Guest" : "Per Household"}
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 mt-2">
-                      <Badge variant="outline" className="flex items-center gap-1">
+                    
+                    <div className="col-span-2">
+                      <div className="flex items-center gap-2">
                         {getTypeIcon(question.type)}
-                        {getTypeLabel(question.type)}
-                      </Badge>
-                      {question.isRequired && (
-                        <Badge variant="secondary">Required</Badge>
-                      )}
-                      {question.perGuest && (
-                        <Badge variant="secondary">Per Guest</Badge>
-                      )}
+                        <span className="text-sm">{question.type}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="col-span-2">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={question.isActive}
+                          className="data-[state=checked]:bg-gold"
+                        />
+                        <span className="text-sm">{question.isActive ? "Active" : "Inactive"}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="col-span-1">
+                      <div className="flex items-center gap-1">
+                        <span className="font-mono w-6 text-center">{question.order}</span>
+                        <div className="flex flex-col">
+                          <Button variant="ghost" size="icon" className="h-4 w-4">
+                            <ArrowUp className="h-3 w-3" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-4 w-4">
+                            <ArrowDown className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="col-span-2 flex justify-end gap-2">
+                      <Button variant="ghost" size="sm" className="h-8 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800">
+                        <Edit className="h-3.5 w-3.5" />
+                        <span className="ml-1.5">Edit</span>
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800"
+                        onClick={() => confirmDelete(question.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span className="ml-1.5">Delete</span>
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <Switch
-                      checked={question.isActive}
-                      onCheckedChange={() => handleToggleActive(question)}
-                      className="data-[state=checked]:bg-gold"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setEditingQuestion(question)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Edit className="h-4 w-4 text-gray-500" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setDeleteQuestion(question)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
-                  </div>
+                  
+                  {(question.type === "MULTIPLE_CHOICE" || question.type === "MULTIPLE_SELECT") && (
+                    <div className="px-4 pb-4 -mt-2">
+                      <div className="text-xs font-medium text-gray-500 mb-1.5">Options:</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(() => {
+                          try {
+                            return JSON.parse(question.options).map((option: string, index: number) => (
+                              <Badge 
+                                key={index}
+                                variant="secondary"
+                                className="bg-gray-100 text-gray-700 hover:bg-gray-200"
+                              >
+                                {option}
+                              </Badge>
+                            ))
+                          } catch {
+                            return null
+                          }
+                        })()}
+                      </div>
+                    </div>
+                  )}
                 </div>
-
-                {(question.type === "MULTIPLE_CHOICE" || question.type === "MULTIPLE_SELECT") && (
-                  <div className="mt-4 pl-11">
-                    <div className="flex flex-wrap gap-2">
-                      {(() => {
-                        try {
-                          return JSON.parse(question.options).map((option: string, index: number) => (
-                            <Badge 
-                              key={index}
-                              variant="secondary"
-                              className="bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
-                            >
-                              {option}
-                            </Badge>
-                          ))
-                        } catch {
-                          return null
-                        }
-                      })()}
-                    </div>
-                  </div>
-                )}
-              </Card>
-            </motion.div>
-          ))}
-        </div>
-      )}
-
-      <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Add New Question</DialogTitle>
-            <DialogDescription>
-              Create a new question for your RSVP form.
-            </DialogDescription>
-          </DialogHeader>
-          <QuestionForm
-            onSubmit={handleAddQuestion}
-            onCancel={() => setShowForm(false)}
-          />
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!editingQuestion} onOpenChange={() => setEditingQuestion(null)}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Edit Question</DialogTitle>
-            <DialogDescription>
-              Modify the existing question.
-            </DialogDescription>
-          </DialogHeader>
-          {editingQuestion && (
-            <QuestionForm
-              initialData={editingQuestion}
-              onSubmit={handleEditQuestion}
-              onCancel={() => setEditingQuestion(null)}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={!!deleteQuestion} onOpenChange={() => setDeleteQuestion(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the question
-              and all associated responses.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteQuestion}
-              className="bg-red-500 hover:bg-red-600"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   )
 } 
