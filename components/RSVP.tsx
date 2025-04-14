@@ -246,6 +246,12 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
   };
 
   const handleModalClose = () => {
+    // If we're in success state and at least one guest is attending, allow closing
+    if (showSuccess && !allNotAttending) {
+      if (onClose) onClose();
+      return;
+    }
+    
     // Check if any guest has toggled their attendance status
     const hasToggledAttendance = household?.guests.some(guest => guest.isAttending !== null);
     
@@ -302,12 +308,22 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
             <br />
             <span className="font-mono font-bold text-white">{household?.code}</span>
             </p>
-            <Button 
-            onClick={handleModifyResponse}
-            className="bg-white text-black hover:bg-gray-200"
-            >
-            Modify Response
-            </Button>
+            <div className="space-y-4">
+              <Button 
+                onClick={handleModifyResponse}
+                className="bg-white text-black hover:bg-gray-200"
+              >
+                Modify Response
+              </Button>
+              {!allNotAttending && (
+                <Button 
+                  onClick={handleModalClose}
+                  className="w-full bg-green-600 text-white hover:bg-green-700"
+                >
+                  Close and View Wedding Details
+                </Button>
+              )}
+            </div>
           </div>
             </MotionDiv>
 
