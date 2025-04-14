@@ -36,13 +36,26 @@ export default function Questions() {
     try {
       const response = await fetch('/api/admin/questions')
       if (!response.ok) throw new Error('Failed to fetch questions')
+      
       const data = await response.json()
       const questionsWithArrayOptions = data.map((q: any) => ({
         ...q,
-        options: q.options ? q.options.split(',').filter(Boolean) : []
+        options: q.options 
+          ? (typeof q.options === 'string' 
+              ? (
+                  // Try to parse as JSON
+                  q.options.startsWith('[') 
+                    ? JSON.parse(q.options) 
+                    : q.options.split(',').filter(Boolean)
+                )
+              : q.options
+            )
+          : []
       }))
+      
       setQuestions(questionsWithArrayOptions.sort((a: Question, b: Question) => a.order - b.order))
     } catch (error) {
+      console.error('Failed to load questions:', error)
       toast({
         variant: "destructive",
         title: "Error",
@@ -93,8 +106,10 @@ export default function Questions() {
     try {
       const questionsToSave = questions.map(q => ({
         ...q,
-        // Only join options for multiple choice questions
-        options: q.type === "MULTIPLE_CHOICE" ? q.options.filter(Boolean) : []
+        // Process options for both MULTIPLE_CHOICE and MULTIPLE_SELECT
+        options: (q.type === "MULTIPLE_CHOICE" || q.type === "MULTIPLE_SELECT") 
+          ? q.options.filter(Boolean) 
+          : []
       }))
       
       const response = await fetch('/api/admin/questions', {
@@ -241,7 +256,7 @@ export default function Questions() {
                                     </Select>
 
                                 </div>
-                                {question.type === "MULTIPLE_CHOICE" && (
+                                {(question.type === "MULTIPLE_CHOICE" || question.type === "MULTIPLE_SELECT") && (
                                   <div className="space-y-2 border-l-2 pl-4">
                                     <label className="text-sm font-medium">Answer Options</label>
                                     {question.options.map((option, optionIndex) => (
