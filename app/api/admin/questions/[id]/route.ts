@@ -6,11 +6,17 @@ export async function DELETE(
 	{ params }: { params: { id: string } }
 ) {
 	try {
-		await prisma.question.delete({
-			where: {
-				id: params.id
-			}
-		})
+		// First delete all responses for this question
+		await prisma.$transaction([
+			// Delete all responses for this question
+			prisma.questionResponse.deleteMany({
+				where: { questionId: params.id }
+			}),
+			// Then delete the question
+			prisma.question.delete({
+				where: { id: params.id }
+			})
+		])
 
 		return NextResponse.json({ success: true })
 	} catch (error) {

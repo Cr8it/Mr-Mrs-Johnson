@@ -20,40 +20,29 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const questions = await request.json()
+    const question = await request.json()
     
-    // Delete all existing questions first
-    await prisma.question.deleteMany()
-    
-    // Create all questions in a transaction
-    await prisma.$transaction(
-      questions.map((question: any) => 
-      prisma.question.create({
-        data: {
-          question: question.question,
-          type: question.type,
-          // Store options as a JSON string if they exist
-          options: question.type === 'MULTIPLE_CHOICE' ? JSON.stringify(question.options) : '',
-          isRequired: question.isRequired,
-          isActive: question.isActive,
-          order: question.order,
-          perGuest: question.perGuest || false
-        }
-      })
-      )
-    )
-
-    const updatedQuestions = await prisma.question.findMany({
-      orderBy: {
-        order: 'asc'
+    // Create the question with proper options handling
+    const createdQuestion = await prisma.question.create({
+      data: {
+        question: question.question,
+        type: question.type,
+        // Store options as a JSON string for both MULTIPLE_CHOICE and MULTIPLE_SELECT
+        options: (question.type === 'MULTIPLE_CHOICE' || question.type === 'MULTIPLE_SELECT') 
+          ? JSON.stringify(question.options) 
+          : '',
+        isRequired: question.isRequired,
+        isActive: question.isActive,
+        order: question.order,
+        perGuest: question.perGuest || false
       }
     })
 
-    return NextResponse.json(updatedQuestions)
+    return NextResponse.json(createdQuestion)
   } catch (error) {
-    console.error("Error saving questions:", error)
+    console.error("Error saving question:", error)
     return NextResponse.json(
-      { error: "Failed to save questions" },
+      { error: "Failed to save question" },
       { status: 500 }
     )
   }
