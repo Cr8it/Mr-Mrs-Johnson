@@ -54,7 +54,7 @@ interface DraggableOptionProps {
 }
 
 const DraggableOption = ({ option, index, moveOption, onDelete }: DraggableOptionProps) => {
-  const [{ isDragging }, drag] = useDrag({
+  const [{ isDragging }, dragRef] = useDrag({
     type: 'OPTION',
     item: { index },
     collect: (monitor) => ({
@@ -62,7 +62,7 @@ const DraggableOption = ({ option, index, moveOption, onDelete }: DraggableOptio
     }),
   })
 
-  const [, drop] = useDrop({
+  const [, dropRef] = useDrop({
     accept: 'OPTION',
     hover: (item: { index: number }) => {
       if (item.index !== index) {
@@ -72,9 +72,15 @@ const DraggableOption = ({ option, index, moveOption, onDelete }: DraggableOptio
     },
   })
 
+  // Combine the refs
+  const ref = (node: HTMLDivElement | null) => {
+    dragRef(node)
+    dropRef(node)
+  }
+
   return (
     <div
-      ref={(node) => drag(drop(node))}
+      ref={ref}
       className={`flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-md ${
         isDragging ? 'opacity-50' : ''
       }`}
