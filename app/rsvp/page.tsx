@@ -33,15 +33,19 @@ export default function RsvpPage() {
 
   const handleClose = () => {
     setIsOpen(false)
-    router.push("/")
+    setTimeout(() => {
+      router.push("/")
+    }, 300)
   }
 
   const handleRSVPStatus = (notAttending: boolean) => {
     setAllNotAttending(notAttending)
   }
 
+  if (!isOpen) return null;
+
   return (
-    <div className="flex items-center justify-center min-h-screen">
+    <div className="fixed inset-0 z-50">
       <Modal 
         isOpen={isOpen} 
         onClose={handleClose}
