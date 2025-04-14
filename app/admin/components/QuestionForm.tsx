@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -28,7 +28,7 @@ import {
   AlertCircle,
   GripVertical
 } from "lucide-react"
-import { DndProvider, useDrag, useDrop } from 'react-dnd'
+import { DndProvider, useDrag, useDrop, ConnectDragSource, ConnectDropTarget } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
 
 interface QuestionFormProps {
@@ -53,33 +53,37 @@ interface DraggableOptionProps {
   onDelete: () => void
 }
 
-const DraggableOption = ({ option, index, moveOption, onDelete }: DraggableOptionProps) => {
-  const [{ isDragging }, drag] = useDrag({
+function useDragDropRef(): [
+  { isDragging: boolean },
+  (element: HTMLDivElement | null) => void
+] {
+  const [{ isDragging }, dragRef] = useDrag({
     type: 'OPTION',
-    item: { index },
+    item: { type: 'OPTION' },
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
   })
 
-  const [, drop] = useDrop({
+  const [, dropRef] = useDrop({
     accept: 'OPTION',
-    hover: (item: { index: number }) => {
-      if (item.index !== index) {
-        moveOption(item.index, index)
-        item.index = index
-      }
-    },
+    hover: () => undefined,
   })
 
-  const elementRef = useRef<HTMLDivElement>(null)
-  
-  // Connect the drag and drop refs to our element
-  drag(drop(elementRef))
+  const ref = (element: HTMLDivElement | null) => {
+    dragRef(element)
+    dropRef(element)
+  }
+
+  return [{ isDragging }, ref]
+}
+
+const DraggableOption = ({ option, index, moveOption, onDelete }: DraggableOptionProps) => {
+  const [{ isDragging }, dragDropRef] = useDragDropRef()
 
   return (
     <div
-      ref={elementRef}
+      ref={dragDropRef}
       className={`flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-md ${
         isDragging ? 'opacity-50' : ''
       }`}
