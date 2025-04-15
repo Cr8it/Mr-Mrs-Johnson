@@ -79,13 +79,18 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 		setUploadProgress(0)
 		setUploadStatus("Preparing upload...")
 
+		// Add file size warning for large files (over 1MB)
+		if (file.size > 1024 * 1024) {
+			setError(`Warning: Your file is ${(file.size / (1024 * 1024)).toFixed(1)}MB which is large. The upload may take longer and could time out. Consider splitting into smaller batches if you encounter issues.`)
+		}
+
 		const formData = new FormData()
 		formData.append('file', file)
 
 		try {
-			// Increased timeout to 5 minutes (300 seconds)
+			// Create an AbortController for timeout handling
 			const controller = new AbortController()
-			const timeoutId = setTimeout(() => controller.abort(), 300000) 
+			const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 second timeout
 			
 			// Start the progress simulation
 			simulateProgress()
@@ -106,12 +111,16 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 				const data = await response.json()
 				setUploadStatus("Partial success")
 				setError(`The upload was partially completed. ${data.processed.guests} guests across ${data.processed.households} households were imported successfully, but some entries could not be processed.`)
+				
+				if (data.errors && Array.isArray(data.errors)) {
+					setErrorList(data.errors)
+				}
 				return
 			}
 
 			// Handle timeouts and large files
 			if (response.status === 504) {
-				setError('The server took too long to process your request. This is a server configuration issue, not a problem with your data. Please contact support.')
+				setError('The server took too long to process your request. Try splitting your data into smaller batches and check for formatting issues in your CSV file.')
 				return
 			}
 
@@ -131,6 +140,8 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 				} else if (data.details && Array.isArray(data.details)) {
 					// Format detailed errors into an array for display
 					setErrorList(data.details)
+				} else if (data.errors && Array.isArray(data.errors)) {
+					setErrorList(data.errors)
 				}
 				
 				return
@@ -142,7 +153,7 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 		} catch (error: any) {
 			// Better error handling for different failure scenarios
 			if (error.name === 'AbortError') {
-				setError('The upload request timed out. This indicates a server configuration issue, not a problem with your data. Please contact support.')
+				setError('The upload request timed out. This may be due to the file size being too large. Try splitting your data into smaller batches or check for formatting issues in your CSV file.')
 			} else {
 				setError(error.message || 'An unexpected error occurred')
 			}
