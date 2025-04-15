@@ -102,17 +102,18 @@ model QuestionResponse {
 }
 
 model Settings {
-  id            Int       @id @default(1)
-  weddingDate   DateTime?
-  venueName     String    @default("")
-  venueAddress  String    @default("")
-  ceremonyTime  String    @default("")
-  receptionTime String    @default("")
-  primaryColor  String    @default("#d4af37")
-  accentColor   String    @default("#000000")
-  backgroundImage String  @default("")
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id             Int       @id @default(1)
+  weddingDate    DateTime?
+  ceremonyTime   String?
+  receptionTime  String?
+  venueName      String?
+  venueAddress   String?
+  primaryColor   String    @default("#d4af37")
+  accentColor    String    @default("#000000")
+  backgroundImage String?
+  showGallery    Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@unique([id])
 }

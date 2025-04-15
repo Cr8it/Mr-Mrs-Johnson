@@ -43,20 +43,11 @@ export async function POST(req: Request) {
 		console.log('Received settings data:', data)
 		
 		// Try to update existing settings
-		const settings = await prisma.settings.upsert({
-			where: { id: 1 },
-			update: {
-				weddingDate: data.weddingDate ? new Date(data.weddingDate) : null,
-				venueName: data.venueName || '',
-				venueAddress: data.venueAddress || '',
-				ceremonyTime: data.ceremonyTime || '',
-				receptionTime: data.receptionTime || '',
-				primaryColor: data.primaryColor || '#d4af37',
-				accentColor: data.accentColor || '#000000',
-				backgroundImage: data.backgroundImage || ''
+		const settings = await prisma.settings.update({
+			where: {
+				id: 1
 			},
-			create: {
-				id: 1,
+			data: {
 				weddingDate: data.weddingDate ? new Date(data.weddingDate) : null,
 				venueName: data.venueName || '',
 				venueAddress: data.venueAddress || '',
@@ -64,7 +55,8 @@ export async function POST(req: Request) {
 				receptionTime: data.receptionTime || '',
 				primaryColor: data.primaryColor || '#d4af37',
 				accentColor: data.accentColor || '#000000',
-				backgroundImage: data.backgroundImage || ''
+				backgroundImage: data.backgroundImage || '',
+				showGallery: data.showGallery || false
 			}
 		})
 		console.log('Updated settings:', settings)

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
 
 export default function SettingsPage() {
 	const [settings, setSettings] = useState({
@@ -18,7 +19,8 @@ export default function SettingsPage() {
 		ceremonyTime: "",
 		primaryColor: "#d4af37", // Default gold color
 		accentColor: "#000000",
-		backgroundImage: ""
+		backgroundImage: "",
+		showGallery: true
 	})
 	const [loading, setLoading] = useState(false)
 	const [isUploading, setIsUploading] = useState(false)
@@ -172,8 +174,19 @@ export default function SettingsPage() {
 								/>
 							</div>
 
-
-
+							<div className="flex items-center justify-between border-t pt-4">
+								<div className="space-y-0.5">
+									<Label>Show Photo Gallery</Label>
+									<p className="text-sm text-muted-foreground">
+										Toggle visibility of the "Our Journey in Pictures" section
+									</p>
+								</div>
+								<Switch
+									checked={settings.showGallery}
+									onCheckedChange={(checked) => setSettings({ ...settings, showGallery: checked })}
+									className="data-[state=checked]:bg-gold"
+								/>
+							</div>
 						</CardContent>
 					</Card>
 				</TabsContent>
