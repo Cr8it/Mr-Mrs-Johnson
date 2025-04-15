@@ -77,6 +77,8 @@ export default function GuestList() {
   const [showSuccessAlert, setShowSuccessAlert] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [isDeleteAllDialogOpen, setIsDeleteAllDialogOpen] = useState(false)
+  const [deleteAllLoading, setDeleteAllLoading] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -353,6 +355,39 @@ export default function GuestList() {
     }
   };
 
+  const handleDeleteAllGuests = async () => {
+    setDeleteAllLoading(true);
+    
+    try {
+      const response = await fetch("/api/admin/guests/delete-all", {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete all guests");
+      }
+
+      // Reset guests list
+      setGuests([]);
+      setFilteredGuests([]);
+      
+      toast({
+        title: "Success",
+        description: "All guests have been deleted successfully",
+      });
+    } catch (error) {
+      console.error("Error deleting all guests:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete all guests",
+      });
+    } finally {
+      setDeleteAllLoading(false);
+      setIsDeleteAllDialogOpen(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[400px]">
@@ -413,6 +448,13 @@ export default function GuestList() {
           >
           <UserPlus className="mr-2 h-4 w-4" />
           Add Guest
+          </Button>
+          <Button 
+            onClick={() => setIsDeleteAllDialogOpen(true)}
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete All
           </Button>
         </div>
         </div>
@@ -537,6 +579,46 @@ export default function GuestList() {
           </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={isDeleteAllDialogOpen} onOpenChange={setIsDeleteAllDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete All Guests</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete all guests? This action cannot be undone and will 
+                remove all guests, households, and their responses from the database.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsDeleteAllDialogOpen(false)}
+                disabled={deleteAllLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteAllGuests}
+                disabled={deleteAllLoading}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {deleteAllLoading ? (
+                  <>
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="mr-2 h-4 w-4 border-2 border-t-white border-r-white border-b-white border-l-transparent rounded-full"
+                    />
+                    Deleting...
+                  </>
+                ) : (
+                  "Delete All"
+                )}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
         </AlertDialog>
       </div>
       )
