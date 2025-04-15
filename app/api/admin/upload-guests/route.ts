@@ -2,286 +2,236 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { parse } from 'csv-parse/sync'
 
+// Simple structure to represent a guest record
 interface GuestRecord {
   Name: string
-  Email?: string
+  Email: string | null
   Household: string
-  Child?: string
-  Teenager?: string
-}
-
-interface HouseholdGroups {
-  [key: string]: GuestRecord[]
-}
-
-const normalizeHeaders = (record: any): GuestRecord => {
-  const normalized: any = {};
-  
-  // Map common variations of column names
-  const headerMappings: { [key: string]: string } = {
-    'name': 'Name',
-    'email': 'Email',
-    'household': 'Household',
-    'child': 'Child',
-    'teenager': 'Teenager'
-  };
-  
-  Object.entries(record).forEach(([key, value]) => {
-    // Clean the key (remove spaces, lowercase)
-    const cleanKey = key.trim().toLowerCase();
-    // Use mapped header or capitalize first letter
-    const properKey = headerMappings[cleanKey] || 
-      (cleanKey.charAt(0).toUpperCase() + cleanKey.slice(1));
-    normalized[properKey] = value;
-  });
-  
-  return normalized as GuestRecord;
-};
-
-const validateCsvRow = (row: any, rowNumber: number): { isValid: boolean; errors: string[] } => {
-  const errors: string[] = [];
-  
-  // First check if row is empty or undefined
-  if (!row || Object.keys(row).length === 0) {
-    errors.push(`Row ${rowNumber}: Row is empty or undefined`);
-    return { isValid: false, errors };
-  }
-
-  const normalizedRow = normalizeHeaders(row);
-  console.log(`Validating Row ${rowNumber}:`, JSON.stringify(normalizedRow));
-
-  // Required fields validation
-  if (!normalizedRow.Name || typeof normalizedRow.Name !== "string" || normalizedRow.Name.trim() === "") {
-    errors.push(`Row ${rowNumber}: Name is required and cannot be empty`);
-  }
-  if (!normalizedRow.Household || typeof normalizedRow.Household !== "string" || normalizedRow.Household.trim() === "") {
-    errors.push(`Row ${rowNumber}: Household is required and cannot be empty for guest: ${normalizedRow.Name || 'Unknown'}`);
-  }
-
-  // Email validation (optional)
-  if (normalizedRow.Email && normalizedRow.Email.trim() !== "") {
-    // Basic email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(normalizedRow.Email.trim())) {
-      errors.push(`Row ${rowNumber}: Invalid email format "${normalizedRow.Email}" for guest: ${normalizedRow.Name}`);
-    }
-  }
-
-  // Child/Teenager validation - accept various formats
-  const validFlags = ['yes', 'true', 'y', 't', '1'];
-  
-  if (normalizedRow.Child) {
-    const childValue = normalizedRow.Child.toString().toLowerCase().trim();
-    if (childValue !== '' && !validFlags.includes(childValue)) {
-      errors.push(`Row ${rowNumber}: Invalid Child value "${childValue}" for guest ${normalizedRow.Name}`);
-    }
-  }
-
-  if (normalizedRow.Teenager) {
-    const teenValue = normalizedRow.Teenager.toString().toLowerCase().trim();
-    if (teenValue !== '' && !validFlags.includes(teenValue)) {
-      errors.push(`Row ${rowNumber}: Invalid Teenager value "${teenValue}" for guest ${normalizedRow.Name}`);
-    }
-  }
-
-  return {
-    isValid: errors.length === 0,
-    errors
-  };
+  Child: boolean
+  Teenager: boolean
 }
 
 export async function POST(request: Request) {
   try {
-    console.log("Starting guest list upload process");
-    const data = await request.formData();
-    const file = data.get('file') as File;
+    // Get the uploaded file
+    const data = await request.formData()
+    const file = data.get('file') as File
     
     if (!file) {
-      return NextResponse.json(
-        { error: "No file uploaded" },
-        { status: 400 }
-      );
+      return NextResponse.json({ 
+        error: "No file uploaded",
+        message: "Please select a CSV file to upload."
+      }, { status: 400 })
     }
     
-    console.log("File details:", {
-      name: file.name,
-      type: file.type,
-      size: file.size
-    });
+    // Log basic file info
+    console.log("Processing file:", file.name, file.type, file.size)
     
-    const content = await file.text();
+    // Read the file content
+    const content = await file.text()
     
-    let records: any[];
+    // Get the first line to determine delimiter
+    const firstLine = content.split('\n')[0]
+    const delimiter = firstLine.includes('\t') ? '\t' : ','
+    console.log(`Using ${delimiter === '\t' ? 'tab' : 'comma'} delimiter`)
+    
+    // Parse the CSV file
+    let rawRecords
     try {
-      // Try to detect the delimiter by checking for tabs and commas in the first line
-      const firstLine = content.split('\n')[0];
-      const delimiter = firstLine.includes('\t') ? '\t' : ',';
-      
-      console.log('First line:', firstLine);
-      console.log('Using delimiter:', delimiter === '\t' ? 'TAB' : 'COMMA');
-      
-      records = parse(content, {
+      rawRecords = parse(content, {
         columns: true,
         skip_empty_lines: true,
         trim: true,
         delimiter: delimiter,
-        relaxColumnCount: true
-      });
+        relaxColumnCount: true // Allow varying column counts
+      })
       
-      console.log(`Parsed ${records.length} records from file`);
-
-      // Remove any completely empty rows
-      const beforeFilter = records.length;
-      records = records.filter(record => 
-        Object.values(record).some(value => value && value.toString().trim() !== '')
-      );
-      console.log(`Removed ${beforeFilter - records.length} completely empty rows`);
-
-      // Normalize headers for all records
-      records = records.map(normalizeHeaders);
-
-      // Check for required columns
-      const requiredColumns = ['Name', 'Household'];
-      const firstRecord = records[0] || {};
-      console.log("First record columns:", Object.keys(firstRecord));
-      
-      const missingColumns = requiredColumns.filter(col => 
-        !Object.keys(firstRecord).some(key => 
-          key.toLowerCase() === col.toLowerCase()
-        )
-      );
-      
-      if (missingColumns.length > 0) {
-        return NextResponse.json(
-          {
-            error: "Missing required columns",
-            details: `Missing columns: ${missingColumns.join(', ')}`,
-            foundColumns: Object.keys(firstRecord),
-            firstRecord: firstRecord
-          },
-          { status: 400 }
-        );
-      }
-    } catch (parseError) {
-      console.error('Parse error:', parseError);
-      return NextResponse.json(
-        {
-          error: "Failed to parse file",
-          details: parseError instanceof Error ? parseError.message : String(parseError),
-          firstFewLines: content.split('\n').slice(0, 5).join('\n')
-        },
-        { status: 400 }
-      );
+      console.log(`Parsed ${rawRecords.length} records from file`)
+    } catch (error) {
+      console.error("CSV parsing error:", error)
+      return NextResponse.json({
+        error: "Failed to parse CSV file",
+        message: "The uploaded file could not be parsed. Please ensure it's a valid CSV or Excel file exported as CSV.",
+        details: error instanceof Error ? error.message : String(error)
+      }, { status: 400 })
     }
-
-    // Validate each record
-    console.log("Validating all records...");
-    const validationResults = records.map((record, index) => {
-      const rowNumber = index + 2; // +2 because index starts at 0 and we skip header row
-      const validation = validateCsvRow(record, rowNumber);
-      return {
-        rowNumber,
-        ...validation,
-        record,
-        displayData: {
-          name: record.Name || record.name || "",
-          household: record.Household || record.household || "",
-          email: record.Email || record.email || "",
-          child: record.Child || record.child || "",
-          teenager: record.Teenager || record.teenager || ""
+    
+    // Validate and normalize records
+    const errors = []
+    const processedRecords = []
+    
+    // First, check if we have the required columns
+    const firstRecord = rawRecords[0] || {}
+    const headers = Object.keys(firstRecord).map(key => key.toLowerCase())
+    const requiredHeaders = ['name', 'household']
+    const missingHeaders = []
+    
+    for (const required of requiredHeaders) {
+      if (!headers.some(header => header.includes(required))) {
+        missingHeaders.push(required)
+      }
+    }
+    
+    if (missingHeaders.length > 0) {
+      return NextResponse.json({
+        error: "Missing required columns",
+        message: `Your file is missing these required columns: ${missingHeaders.join(', ')}`,
+        details: {
+          missingColumns: missingHeaders,
+          foundColumns: headers,
+          firstRow: firstRecord
         }
-      };
-    });
-
-    const invalidRecords = validationResults.filter(result => !result.isValid);
-    if (invalidRecords.length > 0) {
-      console.log(`Found ${invalidRecords.length} invalid records`);
-      
-      // Enhanced error details with original row data
-      const errorDetails = invalidRecords.map(record => ({
-        rowNumber: record.rowNumber,
-        errors: record.errors,
-        data: record.displayData
-      }));
-      
-      console.log("Error details:", JSON.stringify(errorDetails, null, 2));
-      
-      return NextResponse.json(
-        {
-          error: "Invalid records found in file",
-          message: "Please fix the following rows in your spreadsheet:",
-          details: errorDetails,
-          errorSummary: invalidRecords.map(r => 
-            `Row ${r.rowNumber}: ${r.errors.join('; ')}`
-          ).join('\n')
-        },
-        { status: 400 }
-      );
+      }, { status: 400 })
     }
-
-    // Group records by household
-    console.log("Grouping records by household...");
-    const householdGroups = records.reduce<HouseholdGroups>((acc, record) => {
-      const normalizedRecord = normalizeHeaders(record);
-      const householdName = normalizedRecord.Household.trim();
-      if (!acc[householdName]) {
-        acc[householdName] = [];
+    
+    // Process each record
+    for (let i = 0; i < rawRecords.length; i++) {
+      const row = rawRecords[i]
+      const rowNumber = i + 2 // +2 for 1-based indexing and header row
+      
+      // Skip completely empty rows
+      if (!row || Object.values(row).every(val => !val || val.toString().trim() === '')) {
+        console.log(`Skipping empty row ${rowNumber}`)
+        continue
       }
-      acc[householdName].push(normalizedRecord);
-      return acc;
-    }, {});
-
-    console.log(`Found ${Object.keys(householdGroups).length} unique households`);
-
-    // Create households and guests
-    console.log("Creating households and guests in database...");
+      
+      // Get column values using case-insensitive matching
+      const getValue = (key) => {
+        const exactKey = Object.keys(row).find(k => k.toLowerCase() === key.toLowerCase())
+        return exactKey ? row[exactKey] : null
+      }
+      
+      // Extract values with robust fallbacks
+      const name = getValue('name')?.trim()
+      const email = getValue('email')?.trim() || null
+      const household = getValue('household')?.trim()
+      
+      // Check for Child and Teenager values - accept "yes", "y", etc.
+      const childValue = getValue('child')?.toString().toLowerCase().trim() || ''
+      const teenValue = getValue('teenager')?.toString().toLowerCase().trim() || ''
+      
+      const isChild = ['yes', 'y', 'true', 't', '1'].includes(childValue)
+      const isTeenager = ['yes', 'y', 'true', 't', '1'].includes(teenValue)
+      
+      // Validate required fields
+      const rowErrors = []
+      
+      if (!name) {
+        rowErrors.push(`Name is required`)
+      }
+      
+      if (!household) {
+        rowErrors.push(`Household is required`)
+      }
+      
+      // Validate email format if provided
+      if (email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!emailRegex.test(email)) {
+          rowErrors.push(`Invalid email format: "${email}"`)
+        }
+      }
+      
+      // If we have errors for this row, add them to our error list
+      if (rowErrors.length > 0) {
+        errors.push({
+          row: rowNumber,
+          name: name || '[MISSING]',
+          errors: rowErrors
+        })
+      } else {
+        // Otherwise, add the processed record
+        processedRecords.push({
+          Name: name,
+          Email: email,
+          Household: household,
+          Child: isChild,
+          Teenager: isTeenager
+        })
+      }
+    }
+    
+    // If we have validation errors, return them
+    if (errors.length > 0) {
+      console.log(`Found ${errors.length} invalid rows`)
+      
+      // Format errors for easy reading in the frontend
+      const formattedErrors = errors.map(err => 
+        `Row ${err.row} (${err.name}): ${err.errors.join(', ')}`
+      ).join('\n')
+      
+      return NextResponse.json({
+        error: "Invalid records in file",
+        message: "Please fix the following issues and try again:",
+        errorList: formattedErrors,
+        details: errors
+      }, { status: 400 })
+    }
+    
+    // Group by household
+    console.log("Grouping guests by household...")
+    const householdGroups = {}
+    
+    for (const record of processedRecords) {
+      if (!householdGroups[record.Household]) {
+        householdGroups[record.Household] = []
+      }
+      householdGroups[record.Household].push(record)
+    }
+    
+    console.log(`Found ${Object.keys(householdGroups).length} households with ${processedRecords.length} total guests`)
+    
+    // Create households and guests in database
+    console.log("Creating households and guests in database...")
     const results = await Promise.all(
       Object.entries(householdGroups).map(async ([householdName, guests]) => {
         try {
-          console.log(`Creating household "${householdName}" with ${guests.length} guests`);
           const household = await prisma.household.create({
             data: {
               name: householdName,
+              // Generate a random 6-character uppercase code
               code: Math.random().toString(36).substring(2, 8).toUpperCase(),
               guests: {
                 create: guests.map(guest => ({
-                  name: guest.Name.trim(),
-                  email: guest.Email?.trim() || null,
-                  isChild: guest.Child ? ['yes', 'true', 'y', 't', '1'].includes(guest.Child.toLowerCase().trim()) : false,
-                  isTeenager: guest.Teenager ? ['yes', 'true', 'y', 't', '1'].includes(guest.Teenager.toLowerCase().trim()) : false
+                  name: guest.Name,
+                  email: guest.Email,
+                  isChild: guest.Child,
+                  isTeenager: guest.Teenager
                 }))
               }
             },
             include: {
               guests: true
             }
-          });
-          return household;
+          })
+          
+          return household
         } catch (error) {
-          console.error(`Error creating household ${householdName}:`, error);
-          throw error;
+          console.error(`Error creating household ${householdName}:`, error)
+          throw new Error(`Failed to create household "${householdName}": ${error.message}`)
         }
       })
-    );
-
-    const totalGuests = results.reduce((sum, household) => sum + household.guests.length, 0);
-    console.log(`Successfully created ${results.length} households with ${totalGuests} total guests`);
-
-    return NextResponse.json({ 
+    )
+    
+    // Summarize results
+    const totalGuests = results.reduce((sum, household) => sum + household.guests.length, 0)
+    console.log(`Successfully created ${results.length} households with ${totalGuests} guests`)
+    
+    return NextResponse.json({
       success: true,
-      households: results,
-      totalGuests: totalGuests
-    });
+      message: `Successfully imported ${totalGuests} guests in ${results.length} households`,
+      households: results.length,
+      guests: totalGuests
+    })
+    
   } catch (error) {
-    console.error("Error uploading guests:", error);
-    return NextResponse.json(
-      { 
-        error: "Failed to upload guest list",
-        details: error instanceof Error ? error.message : "Unknown error",
-        stack: error instanceof Error ? error.stack : undefined
-      },
-      { status: 500 }
-    );
+    console.error("Error processing upload:", error)
+    
+    return NextResponse.json({
+      error: "Upload failed",
+      message: error.message || "An unexpected error occurred while processing your upload",
+      details: error.stack
+    }, { status: 500 })
   }
 }
 
