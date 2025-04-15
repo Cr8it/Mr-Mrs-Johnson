@@ -19,24 +19,24 @@ export default function OurStory() {
         >
         Our Love Story
         </MotionH2>
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-5xl mx-auto">
           <MotionDiv
-            className="flex flex-col items-center mb-12"
+            className="flex flex-col md:flex-row items-center gap-12"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
             viewport={{ once: true }}
           >
-            <div className="mx-auto mb-12">
+            <div className="md:w-1/2 md:flex-shrink-0">
               <Image
                 src={images.couple.story1 || "/placeholder.svg"}
                 alt="Jermaine and Sarah"
                 width={500}
                 height={700}
-                className="rounded-lg shadow-2xl object-cover"
+                className="rounded-lg shadow-2xl object-cover w-full h-auto mx-auto"
               />
             </div>
-            <div className="font-montserrat text-lg leading-relaxed max-w-3xl">
+            <div className="md:w-1/2 font-montserrat text-lg leading-relaxed">
               <p className="mb-4">
                 Jermaine and Sarah first crossed paths at church—though neither realised the other had been there the whole time. Sarah was faithfully up front, while Jermaine held it down in the middle. Behind the scenes, Sarah's little sister was already plotting, quietly talking to Jermaine about her big sis and making casual introductions. Still, Sarah kept it cool (some might say stush!) and didn't make it easy.
               </p>
