@@ -90,7 +90,7 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 			// Start the progress simulation
 			simulateProgress()
 			
-			const response = await fetch('/api/admin/guests/upload-guests', {
+			const response = await fetch('/api/admin/upload-guests', {
 				method: 'POST',
 				body: formData,
 				signal: controller.signal
