@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     // First, check if we have the required columns
     const firstRecord = rawRecords[0] || {}
     const headers = Object.keys(firstRecord).map(key => key.toLowerCase())
-    const requiredHeaders = ['name', 'household']
+    const requiredHeaders = ['name'] // Only name is strictly required now
     const missingHeaders: string[] = []
     
     for (const required of requiredHeaders) {
@@ -109,7 +109,7 @@ export async function POST(request: Request) {
       // Extract values with robust fallbacks
       const name = getValue('name')?.trim()
       const email = getValue('email')?.trim() || null
-      const household = getValue('household')?.trim()
+      let household = getValue('household')?.trim() || null
       
       // Check for Child and Teenager values - accept "yes", "y", etc.
       const childValue = getValue('child')?.toString().toLowerCase().trim() || ''
@@ -125,9 +125,7 @@ export async function POST(request: Request) {
         rowErrors.push(`Name is required`)
       }
       
-      if (!household) {
-        rowErrors.push(`Household is required`)
-      }
+      // No validation error for missing household - we'll generate one
       
       // Validate email format if provided
       if (email) {
@@ -145,11 +143,14 @@ export async function POST(request: Request) {
           errors: rowErrors
         })
       } else {
+        // Get first name to use for auto-generating household if needed
+        const firstName = name!.split(' ')[0].trim()
+        
         // Otherwise, add the processed record
         processedRecords.push({
-          Name: name!,  // Non-null assertion since we already validated name exists
+          Name: name!,
           Email: email,
-          Household: household!,  // Non-null assertion since we already validated household exists
+          Household: household || firstName, // Use firstName as a fallback
           Child: isChild,
           Teenager: isTeenager
         })
@@ -173,11 +174,24 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
     
-    // Group by household
+    // Group by household with auto-increment logic for duplicates
     console.log("Grouping guests by household...")
     const householdGroups: HouseholdGroups = {}
+    const householdNameCount: Record<string, number> = {}
     
     for (const record of processedRecords) {
+      // If household is auto-generated and already exists, add incrementing number
+      if (!record.Household.includes(' ') && householdNameCount[record.Household]) {
+        // Increment the counter
+        householdNameCount[record.Household]++
+        // Add the incrementing number to the household name
+        record.Household = `${record.Household}${householdNameCount[record.Household]}`
+      } else if (!record.Household.includes(' ')) {
+        // Initialize the counter for this household name
+        householdNameCount[record.Household] = 1
+      }
+      
+      // Add to the household groups
       if (!householdGroups[record.Household]) {
         householdGroups[record.Household] = []
       }
