@@ -76,6 +76,9 @@ export async function POST(request: Request) {
       const firstLine = content.split('\n')[0];
       const delimiter = firstLine.includes('\t') ? '\t' : ',';
       
+      console.log('First line of file:', firstLine);
+      console.log('Detected delimiter:', delimiter);
+      
       records = parse(content, {
         columns: true,
         skip_empty_lines: true,
@@ -83,6 +86,9 @@ export async function POST(request: Request) {
         delimiter: delimiter,
         relaxColumnCount: true // Allow varying column counts
       });
+
+      console.log('Parsed records count:', records.length);
+      console.log('First record sample:', records[0]);
 
       // Remove any completely empty rows
       records = records.filter(record => 
@@ -99,6 +105,8 @@ export async function POST(request: Request) {
       );
       
       if (missingColumns.length > 0) {
+        console.log('Found columns:', Object.keys(records[0] || {}));
+        console.log('Missing columns:', missingColumns);
         return NextResponse.json(
           {
             error: "Missing required columns",
@@ -122,21 +130,36 @@ export async function POST(request: Request) {
     }
 
     // Validate each record
-    const validationResults = records.map((record, index) => ({
-      rowNumber: index + 2, // +2 because index 0 is row 2 (after headers)
-      ...validateCsvRow(record),
-      record
-    }));
+    const validationResults = records.map((record, index) => {
+      const validation = validateCsvRow(record);
+      console.log(`Validating row ${index + 2}:`, {
+        name: record.Name,
+        household: record.Household,
+        isValid: validation.isValid,
+        errors: validation.errors
+      });
+      return {
+        rowNumber: index + 2,
+        ...validation,
+        record
+      };
+    });
 
     const invalidRecords = validationResults.filter(result => !result.isValid);
     if (invalidRecords.length > 0) {
+      console.log('Invalid records found:', invalidRecords);
       return NextResponse.json(
         {
           error: "Invalid records found in file",
           details: invalidRecords.map(record => ({
             rowNumber: record.rowNumber,
             errors: record.errors,
-            data: record.record
+            data: {
+              name: record.record.Name,
+              household: record.record.Household,
+              child: record.record.Child,
+              teenager: record.record.Teenager
+            }
           }))
         },
         { status: 400 }
@@ -153,29 +176,37 @@ export async function POST(request: Request) {
       return acc
     }, {})
 
+    console.log('Household groups created:', Object.keys(householdGroups));
+
     // Create households and guests
     const results = await Promise.all(
       Object.entries(householdGroups).map(async ([householdName, guests]) => {
-        const household = await prisma.household.create({
-          data: {
-            name: householdName,
-            code: Math.random().toString(36).substring(2, 8).toUpperCase(),
-            guests: {
-              create: guests.map(guest => ({
-                name: guest.Name,
-                email: guest.Email || null,
-                isChild: guest.Child ? ['yes', 'true', 'y', 't', 'c'].includes(guest.Child.toLowerCase().trim()) : false,
-                isTeenager: guest.Teenager ? ['yes', 'true', 'y', 't'].includes(guest.Teenager.toLowerCase().trim()) : false,
-                mealChoice: null,
-                dietaryNotes: null
-              }))
+        try {
+          const household = await prisma.household.create({
+            data: {
+              name: householdName,
+              code: Math.random().toString(36).substring(2, 8).toUpperCase(),
+              guests: {
+                create: guests.map(guest => ({
+                  name: guest.Name,
+                  email: guest.Email || null,
+                  isChild: guest.Child ? ['yes', 'true', 'y', 't', 'c'].includes(guest.Child.toLowerCase().trim()) : false,
+                  isTeenager: guest.Teenager ? ['yes', 'true', 'y', 't'].includes(guest.Teenager.toLowerCase().trim()) : false,
+                  mealChoice: null,
+                  dietaryNotes: null
+                }))
+              }
+            },
+            include: {
+              guests: true
             }
-          },
-          include: {
-            guests: true
-          }
-        })
-        return household
+          })
+          console.log(`Created household ${householdName} with ${household.guests.length} guests`);
+          return household;
+        } catch (error) {
+          console.error(`Error creating household ${householdName}:`, error);
+          throw error;
+        }
       })
     )
 
@@ -189,7 +220,8 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { 
         error: "Failed to upload guest list",
-        details: error instanceof Error ? error.message : "Unknown error"
+        details: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined
       },
       { status: 500 }
     )
