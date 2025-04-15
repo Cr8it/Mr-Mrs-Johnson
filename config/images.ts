@@ -1,7 +1,6 @@
 export const images = {
   couple: {
-    story1: "https://i.postimg.cc/bYKLc2Cv/SandJ1.jpg",
-    story2: "https://i.postimg.cc/65nc95gf/SandJ2.jpg",
+    story1: "https://i.postimg.cc/2ysW1D2Z/unnamed.jpg",
     story3: "https://i.postimg.cc/CLFcd38q/RINGWATCH.png",    
   },
   dreamTeam: {
