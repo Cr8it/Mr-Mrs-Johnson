@@ -63,11 +63,15 @@ export async function POST(request: Request) {
     
     let records: any[];
     try {
+      // Try to detect the delimiter by checking for tabs and commas in the first line
+      const firstLine = content.split('\n')[0];
+      const delimiter = firstLine.includes('\t') ? '\t' : ',';
+      
       records = parse(content, {
         columns: true,
         skip_empty_lines: true,
         trim: true,
-        delimiter: '\t' // Use tab as delimiter
+        delimiter: delimiter
       });
 
       // Normalize headers for all records
@@ -84,7 +88,7 @@ export async function POST(request: Request) {
           {
             error: "Missing required columns",
             details: `Missing columns: ${missingColumns.join(', ')}. Required columns are: Name, Household`,
-            example: "Your TSV should have headers: Name\tEmail\tHousehold\tChild\tTeenager",
+            example: `Your ${delimiter === '\t' ? 'TSV' : 'CSV'} should have headers: Name${delimiter}Email${delimiter}Household${delimiter}Child${delimiter}Teenager`,
             foundColumns: Object.keys(records[0] || {})
           },
           { status: 400 }
@@ -93,8 +97,8 @@ export async function POST(request: Request) {
     } catch (parseError) {
       return NextResponse.json(
         {
-          error: "Failed to parse TSV",
-          details: "Please ensure your TSV is properly formatted and has the correct headers: Name\tEmail\tHousehold\tChild\tTeenager"
+          error: "Failed to parse file",
+          details: "Please ensure your file is properly formatted with headers: Name, Email, Household, Child, Teenager (comma or tab separated)"
         },
         { status: 400 }
       );
@@ -111,7 +115,7 @@ export async function POST(request: Request) {
     if (invalidRecords.length > 0) {
       return NextResponse.json(
         {
-          error: "Invalid records found in TSV",
+          error: "Invalid records found in file",
           details: invalidRecords.map(record => ({
             rowNumber: record.rowNumber,
             errors: record.errors,
