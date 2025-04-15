@@ -12,6 +12,16 @@ function generateRandomCode() {
 const TIMEOUT_MS = 120000; // 2 minute timeout
 const BATCH_SIZE = 25; // Process in smaller batches
 
+// Define types for better type safety
+interface GuestRecord {
+  name: string;
+  household: string;
+  email: string | null;
+  isChild: boolean;
+  isTeenager: boolean;
+  dietaryNotes: string | null;
+}
+
 export async function POST(request: NextRequest) {
   noStore()
   
@@ -54,8 +64,8 @@ export async function POST(request: NextRequest) {
     console.log(`Parsed ${records.length} records from CSV`)
     
     // Validate and clean up records
-    const validRecords = []
-    const errors = []
+    const validRecords: GuestRecord[] = []
+    const errors: string[] = []
     
     for (let i = 0; i < records.length; i++) {
       const record = records[i]
@@ -73,7 +83,7 @@ export async function POST(request: NextRequest) {
       }
       
       // Clean up and transform record
-      const cleanedRecord = {
+      const cleanedRecord: GuestRecord = {
         name: record.Name.trim(),
         household: record.Household.trim(),
         email: record.Email ? record.Email.trim() : null,
@@ -113,7 +123,7 @@ export async function POST(request: NextRequest) {
     
     // Process households in batches to avoid timeouts
     const householdNames = Array.from(householdMap.keys())
-    const createdHouseholds = []
+    const createdHouseholds: any[] = []
     
     // Create a timeout promise
     const timeoutPromise = new Promise((_, reject) => {
@@ -128,8 +138,8 @@ export async function POST(request: NextRequest) {
       console.log(`Processing household batch ${i/BATCH_SIZE + 1}/${Math.ceil(householdNames.length/BATCH_SIZE)}`)
       
       try {
-        // Use Promise.race to implement timeout
-        const batchHouseholds = await Promise.race([
+        // Use Promise.race to implement timeout with proper type assertion
+        const result = await Promise.race([
           Promise.all(
             batch.map(async (hhName) => {
               // Generate a unique code for the household
@@ -154,6 +164,10 @@ export async function POST(request: NextRequest) {
           timeoutPromise
         ])
         
+        // Type assertion for the result
+        const batchHouseholds = result as any[];
+        
+        // Now we can safely spread the array
         createdHouseholds.push(...batchHouseholds)
         const batchTime = Date.now() - batchStart
         console.log(`Batch completed in ${batchTime}ms`)
@@ -172,7 +186,7 @@ export async function POST(request: NextRequest) {
     
     // Now process guests in batches
     const guestCount = validRecords.length
-    const createdGuests = []
+    const createdGuests: any[] = []
     
     for (let i = 0; i < validRecords.length; i += BATCH_SIZE) {
       const batchStart = Date.now()
@@ -182,7 +196,7 @@ export async function POST(request: NextRequest) {
       
       try {
         // Use Promise.race to implement timeout
-        const batchGuests = await Promise.race([
+        const result = await Promise.race([
           Promise.all(
             batch.map(async (record) => {
               const hhName = record.household.toLowerCase()
@@ -200,15 +214,16 @@ export async function POST(request: NextRequest) {
                 return null
               }
               
-              // Create the guest
+              // Create the guest - make sure properties match Prisma schema
               const guest = await prisma.guest.create({
                 data: {
                   name: record.name,
                   email: record.email,
-                  isChild: record.isChild,
-                  isTeenager: record.isTeenager,
+                  householdId: household.id,
                   dietaryNotes: record.dietaryNotes,
-                  householdId: household.id
+                  // Using the custom fields from your schema
+                  isChild: record.isChild,
+                  isTeenager: record.isTeenager
                 }
               })
               
@@ -218,8 +233,11 @@ export async function POST(request: NextRequest) {
           timeoutPromise
         ])
         
+        // Type assertion for the result
+        const batchGuests = result as any[];
+        
         // Filter out any nulls (in case of errors)
-        const validGuests = batchGuests.filter(g => g !== null)
+        const validGuests = batchGuests.filter((g: any) => g !== null)
         createdGuests.push(...validGuests)
         
         const batchTime = Date.now() - batchStart
