@@ -18,11 +18,22 @@ export default function PhotoGallery() {
   const [images, setImages] = useState<GalleryImage[]>([])
   const [loading, setLoading] = useState(true)
   const [showAll, setShowAll] = useState(false)
+  const [showGallery, setShowGallery] = useState(true)
 
   const displayedImages = showAll ? images : images.slice(0, 6)
   const hasMoreImages = images.length > 6
 
   useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await fetch('/api/admin/settings')
+        const data = await response.json()
+        setShowGallery(data.showGallery)
+      } catch (error) {
+        console.error('Error fetching settings:', error)
+      }
+    }
+
     const fetchImages = async () => {
       try {
         const response = await fetch('/api/admin/gallery')
@@ -37,6 +48,7 @@ export default function PhotoGallery() {
       }
     }
 
+    fetchSettings()
     fetchImages()
   }, [])
 
@@ -47,6 +59,8 @@ export default function PhotoGallery() {
   const handleClose = () => {
     setSelectedImage(null)
   }
+
+  if (!showGallery) return null
 
   if (loading) {
     return (
