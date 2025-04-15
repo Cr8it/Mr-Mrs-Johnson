@@ -32,21 +32,30 @@ const validateCsvRow = (row: any): { isValid: boolean; errors: string[] } => {
 
   // Check if required fields exist
   if (!normalizedRow.Name || typeof normalizedRow.Name !== "string" || normalizedRow.Name.trim() === "") {
-    errors.push("Name is required and cannot be empty");
+    errors.push(`Name is required and cannot be empty for row with data: ${JSON.stringify(row)}`);
   }
   if (!normalizedRow.Household || typeof normalizedRow.Household !== "string" || normalizedRow.Household.trim() === "") {
-    errors.push("Household is required and cannot be empty");
+    errors.push(`Household is required and cannot be empty for guest: ${normalizedRow.Name || 'Unknown'}`);
   }
 
-  // Optional fields validation
+  // Optional fields validation with more flexible handling
   if (normalizedRow.Email && typeof normalizedRow.Email !== "string") {
-    errors.push("Email must be a string if provided");
+    errors.push(`Invalid email format for guest: ${normalizedRow.Name}`);
   }
-  if (normalizedRow.Child && !["yes", "no", "true", "false", ""].includes(normalizedRow.Child.toLowerCase().trim())) {
-    errors.push("Child must be 'yes', 'no', 'true', 'false', or empty");
+
+  // More flexible Child/Teenager validation
+  if (normalizedRow.Child) {
+    const childValue = normalizedRow.Child.toString().toLowerCase().trim();
+    if (!["yes", "no", "true", "false", "t", "c", "y", "n", ""].includes(childValue)) {
+      errors.push(`Invalid Child value for guest ${normalizedRow.Name}. Must be yes/no/true/false/t/c/y/n or empty`);
+    }
   }
-  if (normalizedRow.Teenager && !["yes", "no", "true", "false", ""].includes(normalizedRow.Teenager.toLowerCase().trim())) {
-    errors.push("Teenager must be 'yes', 'no', 'true', 'false', or empty");
+
+  if (normalizedRow.Teenager) {
+    const teenValue = normalizedRow.Teenager.toString().toLowerCase().trim();
+    if (!["yes", "no", "true", "false", "t", "y", "n", ""].includes(teenValue)) {
+      errors.push(`Invalid Teenager value for guest ${normalizedRow.Name}. Must be yes/no/true/false/t/y/n or empty`);
+    }
   }
 
   return {
@@ -71,8 +80,14 @@ export async function POST(request: Request) {
         columns: true,
         skip_empty_lines: true,
         trim: true,
-        delimiter: delimiter
+        delimiter: delimiter,
+        relaxColumnCount: true // Allow varying column counts
       });
+
+      // Remove any completely empty rows
+      records = records.filter(record => 
+        Object.values(record).some(value => value && value.toString().trim() !== '')
+      );
 
       // Normalize headers for all records
       records = records.map(normalizeHeaders);
@@ -95,10 +110,12 @@ export async function POST(request: Request) {
         );
       }
     } catch (parseError) {
+      console.error('Parse error:', parseError);
       return NextResponse.json(
         {
           error: "Failed to parse file",
-          details: "Please ensure your file is properly formatted with headers: Name, Email, Household, Child, Teenager (comma or tab separated)"
+          details: "Please ensure your file is properly formatted with headers: Name, Email, Household, Child, Teenager (comma or tab separated)",
+          parseError: parseError instanceof Error ? parseError.message : String(parseError)
         },
         { status: 400 }
       );
@@ -147,8 +164,8 @@ export async function POST(request: Request) {
               create: guests.map(guest => ({
                 name: guest.Name,
                 email: guest.Email || null,
-                isChild: guest.Child?.toLowerCase().trim() === 'yes' || guest.Child?.toLowerCase().trim() === 'true',
-                isTeenager: guest.Teenager?.toLowerCase().trim() === 'yes' || guest.Teenager?.toLowerCase().trim() === 'true',
+                isChild: guest.Child ? ['yes', 'true', 'y', 't', 'c'].includes(guest.Child.toLowerCase().trim()) : false,
+                isTeenager: guest.Teenager ? ['yes', 'true', 'y', 't'].includes(guest.Teenager.toLowerCase().trim()) : false,
                 mealChoice: null,
                 dietaryNotes: null
               }))
