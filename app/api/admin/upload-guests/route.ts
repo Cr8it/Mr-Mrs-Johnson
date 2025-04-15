@@ -11,6 +11,11 @@ interface GuestRecord {
   Teenager: boolean
 }
 
+// Type for household groups
+interface HouseholdGroups {
+  [key: string]: GuestRecord[]
+}
+
 export async function POST(request: Request) {
   try {
     // Get the uploaded file
@@ -36,7 +41,7 @@ export async function POST(request: Request) {
     console.log(`Using ${delimiter === '\t' ? 'tab' : 'comma'} delimiter`)
     
     // Parse the CSV file
-    let rawRecords
+    let rawRecords: Record<string, string>[]
     try {
       rawRecords = parse(content, {
         columns: true,
@@ -57,14 +62,14 @@ export async function POST(request: Request) {
     }
     
     // Validate and normalize records
-    const errors = []
-    const processedRecords = []
+    const errors: Array<{ row: number, name: string, errors: string[] }> = []
+    const processedRecords: GuestRecord[] = []
     
     // First, check if we have the required columns
     const firstRecord = rawRecords[0] || {}
     const headers = Object.keys(firstRecord).map(key => key.toLowerCase())
     const requiredHeaders = ['name', 'household']
-    const missingHeaders = []
+    const missingHeaders: string[] = []
     
     for (const required of requiredHeaders) {
       if (!headers.some(header => header.includes(required))) {
@@ -96,7 +101,7 @@ export async function POST(request: Request) {
       }
       
       // Get column values using case-insensitive matching
-      const getValue = (key) => {
+      const getValue = (key: string): string | null => {
         const exactKey = Object.keys(row).find(k => k.toLowerCase() === key.toLowerCase())
         return exactKey ? row[exactKey] : null
       }
@@ -114,7 +119,7 @@ export async function POST(request: Request) {
       const isTeenager = ['yes', 'y', 'true', 't', '1'].includes(teenValue)
       
       // Validate required fields
-      const rowErrors = []
+      const rowErrors: string[] = []
       
       if (!name) {
         rowErrors.push(`Name is required`)
@@ -142,9 +147,9 @@ export async function POST(request: Request) {
       } else {
         // Otherwise, add the processed record
         processedRecords.push({
-          Name: name,
+          Name: name!,  // Non-null assertion since we already validated name exists
           Email: email,
-          Household: household,
+          Household: household!,  // Non-null assertion since we already validated household exists
           Child: isChild,
           Teenager: isTeenager
         })
@@ -170,7 +175,7 @@ export async function POST(request: Request) {
     
     // Group by household
     console.log("Grouping guests by household...")
-    const householdGroups = {}
+    const householdGroups: HouseholdGroups = {}
     
     for (const record of processedRecords) {
       if (!householdGroups[record.Household]) {
@@ -184,7 +189,7 @@ export async function POST(request: Request) {
     // Create households and guests in database
     console.log("Creating households and guests in database...")
     const results = await Promise.all(
-      Object.entries(householdGroups).map(async ([householdName, guests]) => {
+      Object.entries(householdGroups).map(async ([householdName, guests]: [string, GuestRecord[]]) => {
         try {
           const household = await prisma.household.create({
             data: {
@@ -192,7 +197,7 @@ export async function POST(request: Request) {
               // Generate a random 6-character uppercase code
               code: Math.random().toString(36).substring(2, 8).toUpperCase(),
               guests: {
-                create: guests.map(guest => ({
+                create: guests.map((guest: GuestRecord) => ({
                   name: guest.Name,
                   email: guest.Email,
                   isChild: guest.Child,
@@ -206,7 +211,7 @@ export async function POST(request: Request) {
           })
           
           return household
-        } catch (error) {
+        } catch (error: any) {
           console.error(`Error creating household ${householdName}:`, error)
           throw new Error(`Failed to create household "${householdName}": ${error.message}`)
         }
@@ -224,7 +229,7 @@ export async function POST(request: Request) {
       guests: totalGuests
     })
     
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error processing upload:", error)
     
     return NextResponse.json({
