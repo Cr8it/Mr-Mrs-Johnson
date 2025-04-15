@@ -75,14 +75,38 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 		setError("")
 		setErrorList([])
 
+		// Add file size warning
+		if (file.size > 1024 * 1024) { // If larger than 1MB
+			setError(`Large file detected (${(file.size / (1024 * 1024)).toFixed(2)} MB). The upload may take longer and could time out. Consider splitting into smaller files if you encounter issues.`)
+		}
+
 		const formData = new FormData()
 		formData.append('file', file)
 
 		try {
+			// Set up a timeout for client-side as well
+			const controller = new AbortController()
+			const timeoutId = setTimeout(() => controller.abort(), 60000) // 60-second client timeout
+			
 			const response = await fetch('/api/admin/upload-guests', {
 				method: 'POST',
-				body: formData
+				body: formData,
+				signal: controller.signal
 			})
+			
+			clearTimeout(timeoutId) // Clear the timeout if request completes
+
+			// Handle timeouts and large files
+			if (response.status === 504) {
+				setError('The server took too long to process your request. Please try the following:')
+				setErrorList([
+					'Split your file into smaller batches (100-200 guests per file)',
+					'Check for any problematic rows or formatting issues',
+					'Try uploading during off-peak hours',
+					'Contact support if the issue persists'
+				])
+				return
+			}
 
 			const data = await response.json()
 
@@ -110,7 +134,16 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 			onUpload(data.households || [])
 			onClose()
 		} catch (error: any) {
-			setError(error.message || 'An unexpected error occurred')
+			// Better error handling for different failure scenarios
+			if (error.name === 'AbortError') {
+				setError('The upload request timed out. Your file might be too large.')
+				setErrorList([
+					'Split your file into smaller batches',
+					'Try uploading again with fewer guests per file'
+				])
+			} else {
+				setError(error.message || 'An unexpected error occurred')
+			}
 		} finally {
 			setLoading(false)
 		}

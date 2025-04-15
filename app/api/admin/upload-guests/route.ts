@@ -1,255 +1,275 @@
-import { NextResponse } from "next/server"
-import { prisma } from "@/lib/db"
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from "@/lib/prisma"
+import { unstable_noStore as noStore } from 'next/cache'
 import { parse } from 'csv-parse/sync'
+import { generateRandomCode } from '@/lib/utils'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { revalidatePath } from 'next/cache'
+import { Household } from '@prisma/client'
 
-// Simple structure to represent a guest record
-interface GuestRecord {
-  Name: string
-  Email: string | null
-  Household: string
-  Child: boolean
-  Teenager: boolean
-}
+const TIMEOUT_MS = 120000; // 2 minute timeout
+const BATCH_SIZE = 25; // Process in smaller batches
 
-// Type for household groups
-interface HouseholdGroups {
-  [key: string]: GuestRecord[]
-}
-
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  noStore()
+  
   try {
-    // Get the uploaded file
-    const data = await request.formData()
-    const file = data.get('file') as File
+    // Authentication check
+    const session = await getServerSession(authOptions)
+    if (!session || !session.user?.isAdmin) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    console.log('Starting guest upload process')
+    const startTime = Date.now()
+    
+    // Check if request is multipart form data
+    const contentType = request.headers.get('content-type') || ''
+    if (!contentType.includes('multipart/form-data')) {
+      return NextResponse.json({ error: 'Invalid request format' }, { status: 400 })
+    }
+
+    // Get the form data and extract the file
+    const formData = await request.formData()
+    const file = formData.get('file') as File
     
     if (!file) {
-      return NextResponse.json({ 
-        error: "No file uploaded",
-        message: "Please select a CSV file to upload."
-      }, { status: 400 })
+      return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
     
-    // Log basic file info
-    console.log("Processing file:", file.name, file.type, file.size)
+    // Add file size check and logging
+    const fileSizeInMB = file.size / (1024 * 1024)
+    console.log(`Processing file of size: ${fileSizeInMB.toFixed(2)} MB`)
     
-    // Read the file content
-    const content = await file.text()
-    
-    // Get the first line to determine delimiter
-    const firstLine = content.split('\n')[0]
-    const delimiter = firstLine.includes('\t') ? '\t' : ','
-    console.log(`Using ${delimiter === '\t' ? 'tab' : 'comma'} delimiter`)
-    
+    if (fileSizeInMB > 5) {
+      console.warn(`Large file detected (${fileSizeInMB.toFixed(2)} MB). This may cause timeout issues.`)
+    }
+
     // Parse the CSV file
-    let rawRecords: Record<string, string>[]
-    try {
-      rawRecords = parse(content, {
-        columns: true,
-        skip_empty_lines: true,
-        trim: true,
-        delimiter: delimiter,
-        relaxColumnCount: true // Allow varying column counts
-      })
+    const fileContent = await file.text()
+    const records = parse(fileContent, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true
+    })
+
+    console.log(`Parsed ${records.length} records from CSV`)
+    
+    // Validate and clean up records
+    const validRecords = []
+    const errors = []
+    
+    for (let i = 0; i < records.length; i++) {
+      const record = records[i]
+      const rowNum = i + 2 // +2 because row 1 is headers, and we're 0-indexed
       
-      console.log(`Parsed ${rawRecords.length} records from file`)
-    } catch (error) {
-      console.error("CSV parsing error:", error)
-      return NextResponse.json({
-        error: "Failed to parse CSV file",
-        message: "The uploaded file could not be parsed. Please ensure it's a valid CSV or Excel file exported as CSV.",
-        details: error instanceof Error ? error.message : String(error)
-      }, { status: 400 })
-    }
-    
-    // Validate and normalize records
-    const errors: Array<{ row: number, name: string, errors: string[] }> = []
-    const processedRecords: GuestRecord[] = []
-    
-    // First, check if we have the required columns
-    const firstRecord = rawRecords[0] || {}
-    const headers = Object.keys(firstRecord).map(key => key.toLowerCase())
-    const requiredHeaders = ['name'] // Only name is strictly required now
-    const missingHeaders: string[] = []
-    
-    for (const required of requiredHeaders) {
-      if (!headers.some(header => header.includes(required))) {
-        missingHeaders.push(required)
-      }
-    }
-    
-    if (missingHeaders.length > 0) {
-      return NextResponse.json({
-        error: "Missing required columns",
-        message: `Your file is missing these required columns: ${missingHeaders.join(', ')}`,
-        details: {
-          missingColumns: missingHeaders,
-          foundColumns: headers,
-          firstRow: firstRecord
-        }
-      }, { status: 400 })
-    }
-    
-    // Process each record
-    for (let i = 0; i < rawRecords.length; i++) {
-      const row = rawRecords[i]
-      const rowNumber = i + 2 // +2 for 1-based indexing and header row
-      
-      // Skip completely empty rows
-      if (!row || Object.values(row).every(val => !val || val.toString().trim() === '')) {
-        console.log(`Skipping empty row ${rowNumber}`)
+      // Basic validation
+      if (!record.Name || record.Name.trim() === '') {
+        errors.push(`Row ${rowNum}: Missing name`)
         continue
       }
       
-      // Get column values using case-insensitive matching
-      const getValue = (key: string): string | null => {
-        const exactKey = Object.keys(row).find(k => k.toLowerCase() === key.toLowerCase())
-        return exactKey ? row[exactKey] : null
+      if (!record.Household || record.Household.trim() === '') {
+        errors.push(`Row ${rowNum}: Missing household name`)
+        continue
       }
       
-      // Extract values with robust fallbacks
-      const name = getValue('name')?.trim()
-      const email = getValue('email')?.trim() || null
-      let household = getValue('household')?.trim() || null
-      
-      // Check for Child and Teenager values - accept "yes", "y", etc.
-      const childValue = getValue('child')?.toString().toLowerCase().trim() || ''
-      const teenValue = getValue('teenager')?.toString().toLowerCase().trim() || ''
-      
-      const isChild = ['yes', 'y', 'true', 't', '1'].includes(childValue)
-      const isTeenager = ['yes', 'y', 'true', 't', '1'].includes(teenValue)
-      
-      // Validate required fields
-      const rowErrors: string[] = []
-      
-      if (!name) {
-        rowErrors.push(`Name is required`)
+      // Clean up and transform record
+      const cleanedRecord = {
+        name: record.Name.trim(),
+        household: record.Household.trim(),
+        email: record.Email ? record.Email.trim() : null,
+        isChild: record.Child === 'C' || false,
+        isTeenager: record.Teenager === 'T' || false,
+        invitation: record.Invitation || 'STANDARD',
+        dietaryRequirements: record.DietaryRequirements || null
       }
       
-      // No validation error for missing household - we'll generate one
-      
-      // Validate email format if provided
-      if (email) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-        if (!emailRegex.test(email)) {
-          rowErrors.push(`Invalid email format: "${email}"`)
-        }
-      }
-      
-      // If we have errors for this row, add them to our error list
-      if (rowErrors.length > 0) {
-        errors.push({
-          row: rowNumber,
-          name: name || '[MISSING]',
-          errors: rowErrors
-        })
-      } else {
-        // Get first name to use for auto-generating household if needed
-        const firstName = name!.split(' ')[0].trim()
-        
-        // Otherwise, add the processed record
-        processedRecords.push({
-          Name: name!,
-          Email: email,
-          Household: household || firstName, // Use firstName as a fallback
-          Child: isChild,
-          Teenager: isTeenager
-        })
-      }
+      validRecords.push(cleanedRecord)
     }
-    
-    // If we have validation errors, return them
-    if (errors.length > 0) {
-      console.log(`Found ${errors.length} invalid rows`)
-      
-      // Format errors for easy reading in the frontend
-      const formattedErrors = errors.map(err => 
-        `Row ${err.row} (${err.name}): ${err.errors.join(', ')}`
-      ).join('\n')
-      
-      return NextResponse.json({
-        error: "Invalid records in file",
-        message: "Please fix the following issues and try again:",
-        errorList: formattedErrors,
-        details: errors
+
+    if (validRecords.length === 0) {
+      return NextResponse.json({ 
+        error: 'No valid records found in the CSV', 
+        details: errors 
       }, { status: 400 })
     }
+
+    console.log(`Found ${validRecords.length} valid records, proceeding with import`)
     
-    // Group by household with auto-increment logic for duplicates
-    console.log("Grouping guests by household...")
-    const householdGroups: HouseholdGroups = {}
-    const householdNameCount: Record<string, number> = {}
+    // Track households to avoid duplicates 
+    const householdMap = new Map<string, { count: number, code?: string }>()
     
-    for (const record of processedRecords) {
-      // If household is auto-generated and already exists, add incrementing number
-      if (!record.Household.includes(' ') && householdNameCount[record.Household]) {
-        // Increment the counter
-        householdNameCount[record.Household]++
-        // Add the incrementing number to the household name
-        record.Household = `${record.Household}${householdNameCount[record.Household]}`
-      } else if (!record.Household.includes(' ')) {
-        // Initialize the counter for this household name
-        householdNameCount[record.Household] = 1
+    // Count guests per household first
+    validRecords.forEach(record => {
+      const hhName = record.household.toLowerCase()
+      if (!householdMap.has(hhName)) {
+        householdMap.set(hhName, { count: 1 })
+      } else {
+        const hh = householdMap.get(hhName)!
+        hh.count += 1
+        householdMap.set(hhName, hh)
       }
+    })
+    
+    console.log(`Found ${householdMap.size} unique households`)
+    
+    // Process households in batches to avoid timeouts
+    const householdNames = Array.from(householdMap.keys())
+    const createdHouseholds: Household[] = []
+    
+    // Create a timeout promise
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Operation timed out')), TIMEOUT_MS)
+    })
+    
+    // Process households in batches
+    for (let i = 0; i < householdNames.length; i += BATCH_SIZE) {
+      const batchStart = Date.now()
+      const batch = householdNames.slice(i, i + BATCH_SIZE)
       
-      // Add to the household groups
-      if (!householdGroups[record.Household]) {
-        householdGroups[record.Household] = []
+      console.log(`Processing household batch ${i/BATCH_SIZE + 1}/${Math.ceil(householdNames.length/BATCH_SIZE)}`)
+      
+      try {
+        // Use Promise.race to implement timeout
+        const batchHouseholds = await Promise.race([
+          Promise.all(
+            batch.map(async (hhName) => {
+              // Generate a unique code for the household
+              const code = generateRandomCode()
+              
+              // Create the household
+              const household = await prisma.household.create({
+                data: {
+                  name: hhName,
+                  code,
+                  isActive: true
+                }
+              })
+              
+              // Update our household map with the new code
+              const hh = householdMap.get(hhName)!
+              hh.code = code
+              householdMap.set(hhName, hh)
+              
+              return household
+            })
+          ),
+          timeoutPromise
+        ]) as Household[]
+        
+        createdHouseholds.push(...batchHouseholds)
+        const batchTime = Date.now() - batchStart
+        console.log(`Batch completed in ${batchTime}ms`)
+        
+      } catch (error) {
+        console.error('Error during batch processing:', error)
+        return NextResponse.json({ 
+          error: 'The operation timed out. Please try with a smaller file.',
+          processed: createdHouseholds.length,
+          total: householdNames.length
+        }, { status: 504 })
       }
-      householdGroups[record.Household].push(record)
     }
     
-    console.log(`Found ${Object.keys(householdGroups).length} households with ${processedRecords.length} total guests`)
+    console.log(`Created ${createdHouseholds.length} households, now creating guests`)
     
-    // Create households and guests in database
-    console.log("Creating households and guests in database...")
-    const results = await Promise.all(
-      Object.entries(householdGroups).map(async ([householdName, guests]: [string, GuestRecord[]]) => {
-        try {
-          const household = await prisma.household.create({
-            data: {
-              name: householdName,
-              // Generate a random 6-character uppercase code
-              code: Math.random().toString(36).substring(2, 8).toUpperCase(),
-              guests: {
-                create: guests.map((guest: GuestRecord) => ({
-                  name: guest.Name,
-                  email: guest.Email,
-                  isChild: guest.Child,
-                  isTeenager: guest.Teenager
-                }))
+    // Now process guests in batches
+    const guestCount = validRecords.length
+    const createdGuests = []
+    
+    for (let i = 0; i < validRecords.length; i += BATCH_SIZE) {
+      const batchStart = Date.now()
+      const batch = validRecords.slice(i, i + BATCH_SIZE)
+      
+      console.log(`Processing guest batch ${i/BATCH_SIZE + 1}/${Math.ceil(validRecords.length/BATCH_SIZE)}`)
+      
+      try {
+        // Use Promise.race to implement timeout
+        const batchGuests = await Promise.race([
+          Promise.all(
+            batch.map(async (record) => {
+              const hhName = record.household.toLowerCase()
+              const hhDetails = householdMap.get(hhName)!
+              
+              // Find the household we created
+              const household = await prisma.household.findFirst({
+                where: {
+                  name: hhName
+                }
+              })
+              
+              if (!household) {
+                console.error(`Household not found: ${hhName}`)
+                return null
               }
-            },
-            include: {
-              guests: true
-            }
-          })
-          
-          return household
-        } catch (error: any) {
-          console.error(`Error creating household ${householdName}:`, error)
-          throw new Error(`Failed to create household "${householdName}": ${error.message}`)
-        }
-      })
-    )
+              
+              // Create the guest
+              const guest = await prisma.guest.create({
+                data: {
+                  name: record.name,
+                  email: record.email,
+                  isChild: record.isChild,
+                  isTeenager: record.isTeenager,
+                  invitation: record.invitation,
+                  dietaryRequirements: record.dietaryRequirements,
+                  isActive: true,
+                  householdId: household.id
+                }
+              })
+              
+              return guest
+            })
+          ),
+          timeoutPromise
+        ])
+        
+        // Filter out any nulls (in case of errors)
+        const validGuests = batchGuests.filter(g => g !== null)
+        createdGuests.push(...validGuests)
+        
+        const batchTime = Date.now() - batchStart
+        console.log(`Guest batch completed in ${batchTime}ms`)
+        
+      } catch (error) {
+        console.error('Error during guest batch processing:', error)
+        return NextResponse.json({ 
+          error: 'The operation timed out while creating guests. Some households may have been created.',
+          householdsCreated: createdHouseholds.length,
+          guestsCreated: createdGuests.length,
+          total: { households: householdNames.length, guests: validRecords.length }
+        }, { status: 504 })
+      }
+    }
     
-    // Summarize results
-    const totalGuests = results.reduce((sum, household) => sum + household.guests.length, 0)
-    console.log(`Successfully created ${results.length} households with ${totalGuests} guests`)
+    const totalTime = Date.now() - startTime
+    console.log(`Upload completed in ${totalTime}ms. Created ${createdHouseholds.length} households and ${createdGuests.length} guests.`)
     
-    return NextResponse.json({
-      success: true,
-      message: `Successfully imported ${totalGuests} guests in ${results.length} households`,
-      households: results.length,
-      guests: totalGuests
+    // Revalidate the guests page
+    revalidatePath('/admin/guests')
+    
+    // Return success response with summary
+    return NextResponse.json({ 
+      message: `Successfully imported ${createdGuests.length} guests across ${createdHouseholds.length} households`,
+      households: createdHouseholds,
+      guests: createdGuests.length,
+      processingTime: `${(totalTime/1000).toFixed(2)} seconds`
     })
     
   } catch (error: any) {
-    console.error("Error processing upload:", error)
+    console.error('Error in upload-guests route:', error)
     
-    return NextResponse.json({
-      error: "Upload failed",
-      message: error.message || "An unexpected error occurred while processing your upload",
-      details: error.stack
+    // Check if it's a timeout error
+    if (error.message && error.message.includes('timed out')) {
+      return NextResponse.json({ 
+        error: 'The server took too long to process the request. Please try with a smaller file.',
+      }, { status: 504 })
+    }
+    
+    return NextResponse.json({ 
+      error: 'Failed to process upload',
+      message: error.message || 'Unknown error'
     }, { status: 500 })
   }
 }
