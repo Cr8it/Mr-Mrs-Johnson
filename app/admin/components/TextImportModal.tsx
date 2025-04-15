@@ -12,11 +12,11 @@ import { Clipboard, Loader2, AlertCircle, CheckCircle } from "lucide-react"
 import { ExclamationTriangleIcon } from '@radix-ui/react-icons'
 
 // Sample data format for display
-const SAMPLE_DATA = `Name	Household	Email	Child	Teenager	DietaryNotes
-John Smith	Smith Family	john@example.com			No nuts
-Jane Smith	Smith Family	jane@example.com			
-Billy Smith	Smith Family		T		
-Baby Smith	Smith Family	C			Allergic to dairy`;
+const SAMPLE_DATA = `Name	Household	Email	Child	Teenager
+John Smith	Smith Family	john@example.com		
+Jane Smith	Smith Family	jane@example.com		
+Billy Smith	Smith Family		T	
+Baby Smith	Smith Family		C	`;
 
 // Add a helper comment explaining the format
 const FORMAT_HELP = {
@@ -24,8 +24,7 @@ const FORMAT_HELP = {
   Household: "Required. Family or group name",
   Email: "Optional. Email address for the guest",
   Child: "Use 'C' to mark as a child",
-  Teenager: "Use 'T' to mark as a teenager",
-  DietaryNotes: "Optional. Any food allergies or restrictions"
+  Teenager: "Use 'T' to mark as a teenager"
 };
 
 interface TextImportModalProps {
@@ -141,25 +140,25 @@ const TextImportModal: React.FC<TextImportModalProps> = ({ open, onOpenChange, o
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-800">
         <DialogHeader>
-          <DialogTitle>Import Guests from Text</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-gray-900 dark:text-gray-100">Import Guests from Text</DialogTitle>
+          <DialogDescription className="text-gray-500 dark:text-gray-400">
             Paste data from Excel or other spreadsheets. Headers should include Name and Household.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="text-sm text-muted-foreground">
-            <p>Expected format (tab or comma delimited):</p>
-            <pre className="p-2 bg-muted rounded-md mt-1 text-xs overflow-x-auto">
+          <div className="text-sm text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 p-3 rounded-md">
+            <p className="font-semibold mb-2">Expected format (tab or comma delimited):</p>
+            <pre className="p-2 bg-gray-100 dark:bg-gray-900 rounded-md mt-1 text-xs overflow-x-auto text-gray-800 dark:text-gray-300">
               {SAMPLE_DATA}
             </pre>
-            <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+            <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
               {Object.entries(FORMAT_HELP).map(([field, help]) => (
-                <div key={field} className="flex flex-col">
-                  <span className="font-semibold">{field}</span>
-                  <span>{help}</span>
+                <div key={field} className="flex flex-col bg-gray-50 dark:bg-gray-700 p-2 rounded-md">
+                  <span className="font-semibold text-gray-900 dark:text-white">{field}</span>
+                  <span className="text-gray-600 dark:text-gray-300">{help}</span>
                 </div>
               ))}
             </div>
@@ -167,17 +166,17 @@ const TextImportModal: React.FC<TextImportModalProps> = ({ open, onOpenChange, o
 
           <Textarea
             placeholder="Paste your data here..."
-            className="h-[200px] font-mono text-sm"
+            className="h-[200px] font-mono text-sm border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             disabled={loading}
           />
 
           {errors.length > 0 && (
-            <Alert variant="destructive">
-              <ExclamationTriangleIcon className="h-4 w-4" />
-              <AlertTitle>Import Errors</AlertTitle>
-              <AlertDescription>
+            <Alert variant="destructive" className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+              <ExclamationTriangleIcon className="h-4 w-4 text-red-600 dark:text-red-400" />
+              <AlertTitle className="text-red-800 dark:text-red-400">Import Errors</AlertTitle>
+              <AlertDescription className="text-red-700 dark:text-red-300">
                 <ul className="list-disc pl-5 text-sm mt-2 max-h-[200px] overflow-y-auto">
                   {errors.map((error, i) => (
                     <li key={i}>{error}</li>
@@ -188,17 +187,19 @@ const TextImportModal: React.FC<TextImportModalProps> = ({ open, onOpenChange, o
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="gap-2">
           <Button 
             variant="outline" 
             onClick={() => onOpenChange(false)}
             disabled={loading}
+            className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
           >
             Cancel
           </Button>
           <Button 
             onClick={handleImport} 
             disabled={loading || !inputText.trim()}
+            className="bg-gold hover:bg-gold/90 text-white"
           >
             {loading ? (
               <>

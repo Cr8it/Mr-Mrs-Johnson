@@ -91,8 +91,7 @@ export async function POST(request: Request) {
             data: {
               email: record.Email ? record.Email.trim() : existingGuest.email,
               isChild: isChild,
-              isTeenager: isTeenager,
-              dietaryNotes: record.DietaryNotes ? record.DietaryNotes.trim() : existingGuest.dietaryNotes
+              isTeenager: isTeenager
             }
           });
           updatedCount++;
@@ -103,8 +102,7 @@ export async function POST(request: Request) {
               householdId: household.id,
               email: record.Email ? record.Email.trim() : null,
               isChild: isChild,
-              isTeenager: isTeenager,
-              dietaryNotes: record.DietaryNotes ? record.DietaryNotes.trim() : null
+              isTeenager: isTeenager
             }
           });
           importedCount++;
