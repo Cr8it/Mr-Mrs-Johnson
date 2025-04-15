@@ -17,22 +17,33 @@ interface HouseholdGroups {
 const normalizeHeaders = (record: any): GuestRecord => {
   // Create a normalized version of the record with correct casing
   const normalized: any = {};
+  console.log('Normalizing record:', record); // Add logging
   Object.keys(record).forEach(key => {
     // Remove extra spaces and convert to proper case
     const cleanKey = key.trim();
     const properKey = cleanKey.charAt(0).toUpperCase() + cleanKey.slice(1).toLowerCase();
     normalized[properKey] = record[key];
+    console.log(`Normalized ${key} to ${properKey}`); // Add logging
   });
   return normalized as GuestRecord;
 };
 
 const validateCsvRow = (row: any): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
+  console.log('Validating row:', row); // Add logging
+  
+  // First check if row is empty or undefined
+  if (!row || Object.keys(row).length === 0) {
+    errors.push('Row is empty or undefined');
+    return { isValid: false, errors };
+  }
+
   const normalizedRow = normalizeHeaders(row);
+  console.log('Normalized row:', normalizedRow); // Add logging
 
   // Check if required fields exist
   if (!normalizedRow.Name || typeof normalizedRow.Name !== "string" || normalizedRow.Name.trim() === "") {
-    errors.push(`Name is required and cannot be empty for row with data: ${JSON.stringify(row)}`);
+    errors.push(`Name is required and cannot be empty for row: ${JSON.stringify(normalizedRow)}`);
   }
   if (!normalizedRow.Household || typeof normalizedRow.Household !== "string" || normalizedRow.Household.trim() === "") {
     errors.push(`Household is required and cannot be empty for guest: ${normalizedRow.Name || 'Unknown'}`);
@@ -46,15 +57,17 @@ const validateCsvRow = (row: any): { isValid: boolean; errors: string[] } => {
   // More flexible Child/Teenager validation
   if (normalizedRow.Child) {
     const childValue = normalizedRow.Child.toString().toLowerCase().trim();
+    console.log(`Child value for ${normalizedRow.Name}:`, childValue); // Add logging
     if (!["yes", "no", "true", "false", "t", "c", "y", "n", ""].includes(childValue)) {
-      errors.push(`Invalid Child value for guest ${normalizedRow.Name}. Must be yes/no/true/false/t/c/y/n or empty`);
+      errors.push(`Invalid Child value "${childValue}" for guest ${normalizedRow.Name}. Must be yes/no/true/false/t/c/y/n or empty`);
     }
   }
 
   if (normalizedRow.Teenager) {
     const teenValue = normalizedRow.Teenager.toString().toLowerCase().trim();
+    console.log(`Teenager value for ${normalizedRow.Name}:`, teenValue); // Add logging
     if (!["yes", "no", "true", "false", "t", "y", "n", ""].includes(teenValue)) {
-      errors.push(`Invalid Teenager value for guest ${normalizedRow.Name}. Must be yes/no/true/false/t/y/n or empty`);
+      errors.push(`Invalid Teenager value "${teenValue}" for guest ${normalizedRow.Name}. Must be yes/no/true/false/t/y/n or empty`);
     }
   }
 
@@ -88,12 +101,15 @@ export async function POST(request: Request) {
       });
 
       console.log('Parsed records count:', records.length);
-      console.log('First record sample:', records[0]);
+      console.log('First record sample:', JSON.stringify(records[0], null, 2));
 
       // Remove any completely empty rows
       records = records.filter(record => 
         Object.values(record).some(value => value && value.toString().trim() !== '')
       );
+
+      // Log all records after filtering
+      console.log('Records after filtering:', JSON.stringify(records, null, 2));
 
       // Normalize headers for all records
       records = records.map(normalizeHeaders);
@@ -123,7 +139,8 @@ export async function POST(request: Request) {
         {
           error: "Failed to parse file",
           details: "Please ensure your file is properly formatted with headers: Name, Email, Household, Child, Teenager (comma or tab separated)",
-          parseError: parseError instanceof Error ? parseError.message : String(parseError)
+          parseError: parseError instanceof Error ? parseError.message : String(parseError),
+          content: content.slice(0, 200) // Show first 200 characters of file
         },
         { status: 400 }
       );
@@ -131,13 +148,9 @@ export async function POST(request: Request) {
 
     // Validate each record
     const validationResults = records.map((record, index) => {
+      console.log(`\nValidating record ${index + 2}:`, JSON.stringify(record, null, 2));
       const validation = validateCsvRow(record);
-      console.log(`Validating row ${index + 2}:`, {
-        name: record.Name,
-        household: record.Household,
-        isValid: validation.isValid,
-        errors: validation.errors
-      });
+      console.log(`Validation result for row ${index + 2}:`, validation);
       return {
         rowNumber: index + 2,
         ...validation,
@@ -147,7 +160,7 @@ export async function POST(request: Request) {
 
     const invalidRecords = validationResults.filter(result => !result.isValid);
     if (invalidRecords.length > 0) {
-      console.log('Invalid records found:', invalidRecords);
+      console.log('Invalid records found:', JSON.stringify(invalidRecords, null, 2));
       return NextResponse.json(
         {
           error: "Invalid records found in file",
@@ -158,7 +171,8 @@ export async function POST(request: Request) {
               name: record.record.Name,
               household: record.record.Household,
               child: record.record.Child,
-              teenager: record.record.Teenager
+              teenager: record.record.Teenager,
+              rawRecord: record.record // Include the raw record for debugging
             }
           }))
         },
