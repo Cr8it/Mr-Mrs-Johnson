@@ -91,6 +91,8 @@ export async function POST(request: Request, { params }: { params: { code: strin
     // Process responses for each guest
     for (const guest of household.guests) {
       const isAttending = responses[`attending-${guest.id}`]
+      const mealOptionId = responses[`meal-${guest.id}`]
+      const dessertOptionId = responses[`dessert-${guest.id}`]
 
       await prisma.guest.update({
         where: {
@@ -98,19 +100,51 @@ export async function POST(request: Request, { params }: { params: { code: strin
         },
         data: {
           isAttending,
+          mealOptionId: isAttending ? mealOptionId : null,
+          dessertOptionId: isAttending ? dessertOptionId : null,
         },
       })
 
+      // Log the meal and dessert choices in guest activity
       if (isAttending) {
-        // Save guest-specific responses
-        const guestResponses = Object.entries(responses)
-          .filter(([key]) => key.endsWith(`-${guest.id}`))
-          .map(([key, value]) => ({
-            questionId: key.split("-")[0],
-            guestId: guest.id,
-            answer: String(value),
-          }))
+        if (mealOptionId) {
+          await prisma.guestActivity.create({
+            data: {
+              guestId: guest.id,
+              action: 'UPDATE_MEAL',
+              details: `Selected meal option: ${mealOptionId}`
+            }
+          })
+        }
+        
+        if (dessertOptionId) {
+          await prisma.guestActivity.create({
+            data: {
+              guestId: guest.id,
+              action: 'UPDATE_DESSERT',
+              details: `Selected dessert option: ${dessertOptionId}`
+            }
+          })
+        }
+      }
 
+      // Save guest-specific responses
+      const guestResponses = Object.entries(responses)
+        .filter(([key]) => key.endsWith(`-${guest.id}`))
+        .filter(([key]) => !key.startsWith('meal-') && !key.startsWith('dessert-') && !key.startsWith('attending-'))
+        .map(([key, value]) => ({
+          questionId: key.split("-")[0],
+          guestId: guest.id,
+          answer: String(value),
+        }))
+
+      if (guestResponses.length > 0) {
+        // Delete existing responses first
+        await prisma.questionResponse.deleteMany({
+          where: { guestId: guest.id }
+        })
+
+        // Create new responses
         await prisma.questionResponse.createMany({
           data: guestResponses,
         })
@@ -126,9 +160,11 @@ export async function POST(request: Request, { params }: { params: { code: strin
         answer: String(value),
       }))
 
-    await prisma.questionResponse.createMany({
-      data: householdResponses,
-    })
+    if (householdResponses.length > 0) {
+      await prisma.questionResponse.createMany({
+        data: householdResponses,
+      })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {
