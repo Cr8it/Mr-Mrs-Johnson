@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
-import { toast } from "react-hot-toast"
+import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -124,22 +124,16 @@ const TextImportModal: React.FC<TextImportModalProps> = ({ open, onOpenChange, o
 
       if (result.errors && result.errors.length > 0) {
         setErrors(result.errors)
-        toast.warning(`Import completed with ${result.errors.length} errors`, {
-          description: "See details in the import window"
-        })
+        toast.warning(`Import completed with ${result.errors.length} errors. See details in the import window.`)
       } else {
-        toast.success("Import successful", {
-          description: `Imported ${result.imported} new guests and updated ${result.updated} existing guests`
-        })
+        toast.success(`Import successful! Imported ${result.imported} new guests and updated ${result.updated} existing guests.`)
         if (onSuccess) onSuccess()
         onOpenChange(false)
       }
     } catch (error: any) {
       console.error("Import error:", error)
       setErrors([error.message || "Failed to import data"])
-      toast.error("Import failed", {
-        description: error.message || "An error occurred while importing"
-      })
+      toast.error(`Import failed: ${error.message || "An error occurred while importing"}`)
     } finally {
       setLoading(false)
     }
