@@ -74,8 +74,6 @@ function SortableItem({ id, children }: { id: string; children: React.ReactNode 
 	)
 }
 
-
-
 export default function MenuOptionsPage() {
 	const [mealOptions, setMealOptions] = useState<Option[]>([])
 	const [dessertOptions, setDessertOptions] = useState<Option[]>([])
@@ -135,56 +133,66 @@ export default function MenuOptionsPage() {
 				fetch('/api/admin/meal-options'),
 				fetch('/api/admin/dessert-options')
 			])
-			
-			if (mealResponse.ok && dessertResponse.ok) {
+
+			if (mealResponse.ok) {
 				const mealData = await mealResponse.json()
-				const dessertData = await dessertResponse.json()
 				setMealOptions(mealData.options)
+			}
+
+			if (dessertResponse.ok) {
+				const dessertData = await dessertResponse.json()
 				setDessertOptions(dessertData.options)
 			}
+
+			// Refresh statistics after fetching options
+			await fetchStatistics()
 		} catch (error) {
 			toast({
 				variant: "destructive",
 				title: "Error",
-				description: "Failed to fetch menu options"
+				description: "Failed to fetch options"
 			})
 		}
 	}
 
 	const handleDragEnd = async (event: any, type: 'meal' | 'dessert') => {
-		const { active, over } = event
-		
-		if (active.id !== over.id) {
+		if (!event.active || !event.over) return
+
+		const oldIndex = type === 'meal'
+			? mealOptions.findIndex(item => item.id === event.active.id)
+			: dessertOptions.findIndex(item => item.id === event.active.id)
+		const newIndex = type === 'meal'
+			? mealOptions.findIndex(item => item.id === event.over.id)
+			: dessertOptions.findIndex(item => item.id === event.over.id)
+
+		if (oldIndex === -1 || newIndex === -1) return
+
+		try {
 			const options = type === 'meal' ? mealOptions : dessertOptions
-			const oldIndex = options.findIndex((item) => item.id === active.id)
-			const newIndex = options.findIndex((item) => item.id === over.id)
-			
-			const newOrder = arrayMove(options, oldIndex, newIndex)
-			
+			const reorderedOptions = arrayMove(options, oldIndex, newIndex)
+
 			if (type === 'meal') {
-				setMealOptions(newOrder)
+				setMealOptions(reorderedOptions)
 			} else {
-				setDessertOptions(newOrder)
+				setDessertOptions(reorderedOptions)
 			}
 
-			try {
-				await fetch(`/api/admin/${type}-options/reorder`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						items: newOrder.map((item, index) => ({
-							id: item.id,
-							order: index
-						}))
-					})
-				})
-			} catch (error) {
-				toast({
-					variant: "destructive",
-					title: "Error",
-					description: `Failed to reorder ${type} options`
-				})
-			}
+			const response = await fetch(`/api/admin/${type}-options/reorder`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ options: reorderedOptions })
+			})
+
+			if (!response.ok) throw new Error(`Failed to reorder ${type} options`)
+
+			// Refresh statistics after reordering
+			await fetchStatistics()
+		} catch (error) {
+			toast({
+				variant: "destructive",
+				title: "Error",
+				description: `Failed to reorder ${type} options`
+			})
 		}
 	}
 
@@ -219,6 +227,8 @@ export default function MenuOptionsPage() {
 					title: "Success",
 					description: "Meal option added successfully"
 				})
+				// Refresh statistics after adding option
+				await fetchStatistics()
 			}
 		} catch (error) {
 			console.error('Error adding meal option:', error)
@@ -246,6 +256,8 @@ export default function MenuOptionsPage() {
 					title: "Success",
 					description: "Dessert option added successfully"
 				})
+				// Refresh statistics after adding option
+				await fetchStatistics()
 			}
 		} catch (error) {
 			toast({
@@ -268,6 +280,8 @@ export default function MenuOptionsPage() {
 					title: "Success",
 					description: `${type.charAt(0).toUpperCase() + type.slice(1)} option removed successfully`
 				})
+				// Refresh statistics after removing option
+				await fetchStatistics()
 			}
 		} catch (error) {
 			toast({
