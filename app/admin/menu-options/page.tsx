@@ -190,15 +190,30 @@ export default function MenuOptionsPage() {
 
 	const handleAddMealOption = async (e: React.FormEvent) => {
 		e.preventDefault()
+		if (!newMealOption.trim()) {
+			toast({
+				variant: "destructive",
+				title: "Error",
+				description: "Please enter a meal option name"
+			})
+			return
+		}
+
 		try {
 			const response = await fetch('/api/admin/meal-options', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ name: newMealOption })
+				body: JSON.stringify({ name: newMealOption.trim() })
 			})
 
-			if (response.ok) {
-				await fetchOptions()
+			const data = await response.json()
+			
+			if (!response.ok) {
+				throw new Error(data.error || 'Failed to add meal option')
+			}
+
+			if (data.option) {
+				setMealOptions(prev => [...prev, data.option])
 				setNewMealOption("")
 				toast({
 					title: "Success",
@@ -206,10 +221,11 @@ export default function MenuOptionsPage() {
 				})
 			}
 		} catch (error) {
+			console.error('Error adding meal option:', error)
 			toast({
 				variant: "destructive",
 				title: "Error",
-				description: "Failed to add meal option"
+				description: error instanceof Error ? error.message : "Failed to add meal option"
 			})
 		}
 	}

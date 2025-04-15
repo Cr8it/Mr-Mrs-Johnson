@@ -28,34 +28,31 @@ export async function GET() {
 
 export async function POST(request: Request) {
 	try {
-		const body = await request.json()
+		const data = await request.json()
 		
-		if (!body.name || typeof body.name !== 'string') {
-			return NextResponse.json(
-				{ error: "Name is required and must be a string" },
-				{ status: 400 }
-			)
+		if (!data.name || typeof data.name !== 'string' || !data.name.trim()) {
+			return new Response(JSON.stringify({ error: 'Name is required' }), {
+				status: 400,
+				headers: { 'Content-Type': 'application/json' }
+			})
 		}
 
-		const { name } = body
-		console.log("Creating meal option:", name)
-		
 		const option = await prisma.mealOption.create({
 			data: {
-				name,
-				isActive: true,
-				updatedAt: new Date()
+				name: data.name.trim()
 			}
 		})
-		
-		console.log("Created meal option:", option)
-		return NextResponse.json({ option })
+
+		return new Response(JSON.stringify({ option }), {
+			status: 201,
+			headers: { 'Content-Type': 'application/json' }
+		})
 	} catch (error) {
-		console.error("POST meal option error:", error)
-		return NextResponse.json(
-			{ error: "Failed to create meal option" },
-			{ status: 500 }
-		)
+		console.error('Error creating meal option:', error)
+		return new Response(JSON.stringify({ error: 'Failed to create meal option' }), {
+			status: 500,
+			headers: { 'Content-Type': 'application/json' }
+		})
 	}
 }
 
