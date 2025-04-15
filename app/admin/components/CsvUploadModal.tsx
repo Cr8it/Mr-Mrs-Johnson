@@ -16,6 +16,7 @@ interface CsvUploadModalProps {
 export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProps) {
 	const [file, setFile] = useState<File | null>(null)
 	const [error, setError] = useState("")
+	const [errorList, setErrorList] = useState<string[]>([])
 	const [loading, setLoading] = useState(false)
 	const [dragActive, setDragActive] = useState(false)
 
@@ -39,8 +40,10 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 			if (file.type === "text/csv") {
 				setFile(file)
 				setError("")
+				setErrorList([])
 			} else {
 				setError("Please upload a CSV file")
+				setErrorList([])
 			}
 		}
 	}
@@ -49,11 +52,12 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 		if (e.target.files?.[0]) {
 			setFile(e.target.files[0])
 			setError("")
+			setErrorList([])
 		}
 	}
 
 	const downloadSampleCsv = () => {
-		const csvContent = "name,email,household\nJohn Doe,john@example.com,Doe Family\nJane Doe,jane@example.com,Doe Family"
+		const csvContent = "Name,Email,Household,Child,Teenager\nJohn Smith,john@example.com,Smith Family,yes,\nJane Smith,jane@example.com,Smith Family,,yes\nBaby Smith,,Smith Family,yes,"
 		const blob = new Blob([csvContent], { type: 'text/csv' })
 		const url = window.URL.createObjectURL(blob)
 		const a = document.createElement('a')
@@ -69,6 +73,7 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 
 		setLoading(true)
 		setError("")
+		setErrorList([])
 
 		const formData = new FormData()
 		formData.append('file', file)
@@ -82,13 +87,30 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 			const data = await response.json()
 
 			if (!response.ok) {
-				throw new Error(data.error || 'Failed to upload guests')
+				// Check for different error message formats
+				if (data.message) {
+					setError(data.message)
+				} else {
+					setError(data.error || 'Failed to upload guests')
+				}
+				
+				// Display error list if available
+				if (data.errorList) {
+					setErrorList(data.errorList.split('\n'))
+				} else if (data.details && Array.isArray(data.details)) {
+					// Format detailed errors into an array for display
+					setErrorList(data.details.map((detail: any) => 
+						`Row ${detail.row} (${detail.name}): ${detail.errors.join(', ')}`
+					))
+				}
+				
+				return
 			}
 
-			onUpload(data.households)
+			onUpload(data.households || [])
 			onClose()
 		} catch (error: any) {
-			setError(error.message)
+			setError(error.message || 'An unexpected error occurred')
 		} finally {
 			setLoading(false)
 		}
@@ -96,56 +118,65 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 
 	return (
 		<Dialog open={isOpen} onOpenChange={onClose}>
-			<DialogContent className="sm:max-w-[500px] dark:bg-gray-800">
+			<DialogContent className="sm:max-w-[500px] dark:bg-gray-800 max-h-[90vh] overflow-y-auto">
 				<DialogHeader>
 					<DialogTitle className="text-xl font-semibold flex items-center gap-2">
 						<Upload className="h-5 w-5 text-gold" />
 						Upload Guest List
 					</DialogTitle>
 				</DialogHeader>
-				<form onSubmit={handleSubmit} className="space-y-6">
+
+				<form onSubmit={handleSubmit} className="space-y-4">
 					<div
-						className={`
-							relative rounded-lg border-2 border-dashed p-6 transition-colors
-							${dragActive ? 'border-gold bg-gold/5' : 'border-gray-200 dark:border-gray-700'}
-							${file ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700' : ''}
-						`}
 						onDragEnter={handleDrag}
 						onDragLeave={handleDrag}
 						onDragOver={handleDrag}
 						onDrop={handleDrop}
+						className={`border-2 border-dashed rounded-md p-8 text-center transition-colors ${
+							dragActive ? "border-gold bg-gold/5" : "border-gray-300 dark:border-gray-600"
+						}`}
 					>
-						<input
-							type="file"
-							accept=".csv"
-							onChange={handleFileChange}
-							className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-						/>
-						<div className="text-center">
-							{file ? (
-								<div className="space-y-2">
-									<CheckCircle2 className="mx-auto h-8 w-8 text-green-500" />
-									<div>
-										<p className="text-sm font-medium">{file.name}</p>
-										<p className="text-xs text-gray-500 dark:text-gray-400">
-											{(file.size / 1024).toFixed(2)} KB
-										</p>
-									</div>
+						{file ? (
+							<div className="flex flex-col items-center gap-2">
+								<FileText className="h-10 w-10 text-gold" />
+								<div className="text-sm font-medium">{file.name}</div>
+								<div className="text-xs text-gray-500">
+									{(file.size / 1024).toFixed(2)} KB
 								</div>
-							) : (
-								<>
-									<FileText className="mx-auto h-8 w-8 text-gray-400 dark:text-gray-500" />
-									<div className="mt-2">
-										<p className="text-sm font-medium dark:text-gray-200">
-											Drag and drop your CSV file here, or click to browse
-										</p>
-										<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-											File must be in CSV format
-										</p>
-									</div>
-								</>
-							)}
-						</div>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									onClick={() => {
+										setFile(null)
+										setError("")
+										setErrorList([])
+									}}
+									className="mt-2 text-xs"
+								>
+									Remove
+								</Button>
+							</div>
+						) : (
+							<div className="flex flex-col items-center">
+								<Upload className="h-10 w-10 text-gray-400 dark:text-gray-500 mb-2" />
+								<p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+									Drag & drop your CSV file here, or click to select
+								</p>
+								<Input
+									type="file"
+									accept=".csv"
+									className="hidden"
+									id="csv-upload"
+									onChange={handleFileChange}
+								/>
+								<label htmlFor="csv-upload">
+									<Button type="button" variant="outline" size="sm" className="cursor-pointer">
+										Select CSV File
+									</Button>
+								</label>
+							</div>
+						)}
 					</div>
 
 					<div className="space-y-4">
@@ -170,9 +201,11 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 							<AlertDescription className="mt-2 text-xs space-y-2">
 								<p>Your CSV file must include the following columns:</p>
 								<ul className="list-disc list-inside">
-									<li>name (Guest's full name)</li>
-									<li>email (Guest's email address)</li>
-									<li>household (Household/family name)</li>
+									<li>Name (Guest's full name - required)</li>
+									<li>Household (Household/family name - required)</li>
+									<li>Email (Guest's email address - optional)</li>
+									<li>Child (Use "yes" to mark as a child - optional)</li>
+									<li>Teenager (Use "yes" to mark as a teenager - optional)</li>
 								</ul>
 							</AlertDescription>
 						</Alert>
@@ -182,6 +215,22 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 						<Alert variant="destructive">
 							<AlertCircle className="h-4 w-4" />
 							<AlertDescription className="ml-2">{error}</AlertDescription>
+						</Alert>
+					)}
+					
+					{errorList.length > 0 && (
+						<Alert variant="destructive" className="mt-2">
+							<AlertTitle className="flex items-center gap-2 text-sm font-medium">
+								<AlertCircle className="h-4 w-4" />
+								Validation Errors
+							</AlertTitle>
+							<AlertDescription className="mt-2 max-h-60 overflow-y-auto">
+								<ul className="text-xs space-y-1 list-disc list-inside">
+									{errorList.map((err, index) => (
+										<li key={index}>{err}</li>
+									))}
+								</ul>
+							</AlertDescription>
 						</Alert>
 					)}
 
