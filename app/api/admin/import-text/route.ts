@@ -1,43 +1,5 @@
-import { NextRequest } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import { revalidatePath } from "next/cache";
-import { z } from "zod";
-import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import logger from '@/lib/logger'
-
-const prismaClient = new PrismaClient();
-
-// Define the schema for guest records
-const GuestRecordSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  household: z.string().min(1, "Household is required"),
-  email: z.string().email().optional().nullable(),
-  phone: z.string().optional().nullable(),
-  role: z.enum(["GUEST", "ADMIN"]).default("GUEST"),
-  isChild: z.boolean().default(false),
-  isTeenager: z.boolean().default(false),
-  rsvpStatus: z.enum(["PENDING", "ATTENDING", "DECLINED"]).default("PENDING"),
-  dietaryRestrictions: z.string().optional().nullable(),
-  notes: z.string().optional().nullable(),
-});
-
-// Expected headers for the text data
-const EXPECTED_HEADERS = [
-  'Name',
-  'Household',
-  'Email',
-  'Phone',
-  'Attending',
-  'Adult',
-  'Teenager',
-  'Child',
-  'Meal Option',
-  'Dessert Option',
-  'Notes'
-]
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
 
 // Helper function to generate a random code
 function generateRandomCode() {
@@ -45,43 +7,37 @@ function generateRandomCode() {
 }
 
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions)
-
-  if (!session || !session.user) {
-    return new Response('Unauthorized', { status: 401 })
-  }
-
   try {
-    const { records } = await request.json()
+    const { records } = await request.json();
 
     if (!Array.isArray(records) || records.length === 0) {
       return NextResponse.json(
         { error: 'No valid records provided' },
         { status: 400 }
-      )
+      );
     }
 
-    logger.info(`Processing ${records.length} records from text import`)
+    console.log(`Processing ${records.length} records from text import`);
 
-    const importErrors: string[] = []
-    let importedCount = 0
-    let updatedCount = 0
+    const importErrors: string[] = [];
+    let importedCount = 0;
+    let updatedCount = 0;
 
     // Process each record
     for (let i = 0; i < records.length; i++) {
-      const record = records[i]
-      const rowNumber = i + 2 // +2 because we're 0-indexed but users think in 1-indexed, and we skip the header row
+      const record = records[i];
+      const rowNumber = i + 2; // +2 because we're 0-indexed but users think in 1-indexed, and we skip the header row
 
       try {
         // Basic validation
         if (!record.Name?.trim()) {
-          importErrors.push(`Row ${rowNumber}: Name is required`)
-          continue
+          importErrors.push(`Row ${rowNumber}: Name is required`);
+          continue;
         }
 
         if (!record.Household?.trim()) {
-          importErrors.push(`Row ${rowNumber}: Household is required`)
-          continue
+          importErrors.push(`Row ${rowNumber}: Household is required`);
+          continue;
         }
 
         // Check if household exists, create if not
@@ -92,7 +48,7 @@ export async function POST(request: Request) {
               mode: 'insensitive'
             }
           }
-        })
+        });
 
         if (!household) {
           household = await prisma.household.create({
@@ -100,8 +56,8 @@ export async function POST(request: Request) {
               name: record.Household.trim(),
               code: generateRandomCode()
             }
-          })
-          logger.info(`Created new household: ${household.name} with code ${household.code}`)
+          });
+          console.log(`Created new household: ${household.name} with code ${household.code}`);
         }
 
         // Check if guest exists
@@ -113,7 +69,7 @@ export async function POST(request: Request) {
             },
             householdId: household.id
           }
-        })
+        });
 
         // Determine if child or teenager
         const isChild = record.Child === 'C' || 
@@ -138,8 +94,8 @@ export async function POST(request: Request) {
               isTeenager: isTeenager,
               dietaryNotes: record.DietaryNotes ? record.DietaryNotes.trim() : existingGuest.dietaryNotes
             }
-          })
-          updatedCount++
+          });
+          updatedCount++;
         } else {
           await prisma.guest.create({
             data: {
@@ -150,12 +106,12 @@ export async function POST(request: Request) {
               isTeenager: isTeenager,
               dietaryNotes: record.DietaryNotes ? record.DietaryNotes.trim() : null
             }
-          })
-          importedCount++
+          });
+          importedCount++;
         }
-      } catch (error) {
-        logger.error(`Error processing row ${rowNumber}:`, error)
-        importErrors.push(`Row ${rowNumber}: ${error.message || 'Unknown error'}`)
+      } catch (error: any) {
+        console.error(`Error processing row ${rowNumber}:`, error);
+        importErrors.push(`Row ${rowNumber}: ${error.message || 'Unknown error'}`);
       }
     }
 
@@ -164,12 +120,12 @@ export async function POST(request: Request) {
       imported: importedCount,
       updated: updatedCount,
       errors: importErrors
-    })
-  } catch (error) {
-    logger.error('Text import error:', error)
+    });
+  } catch (error: any) {
+    console.error('Text import error:', error);
     return NextResponse.json(
       { error: 'Failed to process import: ' + error.message },
       { status: 500 }
-    )
+    );
   }
 } 

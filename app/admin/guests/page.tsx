@@ -15,6 +15,7 @@ export default function GuestsPage() {
   const [isTextModalOpen, setIsTextModalOpen] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [textImportOpen, setTextImportOpen] = useState(false)
+  const [createGuestOpen, setCreateGuestOpen] = useState(false)
 
   const handleUploadSuccess = () => {
     // Refresh the guest list
@@ -67,9 +68,9 @@ export default function GuestsPage() {
       />
       
       <CsvUploadModal
-        open={uploadOpen}
-        onOpenChange={setUploadOpen}
-        onSuccess={handleUploadSuccess}
+        isOpen={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        onUpload={handleUploadSuccess}
       />
     </div>
   )
