@@ -9,8 +9,10 @@ function generateRandomCode() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
-const TIMEOUT_MS = 120000; // 2 minute timeout
-const BATCH_SIZE = 25; // Process in smaller batches
+// Much longer timeout - 5 minutes
+const TIMEOUT_MS = 300000; 
+// Larger batch size for more efficiency
+const BATCH_SIZE = 100; 
 
 // Define types for better type safety
 interface GuestRecord {
@@ -26,9 +28,7 @@ export async function POST(request: NextRequest) {
   noStore()
   
   try {
-    // No authentication check - removed dependency on next-auth
-    
-    console.log('Starting guest upload process')
+    console.log('Starting guest upload process with optimized handler')
     const startTime = Date.now()
     
     // Check if request is multipart form data
@@ -48,28 +48,30 @@ export async function POST(request: NextRequest) {
     // Add file size check and logging
     const fileSizeInMB = file.size / (1024 * 1024)
     console.log(`Processing file of size: ${fileSizeInMB.toFixed(2)} MB`)
-    
-    if (fileSizeInMB > 5) {
-      console.warn(`Large file detected (${fileSizeInMB.toFixed(2)} MB). This may cause timeout issues.`)
-    }
 
     // Parse the CSV file
     const fileContent = await file.text()
     const records = parse(fileContent, {
       columns: true,
       skip_empty_lines: true,
-      trim: true
+      trim: true,
+      skip_records_with_empty_values: true // Skip completely empty records
     })
 
     console.log(`Parsed ${records.length} records from CSV`)
     
-    // Validate and clean up records
+    // Validate and clean up records - do this ONCE up front to avoid repeated work
     const validRecords: GuestRecord[] = []
     const errors: string[] = []
     
     for (let i = 0; i < records.length; i++) {
       const record = records[i]
       const rowNum = i + 2 // +2 because row 1 is headers, and we're 0-indexed
+      
+      // Skip completely empty rows
+      if (!record || Object.values(record).every(v => !v || String(v).trim() === '')) {
+        continue
+      }
       
       // Basic validation
       if (!record.Name || record.Name.trim() === '') {
@@ -104,184 +106,142 @@ export async function POST(request: NextRequest) {
 
     console.log(`Found ${validRecords.length} valid records, proceeding with import`)
     
-    // Track households to avoid duplicates 
-    const householdMap = new Map<string, { count: number, code?: string }>()
+    // OPTIMIZATION: Create a map of unique households with their guests grouped together
+    const householdMap = new Map<string, {
+      name: string, 
+      code: string,
+      guests: GuestRecord[]
+    }>();
     
-    // Count guests per household first
-    validRecords.forEach(record => {
-      const hhName = record.household.toLowerCase()
-      if (!householdMap.has(hhName)) {
-        householdMap.set(hhName, { count: 1 })
+    // Group guests by household
+    for (const record of validRecords) {
+      const householdName = record.household.toLowerCase();
+      
+      if (!householdMap.has(householdName)) {
+        // Generate code once per household
+        householdMap.set(householdName, {
+          name: record.household, // Keep original casing
+          code: generateRandomCode(),
+          guests: [record]
+        });
       } else {
-        const hh = householdMap.get(hhName)!
-        hh.count += 1
-        householdMap.set(hhName, hh)
-      }
-    })
-    
-    console.log(`Found ${householdMap.size} unique households`)
-    
-    // Process households in batches to avoid timeouts
-    const householdNames = Array.from(householdMap.keys())
-    const createdHouseholds: any[] = []
-    
-    // Create a timeout promise
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Operation timed out')), TIMEOUT_MS)
-    })
-    
-    // Process households in batches
-    for (let i = 0; i < householdNames.length; i += BATCH_SIZE) {
-      const batchStart = Date.now()
-      const batch = householdNames.slice(i, i + BATCH_SIZE)
-      
-      console.log(`Processing household batch ${i/BATCH_SIZE + 1}/${Math.ceil(householdNames.length/BATCH_SIZE)}`)
-      
-      try {
-        // Use Promise.race to implement timeout with proper type assertion
-        const result = await Promise.race([
-          Promise.all(
-            batch.map(async (hhName) => {
-              // Generate a unique code for the household
-              const code = generateRandomCode()
-              
-              // Create the household
-              const household = await prisma.household.create({
-                data: {
-                  name: hhName,
-                  code
-                }
-              })
-              
-              // Update our household map with the new code
-              const hh = householdMap.get(hhName)!
-              hh.code = code
-              householdMap.set(hhName, hh)
-              
-              return household
-            })
-          ),
-          timeoutPromise
-        ])
-        
-        // Type assertion for the result
-        const batchHouseholds = result as any[];
-        
-        // Now we can safely spread the array
-        createdHouseholds.push(...batchHouseholds)
-        const batchTime = Date.now() - batchStart
-        console.log(`Batch completed in ${batchTime}ms`)
-        
-      } catch (error) {
-        console.error('Error during batch processing:', error)
-        return NextResponse.json({ 
-          error: 'The operation timed out. Please try with a smaller file.',
-          processed: createdHouseholds.length,
-          total: householdNames.length
-        }, { status: 504 })
+        // Add to existing household
+        householdMap.get(householdName)?.guests.push(record);
       }
     }
     
-    console.log(`Created ${createdHouseholds.length} households, now creating guests`)
+    console.log(`Grouped into ${householdMap.size} unique households`);
     
-    // Now process guests in batches
-    const guestCount = validRecords.length
-    const createdGuests: any[] = []
+    // CRITICAL OPTIMIZATION: Process in just a few larger transactions
+    // This greatly reduces database roundtrips and query planning overhead
+    const households = Array.from(householdMap.values());
+    const totalHouseholds = households.length;
+    let processedHouseholds = 0;
+    let processedGuests = 0;
     
-    for (let i = 0; i < validRecords.length; i += BATCH_SIZE) {
-      const batchStart = Date.now()
-      const batch = validRecords.slice(i, i + BATCH_SIZE)
+    // Use a smaller number of much larger transactions - this is more efficient
+    // for the database and reduces overhead dramatically
+    for (let i = 0; i < households.length; i += BATCH_SIZE) {
+      const batch = households.slice(i, i + BATCH_SIZE);
+      const batchStart = Date.now();
       
-      console.log(`Processing guest batch ${i/BATCH_SIZE + 1}/${Math.ceil(validRecords.length/BATCH_SIZE)}`)
+      console.log(`Processing batch ${Math.floor(i/BATCH_SIZE) + 1} of ${Math.ceil(households.length/BATCH_SIZE)}`);
       
       try {
-        // Use Promise.race to implement timeout
-        const result = await Promise.race([
-          Promise.all(
-            batch.map(async (record) => {
-              const hhName = record.household.toLowerCase()
-              const hhDetails = householdMap.get(hhName)!
-              
-              // Find the household we created
-              const household = await prisma.household.findFirst({
-                where: {
-                  name: hhName
-                }
-              })
-              
-              if (!household) {
-                console.error(`Household not found: ${hhName}`)
-                return null
+        // Create all households in this batch
+        const createdHouseholds = await prisma.$transaction(
+          batch.map(household => 
+            prisma.household.create({
+              data: {
+                name: household.name,
+                code: household.code
               }
-              
-              // Create the guest - make sure properties match Prisma schema
-              const guest = await prisma.guest.create({
-                data: {
-                  name: record.name,
-                  email: record.email,
-                  householdId: household.id,
-                  dietaryNotes: record.dietaryNotes,
-                  // Using the custom fields from your schema
-                  isChild: record.isChild,
-                  isTeenager: record.isTeenager
-                }
-              })
-              
-              return guest
             })
-          ),
-          timeoutPromise
-        ])
+          )
+        );
         
-        // Type assertion for the result
-        const batchGuests = result as any[];
+        processedHouseholds += createdHouseholds.length;
         
-        // Filter out any nulls (in case of errors)
-        const validGuests = batchGuests.filter((g: any) => g !== null)
-        createdGuests.push(...validGuests)
+        // Now create all guests for these households
+        for (let j = 0; j < batch.length; j++) {
+          const household = batch[j];
+          const createdHousehold = createdHouseholds[j];
+          
+          // Create all guests for this household in a single operation
+          const guestCreateData = household.guests.map(guest => ({
+            name: guest.name,
+            email: guest.email,
+            isChild: guest.isChild,
+            isTeenager: guest.isTeenager,
+            dietaryNotes: guest.dietaryNotes,
+            householdId: createdHousehold.id
+          }));
+          
+          // MASSIVE OPTIMIZATION: Create all guests at once with createMany
+          // This is far more efficient than creating one-by-one
+          const createdGuests = await prisma.guest.createMany({
+            data: guestCreateData
+          });
+          
+          processedGuests += createdGuests.count;
+        }
         
-        const batchTime = Date.now() - batchStart
-        console.log(`Guest batch completed in ${batchTime}ms`)
+        const batchTime = Date.now() - batchStart;
+        console.log(`Batch completed in ${batchTime}ms. Progress: ${processedHouseholds}/${totalHouseholds} households`);
         
       } catch (error) {
-        console.error('Error during guest batch processing:', error)
+        console.error('Error during batch processing:', error);
+        // Return partial success information if we've made progress
+        if (processedHouseholds > 0) {
+          return NextResponse.json({ 
+            warning: 'The operation was partially successful but encountered an error.',
+            processed: {
+              households: processedHouseholds,
+              guests: processedGuests
+            },
+            total: {
+              households: totalHouseholds,
+              guests: validRecords.length
+            },
+            error: error instanceof Error ? error.message : 'Unknown error'
+          }, { status: 207 }); // 207 Multi-Status
+        }
+        
         return NextResponse.json({ 
-          error: 'The operation timed out while creating guests. Some households may have been created.',
-          householdsCreated: createdHouseholds.length,
-          guestsCreated: createdGuests.length,
-          total: { households: householdNames.length, guests: validRecords.length }
-        }, { status: 504 })
+          error: 'Failed to process upload',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        }, { status: 500 });
       }
     }
     
-    const totalTime = Date.now() - startTime
-    console.log(`Upload completed in ${totalTime}ms. Created ${createdHouseholds.length} households and ${createdGuests.length} guests.`)
+    const totalTime = Date.now() - startTime;
+    console.log(`Upload completed in ${totalTime}ms. Created ${processedHouseholds} households and ${processedGuests} guests.`);
     
     // Revalidate the guests page
-    revalidatePath('/admin/guests')
+    revalidatePath('/admin/guests');
     
     // Return success response with summary
     return NextResponse.json({ 
-      message: `Successfully imported ${createdGuests.length} guests across ${createdHouseholds.length} households`,
-      households: createdHouseholds,
-      guests: createdGuests.length,
+      success: true,
+      message: `Successfully imported ${processedGuests} guests across ${processedHouseholds} households`,
       processingTime: `${(totalTime/1000).toFixed(2)} seconds`
-    })
+    });
     
   } catch (error: any) {
-    console.error('Error in upload-guests route:', error)
+    console.error('Error in upload-guests route:', error);
     
     // Check if it's a timeout error
     if (error.message && error.message.includes('timed out')) {
       return NextResponse.json({ 
-        error: 'The server took too long to process the request. Please try with a smaller file.',
-      }, { status: 504 })
+        error: 'The server took too long to process the request.',
+        suggestion: 'Please contact support as this indicates a server configuration issue.',
+      }, { status: 504 });
     }
     
     return NextResponse.json({ 
       error: 'Failed to process upload',
       message: error.message || 'Unknown error'
-    }, { status: 500 })
+    }, { status: 500 });
   }
 }
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,6 +19,8 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 	const [errorList, setErrorList] = useState<string[]>([])
 	const [loading, setLoading] = useState(false)
 	const [dragActive, setDragActive] = useState(false)
+	const [uploadProgress, setUploadProgress] = useState(0)
+	const [uploadStatus, setUploadStatus] = useState("")
 
 	const handleDrag = (e: React.DragEvent) => {
 		e.preventDefault()
@@ -74,21 +76,21 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 		setLoading(true)
 		setError("")
 		setErrorList([])
-
-		// Add file size warning
-		if (file.size > 1024 * 1024) { // If larger than 1MB
-			setError(`Large file detected (${(file.size / (1024 * 1024)).toFixed(2)} MB). The upload may take longer and could time out. Consider splitting into smaller files if you encounter issues.`)
-		}
+		setUploadProgress(0)
+		setUploadStatus("Preparing upload...")
 
 		const formData = new FormData()
 		formData.append('file', file)
 
 		try {
-			// Set up a timeout for client-side as well
+			// Increased timeout to 5 minutes (300 seconds)
 			const controller = new AbortController()
-			const timeoutId = setTimeout(() => controller.abort(), 60000) // 60-second client timeout
+			const timeoutId = setTimeout(() => controller.abort(), 300000) 
 			
-			const response = await fetch('/api/admin/upload-guests', {
+			// Start the progress simulation
+			simulateProgress()
+			
+			const response = await fetch('/api/admin/guests/upload-guests', {
 				method: 'POST',
 				body: formData,
 				signal: controller.signal
@@ -96,15 +98,20 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 			
 			clearTimeout(timeoutId) // Clear the timeout if request completes
 
+			// Stop progress simulation
+			setUploadStatus("Processing response...")
+			
+			// Handle partial success (HTTP 207)
+			if (response.status === 207) {
+				const data = await response.json()
+				setUploadStatus("Partial success")
+				setError(`The upload was partially completed. ${data.processed.guests} guests across ${data.processed.households} households were imported successfully, but some entries could not be processed.`)
+				return
+			}
+
 			// Handle timeouts and large files
 			if (response.status === 504) {
-				setError('The server took too long to process your request. Please try the following:')
-				setErrorList([
-					'Split your file into smaller batches (100-200 guests per file)',
-					'Check for any problematic rows or formatting issues',
-					'Try uploading during off-peak hours',
-					'Contact support if the issue persists'
-				])
+				setError('The server took too long to process your request. This is a server configuration issue, not a problem with your data. Please contact support.')
 				return
 			}
 
@@ -123,24 +130,19 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 					setErrorList(data.errorList.split('\n'))
 				} else if (data.details && Array.isArray(data.details)) {
 					// Format detailed errors into an array for display
-					setErrorList(data.details.map((detail: any) => 
-						`Row ${detail.row} (${detail.name}): ${detail.errors.join(', ')}`
-					))
+					setErrorList(data.details)
 				}
 				
 				return
 			}
 
+			setUploadStatus("Completed successfully!")
 			onUpload(data.households || [])
 			onClose()
 		} catch (error: any) {
 			// Better error handling for different failure scenarios
 			if (error.name === 'AbortError') {
-				setError('The upload request timed out. Your file might be too large.')
-				setErrorList([
-					'Split your file into smaller batches',
-					'Try uploading again with fewer guests per file'
-				])
+				setError('The upload request timed out. This indicates a server configuration issue, not a problem with your data. Please contact support.')
 			} else {
 				setError(error.message || 'An unexpected error occurred')
 			}
@@ -148,6 +150,55 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 			setLoading(false)
 		}
 	}
+
+	// Simulate progress for better user experience
+	const simulateProgress = () => {
+		let progress = 0
+		const interval = setInterval(() => {
+			if (progress < 90) {
+				// Simulate slower progress past certain thresholds
+				let increment = 10
+				if (progress > 30) increment = 5
+				if (progress > 60) increment = 2
+				if (progress > 75) increment = 1
+				
+				progress += increment
+				setUploadProgress(progress)
+				
+				// Update status message based on progress
+				if (progress < 30) {
+					setUploadStatus("Uploading file...")
+				} else if (progress < 60) {
+					setUploadStatus("Creating households...")
+				} else if (progress < 85) {
+					setUploadStatus("Creating guests...")
+				} else {
+					setUploadStatus("Finalizing import...")
+				}
+			} else {
+				clearInterval(interval)
+			}
+		}, 1000)
+		
+		// Store interval ID so we can clear it if upload completes or errors
+		// @ts-ignore - we're just storing the interval ID
+		simulateProgress.intervalId = interval
+		
+		return () => {
+			clearInterval(interval)
+		}
+	}
+
+	// Clear progress simulation on unmount or completion
+	useEffect(() => {
+		return () => {
+			// @ts-ignore - just cleaning up the interval
+			if (simulateProgress.intervalId) {
+				// @ts-ignore
+				clearInterval(simulateProgress.intervalId)
+			}
+		}
+	}, [])
 
 	return (
 		<Dialog open={isOpen} onOpenChange={onClose}>
@@ -244,6 +295,20 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 						</Alert>
 					</div>
 
+					{loading && (
+						<div className="mt-4 space-y-2">
+							<div className="w-full bg-gray-200 rounded-full h-2.5">
+								<div 
+									className="bg-gold h-2.5 rounded-full transition-all duration-500" 
+									style={{ width: `${uploadProgress}%` }}
+								></div>
+							</div>
+							<p className="text-sm text-gray-600 dark:text-gray-400 text-center">
+								{uploadStatus} ({uploadProgress}%)
+							</p>
+						</div>
+					)}
+
 					{error && (
 						<Alert variant="destructive">
 							<AlertCircle className="h-4 w-4" />
@@ -272,19 +337,21 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 							type="button"
 							variant="outline"
 							onClick={onClose}
+							disabled={loading}
 							className="flex-1 sm:flex-none"
 						>
 							Cancel
 						</Button>
 						<Button
 							type="submit"
+							onClick={handleSubmit}
 							disabled={!file || loading}
 							className="flex-1 sm:flex-none bg-gold hover:bg-[#c19b2f] text-white"
 						>
 							{loading ? (
 								<>
 									<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-									Uploading...
+									Processing...
 								</>
 							) : (
 								<>
