@@ -8,23 +8,23 @@ import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Clipboard, Loader2, AlertCircle, CheckCircle } from "lucide-react"
+import { Clipboard, Loader2, AlertCircle, CheckCircle, Download } from "lucide-react"
 import { ExclamationTriangleIcon } from '@radix-ui/react-icons'
 
 // Sample data format for display
-const SAMPLE_DATA = `Name	Household	Email	Child	Teenager
-John Smith	Smith Family	john@example.com		
-Jane Smith	Smith Family	jane@example.com		
-Billy Smith	Smith Family		T	
-Baby Smith	Smith Family		C	`;
+const SAMPLE_DATA = `Name	Email	Household	Child	Teenager
+John Smith	john@example.com	Smith Family		
+Jane Smith	jane@example.com	Smith Family		
+Billy Smith	billy@example.com	Smith Family	yes	
+Baby Smith	baby@example.com	Smith Family	yes	`;
 
 // Add a helper comment explaining the format
 const FORMAT_HELP = {
   Name: "Required. Full name of the guest",
   Household: "Required. Family or group name",
   Email: "Optional. Email address for the guest",
-  Child: "Use 'C' to mark as a child",
-  Teenager: "Use 'T' to mark as a teenager"
+  Child: "Use 'yes' to mark as a child",
+  Teenager: "Use 'yes' to mark as a teenager"
 };
 
 interface TextImportModalProps {
@@ -74,8 +74,16 @@ const TextImportModal: React.FC<TextImportModalProps> = ({ open, onOpenChange, o
       if (!line) continue // Skip empty lines
       
       const values = line.split(delimiter)
-      if (values.length !== headers.length) {
-        throw new Error(`Row ${i} has ${values.length} columns but should have ${headers.length} columns`)
+      
+      // Handle case where values length doesn't match headers
+      // If there are fewer values than headers, pad with empty strings
+      while (values.length < headers.length) {
+        values.push("")
+      }
+      
+      // If there are more values than headers, truncate
+      if (values.length > headers.length) {
+        values.length = headers.length
       }
       
       // Create an object with headers as keys
@@ -138,6 +146,22 @@ const TextImportModal: React.FC<TextImportModalProps> = ({ open, onOpenChange, o
     }
   }
 
+  const downloadTemplate = () => {
+    const headers = "Name\tEmail\tHousehold\tChild\tTeenager";
+    const sampleData = "John Smith\tjohn@example.com\tSmith Family\t\t\nJane Smith\tjane@example.com\tSmith Family\t\t\nBilly Smith\tbilly@example.com\tSmith Family\tyes\t\nBaby Smith\tbaby@example.com\tSmith Family\tyes\t";
+    const content = `${headers}\n${sampleData}`;
+    
+    const blob = new Blob([content], { type: 'text/tab-separated-values' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'guest-import-template.tsv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-800">
@@ -150,7 +174,19 @@ const TextImportModal: React.FC<TextImportModalProps> = ({ open, onOpenChange, o
 
         <div className="space-y-4">
           <div className="text-sm text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 p-3 rounded-md">
-            <p className="font-semibold mb-2">Expected format (tab or comma delimited):</p>
+            <div className="flex justify-between items-center mb-2">
+              <p className="font-semibold">Expected format (tab or comma delimited):</p>
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                onClick={downloadTemplate}
+                className="text-xs bg-transparent"
+              >
+                <Download className="mr-1 h-3 w-3" />
+                Download Template
+              </Button>
+            </div>
             <pre className="p-2 bg-gray-100 dark:bg-gray-900 rounded-md mt-1 text-xs overflow-x-auto text-gray-800 dark:text-gray-300">
               {SAMPLE_DATA}
             </pre>

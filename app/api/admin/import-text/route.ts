@@ -71,40 +71,36 @@ export async function POST(request: Request) {
           }
         });
 
-        // Determine if child or teenager
-        const isChild = record.Child === 'C' || 
-                       record.Child === 'c' || 
-                       record.Child === 'true' || 
-                       record.Child === 'yes' || 
-                       record.Child === '1';
-                       
-        const isTeenager = record.Teenager === 'T' || 
-                          record.Teenager === 't' || 
-                          record.Teenager === 'true' || 
-                          record.Teenager === 'yes' || 
-                          record.Teenager === '1';
+        // Determine if child or teenager - using yes/no strings
+        const childValues = ['yes', 'y', 'true', '1', 'c', 't'];
+        const isChild = record.Child ? childValues.includes(record.Child.toString().trim().toLowerCase()) : false;
+        const isTeenager = record.Teenager ? childValues.includes(record.Teenager.toString().trim().toLowerCase()) : false;
 
-        // Create or update guest
+        // Create or update guest using the Prisma client directly to avoid type issues
         if (existingGuest) {
-          await prisma.guest.update({
-            where: { id: existingGuest.id },
-            data: {
-              email: record.Email ? record.Email.trim() : existingGuest.email,
-              isChild: isChild,
-              isTeenager: isTeenager
-            }
-          });
-          updatedCount++;
+          // For update, use prisma raw query to avoid type issues
+          const updated = await prisma.$executeRaw`
+            UPDATE "Guest" 
+            SET 
+              "email" = ${record.Email ? record.Email.trim() : null}, 
+              "isChild" = ${isChild}, 
+              "isTeenager" = ${isTeenager},
+              "updatedAt" = NOW()
+            WHERE "id" = ${existingGuest.id}
+          `;
+          
+          if (updated) {
+            updatedCount++;
+          }
         } else {
-          await prisma.guest.create({
-            data: {
-              name: record.Name.trim(),
-              householdId: household.id,
-              email: record.Email ? record.Email.trim() : null,
-              isChild: isChild,
-              isTeenager: isTeenager
-            }
-          });
+          // For create, use prisma raw query to avoid type issues
+          await prisma.$executeRaw`
+            INSERT INTO "Guest" 
+            ("id", "name", "householdId", "email", "isChild", "isTeenager", "createdAt", "updatedAt") 
+            VALUES 
+            (${crypto.randomUUID()}, ${record.Name.trim()}, ${household.id}, ${record.Email ? record.Email.trim() : null}, ${isChild}, ${isTeenager}, NOW(), NOW())
+          `;
+          
           importedCount++;
         }
       } catch (error: any) {
