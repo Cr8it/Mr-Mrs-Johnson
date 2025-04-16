@@ -48,7 +48,7 @@ export default function Schedule() {
       title: "The Ceremony",
       emoji: "💍",
       details: [
-        "Prompt start. Latecomers will not be permitted entry.",
+        "Bridal Procession to begin 12:30art. Latecomers will not be permitted entry.",
         "Attire: Formal Attire.",
         settings.venueName && settings.venueAddress ? `${settings.venueName}, ${settings.venueAddress}` : "Venue TBD",
       ],

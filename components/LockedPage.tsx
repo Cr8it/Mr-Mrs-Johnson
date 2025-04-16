@@ -89,7 +89,7 @@ export default function LockedPage({ onUnlock }: LockedPageProps) {
               className="object-cover rounded-lg"
             />
           </div>
-          <p className="text-lg font-montserrat text-center mb-6">RSVP by 1st July</p>
+          <p className="text-lg font-montserrat text-center mb-6">RSVP by Sunday 22nd June '25</p>
           <p className="text-sm font-montserrat text-center mb-6">
             Unfortunately, we cannot accommodate any children. Only named guests will be permitted entry.
           </p>
