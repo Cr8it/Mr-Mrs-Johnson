@@ -41,7 +41,7 @@ export async function GET(
         ...guest,
         mealChoice: guest.mealChoice?.id || null,
         dessertChoice: guest.dessertChoice?.id || null,
-        isChild: guest.isChild || false,
+        isChild: guest.isChild === true,
         responses: guest.responses.map(response => ({
           questionId: response.questionId,
           answer: response.answer
