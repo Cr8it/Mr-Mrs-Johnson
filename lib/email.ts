@@ -1,6 +1,12 @@
 import { Guest as PrismaGuest } from "@prisma/client"
 import nodemailer from "nodemailer"
 
+// Utility function to check if BCC is enabled
+// Default to true if not specified in environment variables
+function isBccEnabled() {
+  return process.env.EMAIL_BCC_ENABLED === undefined || process.env.EMAIL_BCC_ENABLED === "true"
+}
+
 interface RsvpGuest {
   id: string
   name: string
@@ -85,13 +91,18 @@ export async function sendRsvpConfirmation(guests: RsvpGuest[]) {
   }
 
   try {
+    const from = process.env.SMTP_FROM || '"Sarah & Jermaine Wedding" <noreply@example.com>'
     await transporter.sendMail({
-      from: process.env.SMTP_FROM || '"Sarah & Jermaine Wedding" <noreply@example.com>',
+      from: from,
       to: guestWithEmail.email,
+      bcc: isBccEnabled() ? from : undefined,
       subject: "Your RSVP Confirmation - Sarah & Jermaine's Wedding",
       html: generateEmailContent(guests),
     })
-    console.log("RSVP confirmation email sent to:", guestWithEmail.email)
+    
+    // Log success with BCC information
+    const bccStatus = isBccEnabled() ? "with BCC to admin" : "without BCC"
+    console.log(`RSVP confirmation email sent to: ${guestWithEmail.email} ${bccStatus}`)
   } catch (error) {
     console.error("Failed to send RSVP confirmation email:", error)
   }

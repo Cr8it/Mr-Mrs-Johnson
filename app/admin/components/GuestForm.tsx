@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea"
 interface Option {
   id: string
   name: string
+  isChildOption?: boolean
 }
 
 interface GuestFormProps {
@@ -34,6 +35,7 @@ interface GuestFormProps {
     mealChoice?: Option | null
     dessertChoice?: Option | null
     dietaryNotes?: string | null
+    isChild?: boolean
   }
   mode?: 'create' | 'edit'
 }
@@ -61,10 +63,12 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
     isAttending: null,
     mealChoice: null,
     dessertChoice: null,
-    dietaryNotes: ""
+    dietaryNotes: "",
+    isChild: false
   })
   const [loading, setLoading] = useState(false)
   const [mealOptions, setMealOptions] = useState<Option[]>([])
+  const [childMealOptions, setChildMealOptions] = useState<Option[]>([])
   const [dessertOptions, setDessertOptions] = useState<Option[]>([])
   const { toast } = useToast()
 
@@ -86,6 +90,7 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
       if (!response.ok) throw new Error('Failed to fetch options')
       const data = await response.json()
       setMealOptions(data.mealOptions)
+      setChildMealOptions(data.childMealOptions || [])
       setDessertOptions(data.dessertOptions)
     } catch (error) {
       console.error('Fetch options error:', error)
@@ -112,7 +117,8 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
         isAttending: formData.isAttending,
         mealChoice: formData.mealChoice ? { id: formData.mealChoice.id } : null,
         dessertChoice: formData.dessertChoice ? { id: formData.dessertChoice.id } : null,
-        dietaryNotes: formData.dietaryNotes || null
+        dietaryNotes: formData.dietaryNotes || null,
+        isChild: formData.isChild || false
       }
 
       const response = await fetch(endpoint, {
@@ -138,7 +144,8 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
           isAttending: null,
           mealChoice: null,
           dessertChoice: null,
-          dietaryNotes: ""
+          dietaryNotes: "",
+          isChild: false
         })
       }
     } catch (error) {
@@ -211,6 +218,23 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
                 required
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="isChild" className="text-sm font-medium">
+                Child
+              </Label>
+              <Select
+                value={formData.isChild ? "true" : "false"}
+                onValueChange={(value) => setFormData({ ...formData, isChild: value === "true" })}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Is this a child?" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Yes</SelectItem>
+                  <SelectItem value="false">No</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             {mode === 'edit' && (
               <>
                 <div className="space-y-2">
@@ -240,14 +264,14 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
                         value={formData.mealChoice?.id || ""}
                         onValueChange={(value) => setFormData({ 
                           ...formData, 
-                          mealChoice: mealOptions.find(option => option.id === value) || null 
+                          mealChoice: (formData.isChild ? childMealOptions : mealOptions).find(option => option.id === value) || null 
                         })}
                       >
                         <SelectTrigger className="h-9">
                           <SelectValue placeholder="Select meal" />
                         </SelectTrigger>
                         <SelectContent>
-                          {mealOptions.map((option) => (
+                          {(formData.isChild ? childMealOptions : mealOptions).map((option) => (
                             <SelectItem key={option.id} value={option.id}>
                               {option.name}
                             </SelectItem>

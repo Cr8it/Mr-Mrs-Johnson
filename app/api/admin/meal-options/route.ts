@@ -39,7 +39,8 @@ export async function POST(request: Request) {
 
 		const option = await prisma.mealOption.create({
 			data: {
-				name: data.name.trim()
+				name: data.name.trim(),
+				isChildOption: data.isChildOption === true
 			}
 		})
 

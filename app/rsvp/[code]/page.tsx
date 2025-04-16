@@ -16,11 +16,13 @@ interface Guest {
   isAttending?: boolean
   mealOptionId?: string
   dessertOptionId?: string
+  isChild?: boolean
 }
 
 interface Option {
   id: string
   name: string
+  isChildOption?: boolean
 }
 
 interface Question {
@@ -41,6 +43,7 @@ export default function RSVPForm() {
   const [questions, setQuestions] = useState<Question[]>([])
   const [responses, setResponses] = useState<Record<string, any>>({})
   const [mealOptions, setMealOptions] = useState<Option[]>([])
+  const [childMealOptions, setChildMealOptions] = useState<Option[]>([])
   const [dessertOptions, setDessertOptions] = useState<Option[]>([])
 
   useEffect(() => {
@@ -57,6 +60,7 @@ export default function RSVPForm() {
         setHousehold(householdData.household)
         setQuestions(householdData.questions)
         setMealOptions(optionsData.mealOptions)
+        setChildMealOptions(optionsData.childMealOptions || [])
         setDessertOptions(optionsData.dessertOptions)
       } catch (error) {
         toast({
@@ -164,7 +168,7 @@ export default function RSVPForm() {
                         <SelectValue placeholder="Select a meal" />
                         </SelectTrigger>
                         <SelectContent>
-                        {mealOptions.map((option) => (
+                        {(guest.isChild ? childMealOptions : mealOptions).map((option) => (
                           <SelectItem key={option.id} value={option.id}>
                           {option.name}
                           </SelectItem>

@@ -32,11 +32,14 @@ import {
 	verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Badge } from "@/components/ui/badge"
 
 interface Option {
 	id: string
 	name: string
 	isActive: boolean
+	isChildOption?: boolean
 	order: number
 }
 
@@ -78,6 +81,7 @@ export default function MenuOptionsPage() {
 	const [mealOptions, setMealOptions] = useState<Option[]>([])
 	const [dessertOptions, setDessertOptions] = useState<Option[]>([])
 	const [newMealOption, setNewMealOption] = useState("")
+	const [isChildMealOption, setIsChildMealOption] = useState(false)
 	const [newDessertOption, setNewDessertOption] = useState("")
 	const { toast } = useToast()
 	const [statistics, setStatistics] = useState<{
@@ -211,7 +215,10 @@ export default function MenuOptionsPage() {
 			const response = await fetch('/api/admin/meal-options', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ name: newMealOption.trim() })
+				body: JSON.stringify({ 
+					name: newMealOption.trim(),
+					isChildOption: isChildMealOption
+				})
 			})
 
 			const data = await response.json()
@@ -223,6 +230,7 @@ export default function MenuOptionsPage() {
 			if (data.option) {
 				setMealOptions(prev => [...prev, data.option])
 				setNewMealOption("")
+				setIsChildMealOption(false)
 				toast({
 					title: "Success",
 					description: "Meal option added successfully"
@@ -339,17 +347,32 @@ export default function MenuOptionsPage() {
 			<div className="space-y-6">
 				<div className="bg-white p-6 rounded-lg shadow-sm">
 					<h2 className="text-2xl font-bold text-gray-900 mb-4">Meal Options</h2>
-					<form onSubmit={handleAddMealOption} className="flex gap-2 mb-6">
-						<Input
-							value={newMealOption}
-							onChange={(e) => setNewMealOption(e.target.value)}
-							placeholder="Add new meal option..."
-							className="max-w-xs bg-gray-50 border-gray-200 focus:border-gold focus:ring-gold"
-						/>
-						<Button type="submit" className="bg-gold hover:bg-[#c19b2f] text-white">
-							<Plus className="h-4 w-4 mr-2" />
-							Add Option
-						</Button>
+					<form onSubmit={handleAddMealOption} className="space-y-4 mb-6">
+						<div className="flex gap-2">
+							<Input
+								value={newMealOption}
+								onChange={(e) => setNewMealOption(e.target.value)}
+								placeholder="Add new meal option..."
+								className="max-w-xs bg-gray-50 border-gray-200 focus:border-gold focus:ring-gold"
+							/>
+							<Button type="submit" className="bg-gold hover:bg-[#c19b2f] text-white">
+								<Plus className="h-4 w-4 mr-2" />
+								Add Option
+							</Button>
+						</div>
+						<div className="flex items-center space-x-2">
+							<Checkbox 
+								id="isChildOption"
+								checked={isChildMealOption}
+								onCheckedChange={(checked) => setIsChildMealOption(checked === true)}
+							/>
+							<label
+								htmlFor="isChildOption"
+								className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+							>
+								This is a children's meal option
+							</label>
+						</div>
 					</form>
 					<DndContext
 						sensors={sensors}
@@ -363,7 +386,14 @@ export default function MenuOptionsPage() {
 							<div className="space-y-2">
 								{mealOptions.map((option) => (
 									<SortableItem key={option.id} id={option.id}>
-										<span className="flex-1 text-gray-900">{option.name}</span>
+										<div className="flex items-center gap-2">
+											<span className="flex-1 text-gray-900">{option.name}</span>
+											{option.isChildOption && (
+												<Badge variant="outline" className="mr-2 bg-blue-50 text-blue-700 border-blue-200">
+													Child
+												</Badge>
+											)}
+										</div>
 										<Button
 											variant="ghost"
 											size="sm"

@@ -5,13 +5,27 @@ export async function GET() {
 	try {
 		console.log('Fetching meal and dessert options...')
 		
-		// Fetch meal options
-		const mealOptions = await prisma.mealOption.findMany({
-			where: { isActive: true },
+		// Fetch meal options (regular)
+		const regularMealOptions = await prisma.mealOption.findMany({
+			where: { 
+				isActive: true,
+				isChildOption: false
+			},
 			orderBy: { createdAt: 'asc' },
-			select: { id: true, name: true }
+			select: { id: true, name: true, isChildOption: true }
 		})
-		console.log('Found meal options:', mealOptions)
+		console.log('Found regular meal options:', regularMealOptions)
+
+		// Fetch meal options (children)
+		const childMealOptions = await prisma.mealOption.findMany({
+			where: { 
+				isActive: true,
+				isChildOption: true
+			},
+			orderBy: { createdAt: 'asc' },
+			select: { id: true, name: true, isChildOption: true }
+		})
+		console.log('Found child meal options:', childMealOptions)
 
 		// Fetch dessert options
 		const dessertOptions = await prisma.dessertOption.findMany({
@@ -22,7 +36,8 @@ export async function GET() {
 		console.log('Found dessert options:', dessertOptions)
 
 		return NextResponse.json({ 
-			mealOptions, 
+			mealOptions: regularMealOptions, 
+			childMealOptions: childMealOptions,
 			dessertOptions 
 		})
 	} catch (error) {

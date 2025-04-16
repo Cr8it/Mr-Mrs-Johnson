@@ -37,7 +37,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
 	try {
-		const { name, email, householdName, isAttending, mealChoice, dessertChoice, dietaryNotes } = await request.json()
+		const { name, email, householdName, isAttending, mealChoice, dessertChoice, dietaryNotes, isChild } = await request.json()
 
 		// Find or create household
 		let household = await prisma.household.findFirst({
@@ -62,6 +62,7 @@ export async function POST(request: Request) {
 				mealOptionId: mealChoice?.id,
 				dessertOptionId: dessertChoice?.id,
 				householdId: household.id,
+				isChild: isChild === true,
 			},
 			include: {
 				mealChoice: true,

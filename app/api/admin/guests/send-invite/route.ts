@@ -3,6 +3,12 @@ import { prisma } from "@/lib/db"
 import { generateInviteEmailTemplate } from "@/lib/emailTemplates"
 import nodemailer from "nodemailer"
 
+// Utility function to check if BCC is enabled
+// Default to true if not specified in environment variables
+function isBccEnabled() {
+	return process.env.EMAIL_BCC_ENABLED === undefined || process.env.EMAIL_BCC_ENABLED === "true"
+}
+
 const transporter = nodemailer.createTransport({
 	host: process.env.SMTP_HOST,
 	port: Number(process.env.SMTP_PORT),
@@ -46,9 +52,14 @@ export async function POST(request: Request) {
 		await transporter.sendMail({
 			from: process.env.SMTP_FROM,
 			to: guest.email,
+			bcc: isBccEnabled() ? process.env.SMTP_FROM : undefined,
 			subject: "You're Invited to Sarah & Jermaine's Wedding!",
 			html: emailHtml
 		})
+
+		// Log success with BCC information
+		const bccStatus = isBccEnabled() ? "with BCC to admin" : "without BCC"
+		console.log(`Invitation email sent to ${guest.email} ${bccStatus}`)
 
 		return NextResponse.json({ success: true })
 	} catch (error) {
