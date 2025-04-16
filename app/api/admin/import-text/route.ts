@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
+// Helper function to generate a random code
+function generateRandomCode() {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
 export async function POST(request: Request) {
   try {
     const { records } = await request.json();
@@ -17,8 +22,7 @@ export async function POST(request: Request) {
     const importErrors: string[] = [];
     let importedCount = 0;
     let skippedDuplicates = 0;
-    let skippedHouseholds = 0;
-    const missingHouseholds: string[] = [];
+    let createdHouseholds = 0;
 
     // Process each record
     for (let i = 0; i < records.length; i++) {
@@ -37,8 +41,8 @@ export async function POST(request: Request) {
           continue;
         }
 
-        // Check if household exists
-        const household = await prisma.household.findFirst({
+        // Check if household exists, create if not
+        let household = await prisma.household.findFirst({
           where: {
             name: {
               equals: record.Household.trim(),
@@ -55,14 +59,23 @@ export async function POST(request: Request) {
           }
         });
 
-        // Skip if household doesn't exist
         if (!household) {
-          if (!missingHouseholds.includes(record.Household.trim())) {
-            missingHouseholds.push(record.Household.trim());
-            console.log(`Skipping household "${record.Household.trim()}" - not found in database`);
-          }
-          skippedHouseholds++;
-          continue;
+          household = await prisma.household.create({
+            data: {
+              name: record.Household.trim(),
+              code: generateRandomCode()
+            },
+            include: {
+              guests: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
+            }
+          });
+          console.log(`Created new household: ${household.name} with code ${household.code}`);
+          createdHouseholds++;
         }
 
         // Check if guest exists
@@ -76,11 +89,6 @@ export async function POST(request: Request) {
           skippedDuplicates++;
           continue;
         } else {
-          // Determine if child or teenager - using yes/no strings
-          const childValues = ['yes', 'y', 'true', '1', 'c', 't'];
-          const isChild = record.Child ? childValues.includes(record.Child.toString().trim().toLowerCase()) : false;
-          const isTeenager = record.Teenager ? childValues.includes(record.Teenager.toString().trim().toLowerCase()) : false;
-          
           // Create new guest
           await prisma.guest.create({
             data: {
@@ -102,12 +110,10 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       imported: importedCount,
+      householdsCreated: createdHouseholds,
       skipped: {
-        duplicates: skippedDuplicates,
-        households: skippedHouseholds,
-        missingHouseholds: missingHouseholds
+        duplicates: skippedDuplicates
       },
-      warnings: skippedHouseholds > 0 ? [`${skippedHouseholds} guests skipped because their households were not found in the database (${missingHouseholds.join(', ')})`] : [],
       errors: importErrors.length > 0 ? importErrors : undefined
     });
   } catch (error: any) {

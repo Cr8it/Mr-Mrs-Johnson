@@ -148,6 +148,11 @@ const TextImportModal: React.FC<TextImportModalProps> = ({ open, onOpenChange, o
           successMessage += `\n${result.skipped.duplicates} duplicate guests were detected and skipped.`;
         }
         
+        // Add household creation info
+        if (result.householdsCreated > 0) {
+          successMessage += `\nCreated ${result.householdsCreated} new households.`;
+        }
+        
         toast.success(successMessage)
         if (onSuccess) onSuccess()
         onOpenChange(false)
@@ -215,9 +220,9 @@ const TextImportModal: React.FC<TextImportModalProps> = ({ open, onOpenChange, o
               ))}
             </div>
             <div className="mt-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-2 rounded-md">
-              <p className="font-semibold text-amber-800 dark:text-amber-300">Important:</p>
-              <p className="text-amber-700 dark:text-amber-400">Households must already exist in the database. Guests for non-existent households will be skipped.</p>
-              <p className="mt-1 text-amber-600 dark:text-amber-500">Duplicate guests (same name in the same household) will also be skipped.</p>
+              <p className="font-semibold text-amber-800 dark:text-amber-300">Note:</p>
+              <p className="text-amber-700 dark:text-amber-400">New households will be created automatically when they don't exist in the database.</p>
+              <p className="mt-1 text-amber-600 dark:text-amber-500">Duplicate guests (same name in the same household) will be skipped.</p>
             </div>
           </div>
 

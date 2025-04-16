@@ -63,17 +63,16 @@ export async function POST(request: Request) {
     console.log(`Grouped into ${householdMap.size} households`)
     
     // Process households and guests
+    let processedHouseholds = 0
     let processedGuests = 0
     let skippedDuplicates = 0
-    let skippedHouseholds = 0
-    const missingHouseholds: string[] = []
     const errors: string[] = []
     
-    // Process each household and its guests
+    // Create households and their guests
     for (const [key, household] of householdMap.entries()) {
       try {
         // Check if household already exists
-        const existingHousehold = await prisma.household.findFirst({
+        let existingHousehold = await prisma.household.findFirst({
           where: {
             name: {
               equals: household.name,
@@ -90,12 +89,24 @@ export async function POST(request: Request) {
           }
         })
         
-        // Skip if household doesn't exist
+        // Create household if it doesn't exist
         if (!existingHousehold) {
-          console.log(`Skipping household "${household.name}" - not found in database`)
-          skippedHouseholds++
-          missingHouseholds.push(household.name)
-          continue
+          existingHousehold = await prisma.household.create({
+            data: {
+              name: household.name,
+              code: generateRandomCode()
+            },
+            include: {
+              guests: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
+            }
+          })
+          processedHouseholds++
+          console.log(`Created new household: ${household.name}`)
         }
         
         // Process each guest in the household
@@ -135,38 +146,39 @@ export async function POST(request: Request) {
     }
     
     const totalTime = Date.now() - startTime
-    console.log(`Import completed in ${totalTime}ms. Added ${processedGuests} guests to existing households. Skipped ${skippedDuplicates} duplicates and ${skippedHouseholds} households that don't exist.`)
+    console.log(`Import completed in ${totalTime}ms. Created ${processedHouseholds} households and ${processedGuests} guests. Skipped ${skippedDuplicates} duplicates.`)
     
     // Revalidate the guests page
     revalidatePath('/admin/guests')
     
     // Return success response with summary and any errors
-    if (errors.length > 0 || skippedHouseholds > 0) {
+    if (errors.length > 0) {
       return NextResponse.json({ 
-        warning: errors.length > 0 ? 'Some guests could not be imported' : 
-                 skippedHouseholds > 0 ? 'Some households were not found in the database' : '',
+        warning: 'Some guests could not be imported',
         processed: {
+          households: processedHouseholds,
           guests: processedGuests
         },
         skipped: {
-          duplicates: skippedDuplicates,
-          households: skippedHouseholds,
-          missingHouseholds: missingHouseholds
+          duplicates: skippedDuplicates
         },
-        warnings: skippedHouseholds > 0 ? [`${skippedHouseholds} households were not found in the database: ${missingHouseholds.join(', ')}`] : [],
-        errors: errors.length > 0 ? errors : undefined
+        total: {
+          households: householdMap.size,
+          guests: guests.length
+        },
+        errors
       }, { status: 207 }) // 207 Multi-Status
     }
     
     return NextResponse.json({ 
       success: true,
-      message: `Added ${processedGuests} guests to existing households${skippedDuplicates > 0 ? `, skipped ${skippedDuplicates} duplicates` : ''}`,
+      message: `Successfully imported ${processedGuests} guests across ${processedHouseholds} households${skippedDuplicates > 0 ? `, skipped ${skippedDuplicates} duplicates` : ''}`,
       processed: {
+        households: processedHouseholds,
         guests: processedGuests
       },
       skipped: {
-        duplicates: skippedDuplicates,
-        households: skippedHouseholds
+        duplicates: skippedDuplicates
       },
       processingTime: `${(totalTime/1000).toFixed(2)} seconds`
     })

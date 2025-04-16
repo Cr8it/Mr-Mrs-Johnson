@@ -162,15 +162,11 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 				if (data.skipped.duplicates) {
 					successMessage += `, ${data.skipped.duplicates} duplicates skipped`;
 				}
-				
-				// Add warning about households not found
-				if (data.skipped.households && data.skipped.households > 0) {
-					setError(`Warning: ${data.skipped.households} guests were skipped because their household wasn't found in the database.`);
-					if (data.skipped.missingHouseholds) {
-						setErrorList([`Missing households: ${data.skipped.missingHouseholds.join(', ')}`]);
-					}
-					return;
-				}
+			}
+			
+			// Add household creation info
+			if (data.processed && data.processed.households) {
+				successMessage += `. Created ${data.processed.households} new households.`;
 			}
 			
 			toast.success(successMessage);
@@ -206,9 +202,9 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 				if (progress < 30) {
 					setUploadStatus("Uploading file...")
 				} else if (progress < 60) {
-					setUploadStatus("Creating households...")
+					setUploadStatus("Creating new households...")
 				} else if (progress < 85) {
-					setUploadStatus("Creating guests...")
+					setUploadStatus("Adding guests to households...")
 				} else {
 					setUploadStatus("Finalizing import...")
 				}
@@ -329,10 +325,10 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 									<li>Teenager (Use "yes" to mark as a teenager - optional)</li>
 								</ul>
 								<p className="mt-2 font-medium text-gray-700 dark:text-gray-300">
-									<strong>Important:</strong> Households must already exist in the database. Guests for non-existent households will be skipped.
+									<strong>Note:</strong> New households will be created automatically when they don't exist.
 								</p>
 								<p className="mt-1 text-gray-600 dark:text-gray-400">
-									Duplicate guests (same name in the same household) will also be skipped, not updated or duplicated.
+									Duplicate guests (same name in the same household) will be skipped, not updated or duplicated.
 								</p>
 							</AlertDescription>
 						</Alert>
