@@ -155,7 +155,7 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 			}
 
 			// Success - show toast and close modal
-			const successMessage = `Upload successful! ${data.processed ? data.processed.guests : data.imported} guests imported`;
+			let successMessage = `Upload successful! ${data.processed ? data.processed.guests : data.imported} guests imported`;
 			
 			// Add skipped duplicates information
 			if (data.skipped) {
