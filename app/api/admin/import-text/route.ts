@@ -22,6 +22,7 @@ export async function POST(request: Request) {
     const importErrors: string[] = [];
     let importedCount = 0;
     let updatedCount = 0;
+    let skippedCount = 0;
 
     // Process each record
     for (let i = 0; i < records.length; i++) {
@@ -76,24 +77,13 @@ export async function POST(request: Request) {
         const isChild = record.Child ? childValues.includes(record.Child.toString().trim().toLowerCase()) : false;
         const isTeenager = record.Teenager ? childValues.includes(record.Teenager.toString().trim().toLowerCase()) : false;
 
-        // Create or update guest using the Prisma client directly to avoid type issues
+        // Skip duplicates instead of updating them
         if (existingGuest) {
-          // For update, use prisma raw query to avoid type issues
-          const updated = await prisma.$executeRaw`
-            UPDATE "Guest" 
-            SET 
-              "email" = ${record.Email ? record.Email.trim() : null}, 
-              "isChild" = ${isChild}, 
-              "isTeenager" = ${isTeenager},
-              "updatedAt" = NOW()
-            WHERE "id" = ${existingGuest.id}
-          `;
-          
-          if (updated) {
-            updatedCount++;
-          }
+          console.log(`Skipping duplicate guest: ${record.Name.trim()} in household ${household.name}`);
+          skippedCount++;
+          continue;
         } else {
-          // For create, use prisma raw query to avoid type issues
+          // Create new guest using prisma raw query to avoid type issues
           await prisma.$executeRaw`
             INSERT INTO "Guest" 
             ("id", "name", "householdId", "email", "isChild", "isTeenager", "createdAt", "updatedAt") 
@@ -113,6 +103,7 @@ export async function POST(request: Request) {
       success: true,
       imported: importedCount,
       updated: updatedCount,
+      skipped: skippedCount,
       errors: importErrors
     });
   } catch (error: any) {

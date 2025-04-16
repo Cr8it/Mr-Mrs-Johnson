@@ -138,6 +138,7 @@ export async function POST(request: NextRequest) {
     const totalHouseholds = households.length;
     let processedHouseholds = 0;
     let processedGuests = 0;
+    let skippedDuplicates = 0;
     
     // Use a smaller number of much larger transactions - this is more efficient
     // for the database and reduces overhead dramatically
@@ -148,42 +149,72 @@ export async function POST(request: NextRequest) {
       console.log(`Processing batch ${Math.floor(i/BATCH_SIZE) + 1} of ${Math.ceil(households.length/BATCH_SIZE)}`);
       
       try {
-        // Create all households in this batch
-        const createdHouseholds = await prisma.$transaction(
-          batch.map(household => 
-            prisma.household.create({
+        // Process each household in the batch
+        for (const household of batch) {
+          // Check if household already exists in the database
+          let existingHousehold = await prisma.household.findFirst({
+            where: {
+              name: {
+                equals: household.name,
+                mode: 'insensitive'
+              }
+            },
+            include: {
+              guests: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
+            }
+          });
+          
+          // Create the household if it doesn't exist
+          if (!existingHousehold) {
+            existingHousehold = await prisma.household.create({
               data: {
                 name: household.name,
                 code: household.code
+              },
+              include: {
+                guests: {
+                  select: {
+                    id: true,
+                    name: true
+                  }
+                }
               }
-            })
-          )
-        );
-        
-        processedHouseholds += createdHouseholds.length;
-        
-        // Now create all guests for these households
-        for (let j = 0; j < batch.length; j++) {
-          const household = batch[j];
-          const createdHousehold = createdHouseholds[j];
+            });
+            processedHouseholds++;
+          }
           
-          // Create all guests for this household in a single operation
-          const guestCreateData = household.guests.map(guest => ({
-            name: guest.name,
-            email: guest.email,
-            isChild: guest.isChild,
-            isTeenager: guest.isTeenager,
-            dietaryNotes: guest.dietaryNotes,
-            householdId: createdHousehold.id
-          }));
-          
-          // MASSIVE OPTIMIZATION: Create all guests at once with createMany
-          // This is far more efficient than creating one-by-one
-          const createdGuests = await prisma.guest.createMany({
-            data: guestCreateData
-          });
-          
-          processedGuests += createdGuests.count;
+          // Process each guest in the household
+          for (const guest of household.guests) {
+            // Check if guest already exists in this household
+            const existingGuest = existingHousehold.guests.find(g => 
+              g.name.toLowerCase() === guest.name.toLowerCase()
+            );
+            
+            // Skip if guest already exists
+            if (existingGuest) {
+              console.log(`Skipping duplicate guest: ${guest.name} in household ${household.name}`);
+              skippedDuplicates++;
+              continue;
+            }
+            
+            // Create the guest
+            await prisma.guest.create({
+              data: {
+                name: guest.name,
+                email: guest.email,
+                isChild: guest.isChild,
+                isTeenager: guest.isTeenager,
+                dietaryNotes: guest.dietaryNotes,
+                householdId: existingHousehold.id
+              }
+            });
+            processedGuests++;
+          }
         }
         
         const batchTime = Date.now() - batchStart;
@@ -199,6 +230,7 @@ export async function POST(request: NextRequest) {
               households: processedHouseholds,
               guests: processedGuests
             },
+            skipped: skippedDuplicates,
             total: {
               households: totalHouseholds,
               guests: validRecords.length
@@ -215,7 +247,7 @@ export async function POST(request: NextRequest) {
     }
     
     const totalTime = Date.now() - startTime;
-    console.log(`Upload completed in ${totalTime}ms. Created ${processedHouseholds} households and ${processedGuests} guests.`);
+    console.log(`Upload completed in ${totalTime}ms. Created ${processedHouseholds} households and ${processedGuests} guests. Skipped ${skippedDuplicates} duplicates.`);
     
     // Revalidate the guests page
     revalidatePath('/admin/guests');
@@ -223,7 +255,12 @@ export async function POST(request: NextRequest) {
     // Return success response with summary
     return NextResponse.json({ 
       success: true,
-      message: `Successfully imported ${processedGuests} guests across ${processedHouseholds} households`,
+      message: `Successfully imported ${processedGuests} guests across ${processedHouseholds} households${skippedDuplicates > 0 ? `, skipped ${skippedDuplicates} duplicates` : ''}`,
+      processed: {
+        households: processedHouseholds,
+        guests: processedGuests
+      },
+      skipped: skippedDuplicates,
       processingTime: `${(totalTime/1000).toFixed(2)} seconds`
     });
     

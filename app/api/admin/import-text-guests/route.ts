@@ -65,6 +65,7 @@ export async function POST(request: Request) {
     // Process households and guests
     let processedHouseholds = 0
     let processedGuests = 0
+    let skippedDuplicates = 0
     const errors: string[] = []
     
     // Create households and their guests
@@ -91,6 +92,24 @@ export async function POST(request: Request) {
         // Create all guests for this household
         for (const guest of household.guests) {
           try {
+            // Check if guest already exists in this household
+            const existingGuest = await prisma.guest.findFirst({
+              where: {
+                name: {
+                  equals: guest.name.trim(),
+                  mode: 'insensitive'
+                },
+                householdId: existingHousehold.id
+              }
+            })
+            
+            // Skip if guest already exists
+            if (existingGuest) {
+              console.log(`Skipping duplicate guest: ${guest.name} in household ${household.name}`)
+              skippedDuplicates++
+              continue
+            }
+            
             await prisma.guest.create({
               data: {
                 name: guest.name,
@@ -114,7 +133,7 @@ export async function POST(request: Request) {
     }
     
     const totalTime = Date.now() - startTime
-    console.log(`Import completed in ${totalTime}ms. Created ${processedHouseholds} households and ${processedGuests} guests.`)
+    console.log(`Import completed in ${totalTime}ms. Created ${processedHouseholds} households and ${processedGuests} guests. Skipped ${skippedDuplicates} duplicates.`)
     
     // Revalidate the guests page
     revalidatePath('/admin/guests')
@@ -127,6 +146,7 @@ export async function POST(request: Request) {
           households: processedHouseholds,
           guests: processedGuests
         },
+        skipped: skippedDuplicates,
         total: {
           households: householdMap.size,
           guests: guests.length
@@ -137,11 +157,12 @@ export async function POST(request: Request) {
     
     return NextResponse.json({ 
       success: true,
-      message: `Successfully imported ${processedGuests} guests across ${processedHouseholds} households`,
+      message: `Successfully imported ${processedGuests} guests across ${processedHouseholds} households${skippedDuplicates > 0 ? `, skipped ${skippedDuplicates} duplicates` : ''}`,
       processed: {
         households: processedHouseholds,
         guests: processedGuests
       },
+      skipped: skippedDuplicates,
       processingTime: `${(totalTime/1000).toFixed(2)} seconds`
     })
     

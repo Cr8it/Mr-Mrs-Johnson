@@ -66,7 +66,11 @@ interface Guest {
   }
 }
 
-export default function GuestList() {
+interface GuestListProps {
+  onGuestCountChange?: (count: number) => void
+}
+
+export default function GuestList({ onGuestCountChange }: GuestListProps) {
   const [guests, setGuests] = useState<Guest[]>([])
   const [filteredGuests, setFilteredGuests] = useState<Guest[]>([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -92,7 +96,12 @@ export default function GuestList() {
       guest.household.name.toLowerCase().includes(searchTerm.toLowerCase())
     )
     setFilteredGuests(filtered)
-  }, [searchTerm, guests])
+    
+    // Notify parent component about guest count
+    if (onGuestCountChange) {
+      onGuestCountChange(filtered.length)
+    }
+  }, [searchTerm, guests, onGuestCountChange])
 
   const fetchGuests = async () => {
     try {

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Download, Upload, FileText, AlertCircle, Loader2, CheckCircle2 } from "lucide-react"
+import { toast } from "react-hot-toast"
 
 interface CsvUploadModalProps {
 	isOpen: boolean
@@ -147,7 +148,10 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 				return
 			}
 
-			setUploadStatus("Completed successfully!")
+			// Success - show toast and close modal
+			const successMessage = `Upload successful! ${data.processed ? data.processed.guests : data.imported} guests imported` + 
+				(data.skipped ? `, ${data.skipped} duplicates skipped` : "");
+			toast.success(successMessage);
 			onUpload(data.households || [])
 			onClose()
 		} catch (error: any) {
@@ -302,6 +306,9 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 									<li>Child (Use "yes" to mark as a child - optional)</li>
 									<li>Teenager (Use "yes" to mark as a teenager - optional)</li>
 								</ul>
+								<p className="mt-2 font-medium text-gray-700 dark:text-gray-300">
+									<strong>Note:</strong> Duplicate guests (same name in the same household) will be skipped, not updated or duplicated.
+								</p>
 							</AlertDescription>
 						</Alert>
 					</div>

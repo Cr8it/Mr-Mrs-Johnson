@@ -133,7 +133,14 @@ const TextImportModal: React.FC<TextImportModalProps> = ({ open, onOpenChange, o
         setErrors(result.errors)
         toast.warning(`Import completed with ${result.errors.length} errors. See details in the import window.`)
       } else {
-        toast.success(`Import successful! Imported ${result.imported} new guests and updated ${result.updated} existing guests.`)
+        let successMessage = `Import successful! ${result.imported} guests imported`;
+        
+        // Make duplicate notification more prominent if any were skipped
+        if (result.skipped && result.skipped > 0) {
+          successMessage += `\n${result.skipped} duplicate guests were detected and skipped.`;
+        }
+        
+        toast.success(successMessage)
         if (onSuccess) onSuccess()
         onOpenChange(false)
       }
@@ -169,6 +176,7 @@ const TextImportModal: React.FC<TextImportModalProps> = ({ open, onOpenChange, o
           <DialogTitle className="text-gray-900 dark:text-gray-100">Import Guests from Text</DialogTitle>
           <DialogDescription className="text-gray-500 dark:text-gray-400">
             Paste data from Excel or other spreadsheets. Headers should include Name and Household.
+            Duplicate guests (same name in the same household) will be skipped.
           </DialogDescription>
         </DialogHeader>
 
