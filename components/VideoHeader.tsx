@@ -117,7 +117,7 @@ export default function VideoHeader({ isLocked, onUnlock }: VideoHeaderProps) {
                   className="object-cover rounded-lg"
                 />
               </div>
-              <p className="text-xl font-montserrat mb-4">RSVP by Sunday 22nd June '25<</p>
+              <p className="text-xl font-montserrat mb-4">RSVP by Sunday 22nd June '25</p>
               <p className="text-sm font-montserrat mb-6">
                 Unfortunately, we cannot accommodate any children. Only the names on the invites will be permitted
                 entry.
