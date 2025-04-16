@@ -10,9 +10,8 @@ export async function GET() {
 			where: { 
 				isActive: true,
 				isChildOption: false
-			},
-			orderBy: { createdAt: 'asc' },
-			select: { id: true, name: true, isChildOption: true }
+			} as any,
+			orderBy: { createdAt: 'asc' }
 		})
 		console.log('Found regular meal options:', regularMealOptions)
 
@@ -21,9 +20,8 @@ export async function GET() {
 			where: { 
 				isActive: true,
 				isChildOption: true
-			},
-			orderBy: { createdAt: 'asc' },
-			select: { id: true, name: true, isChildOption: true }
+			} as any,
+			orderBy: { createdAt: 'asc' }
 		})
 		console.log('Found child meal options:', childMealOptions)
 
@@ -32,9 +30,8 @@ export async function GET() {
 			where: { 
 				isActive: true,
 				isChildOption: false
-			},
-			orderBy: { createdAt: 'asc' },
-			select: { id: true, name: true, isChildOption: true }
+			} as any,
+			orderBy: { createdAt: 'asc' }
 		})
 		console.log('Found regular dessert options:', regularDessertOptions)
 
@@ -43,9 +40,8 @@ export async function GET() {
 			where: { 
 				isActive: true,
 				isChildOption: true
-			},
-			orderBy: { createdAt: 'asc' },
-			select: { id: true, name: true, isChildOption: true }
+			} as any,
+			orderBy: { createdAt: 'asc' }
 		})
 		console.log('Found child dessert options:', childDessertOptions)
 

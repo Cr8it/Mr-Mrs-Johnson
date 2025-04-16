@@ -41,8 +41,8 @@ export async function POST(request: Request) {
 		const option = await prisma.dessertOption.create({
 			data: {
 				name: data.name.trim(),
-				isChildOption: data.isChildOption === true
-			}
+				isChildOption: Boolean(data.isChildOption)
+			} as any
 		})
 
 		return new Response(JSON.stringify({ option }), {

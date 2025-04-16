@@ -1,13 +1,13 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
-  extensions = []
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [uuid_ossp(map: "uuid-ossp", schema: "extensions")]
 }
 
 model Household {
@@ -22,23 +22,23 @@ model Household {
 }
 
 model MealOption {
-  id           String   @id @default(cuid())
-  name         String
-  isActive     Boolean  @default(true)
+  id            String   @id @default(cuid())
+  name          String
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
   isChildOption Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  guests       Guest[]  @relation("GuestMeal")
+  guests        Guest[]  @relation("GuestMeal")
 }
 
 model DessertOption {
-  id           String   @id @default(cuid())
-  name         String
-  isActive     Boolean  @default(true)
+  id            String   @id @default(cuid())
+  name          String
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
   isChildOption Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  guests       Guest[]  @relation("GuestDessert")
+  guests        Guest[]  @relation("GuestDessert")
 }
 
 model Guest {
@@ -50,15 +50,15 @@ model Guest {
   dessertOptionId String?
   dietaryNotes    String?
   householdId     String
-  isChild         Boolean           @default(false)
-  isTeenager      Boolean           @default(false)
+  isChild         Boolean            @default(false)
+  isTeenager      Boolean            @default(false)
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
-  household       Household          @relation(fields: [householdId], references: [id])
   dessertChoice   DessertOption?     @relation("GuestDessert", fields: [dessertOptionId], references: [id])
+  household       Household          @relation(fields: [householdId], references: [id])
   mealChoice      MealOption?        @relation("GuestMeal", fields: [mealOptionId], references: [id])
-  responses       QuestionResponse[]
   activities      GuestActivity[]
+  responses       QuestionResponse[]
 
   @@index([name])
 }
@@ -66,8 +66,8 @@ model Guest {
 model GuestActivity {
   id        String   @id @default(cuid())
   guestId   String
-  action    String   // RSVP_YES, RSVP_NO, UPDATE_MEAL, UPDATE_DESSERT, UPDATE_DETAILS
-  details   String?  // Additional details about the change
+  action    String
+  details   String?
   createdAt DateTime @default(now())
   guest     Guest    @relation(fields: [guestId], references: [id])
 
@@ -79,18 +79,17 @@ model Question {
   id         String             @id @default(cuid())
   question   String
   type       String
-  options    String            @default("")
-  isRequired Boolean           @default(false)
-  isActive   Boolean           @default(true)
-  perGuest   Boolean           @default(false)
-  order      Int               @default(0)
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
+  options    String             @default("")
+  isRequired Boolean            @default(false)
+  isActive   Boolean            @default(true)
+  perGuest   Boolean            @default(false)
+  order      Int                @default(0)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
   responses  QuestionResponse[]
 
   @@index([order])
 }
-
 
 model QuestionResponse {
   id         String   @id @default(cuid())
@@ -104,20 +103,18 @@ model QuestionResponse {
 }
 
 model Settings {
-  id             Int       @id @default(1)
-  weddingDate    DateTime?
-  ceremonyTime   String?
-  receptionTime  String?
-  venueName      String?
-  venueAddress   String?
-  primaryColor   String    @default("#d4af37")
-  accentColor    String    @default("#000000")
+  id              Int       @id @unique @default(1)
+  weddingDate     DateTime?
+  ceremonyTime    String?
+  receptionTime   String?
+  venueName       String?
+  venueAddress    String?
+  primaryColor    String    @default("#d4af37")
+  accentColor     String    @default("#000000")
   backgroundImage String?
-  showGallery    Boolean   @default(true)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  @@unique([id])
+  showGallery     Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
 
 model BridalPartyMember {
@@ -126,7 +123,7 @@ model BridalPartyMember {
   role        String
   description String
   imageUrl    String
-  type        String   // 'bridesmaid' or 'groomsman'
+  type        String
   order       Int
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

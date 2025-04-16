@@ -75,6 +75,13 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
       isAttending: guest.isAttending ?? null
     }));
   });
+  
+  console.log('DEBUGGING CHILD OPTIONS:');
+  console.log('Guest isChild values:', guests.map(g => ({ name: g.name, isChild: g.isChild })));
+  
+  // Log children count
+  const childGuestCount = guests.filter(g => g.isChild).length;
+  console.log(`Found ${childGuestCount} child guests in household`);
 
   // Add handleBack function
   const handleBack = () => {
@@ -94,22 +101,42 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
       const optionsResponse = await fetch('/api/rsvp/form-data')
       const optionsData = await optionsResponse.json()
       
+      console.log('API Response data:', optionsData);
+      console.log('Child meal options from API:', optionsData.childMealOptions);
+      console.log('Child dessert options from API:', optionsData.childDessertOptions);
+      
       if (!optionsResponse.ok) {
         throw new Error(optionsData.error || 'Failed to fetch options')
       }
       
+      // Regular options handling
       if (optionsData.mealOptions?.length > 0) {
         setMealOptions(optionsData.mealOptions)
       }
+      
+      // Child options handling with fallback
       if (optionsData.childMealOptions?.length > 0) {
         setChildMealOptions(optionsData.childMealOptions)
+      } else {
+        // If no child options, use regular options as fallback
+        console.warn('No child meal options found, using regular options as fallback')
+        setChildMealOptions(optionsData.mealOptions || [])
       }
+      
+      // Regular dessert options
       if (optionsData.dessertOptions?.length > 0) {
         setDessertOptions(optionsData.dessertOptions)
       }
+      
+      // Child dessert options with fallback
       if (optionsData.childDessertOptions?.length > 0) {
         setChildDessertOptions(optionsData.childDessertOptions)
+      } else {
+        // If no child options, use regular options as fallback
+        console.warn('No child dessert options found, using regular options as fallback')
+        setChildDessertOptions(optionsData.dessertOptions || [])
       }
+      
     } catch (error) {
       console.error('Failed to fetch data:', error)
       toast({
@@ -172,6 +199,12 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
 
   useEffect(() => {
     fetchData()
+    
+    // Log children when component mounts
+    console.log('Guest isChild values on component mount:', guests.map(g => ({ 
+      name: g.name, 
+      isChild: g.isChild 
+    })))
   }, [])
 
 
@@ -265,15 +298,21 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
   const handleMealChoice = (guestId: string, meal: string) => {
     clearFieldError(guestId, 'Meal choice');
     setGuests(prev => {
-      const updated = prev.map(guest =>
-        guest.id === guestId ? { 
+      const updated = prev.map(guest => {
+        if (guest.id !== guestId) return guest;
+        
+        // Get the appropriate options based on whether guest is a child
+        const relevantOptions = guest.isChild ? childMealOptions : mealOptions;
+        const selectedOption = relevantOptions.find(opt => opt.id === meal);
+        
+        return { 
           ...guest, 
           mealChoice: { 
             id: meal,
-            name: mealOptions.find(opt => opt.id === meal)?.name || ''
+            name: selectedOption?.name || 'Unknown Option'
           } 
-        } : guest
-      );
+        };
+      });
       saveToLocalStorage(updated);
       return updated;
     });
@@ -282,15 +321,21 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
   const handleDessertChoice = (guestId: string, dessert: string) => {
     clearFieldError(guestId, 'Dessert choice');
     setGuests(prev => {
-      const updated = prev.map(guest =>
-        guest.id === guestId ? { 
+      const updated = prev.map(guest => {
+        if (guest.id !== guestId) return guest;
+        
+        // Get the appropriate options based on whether guest is a child
+        const relevantOptions = guest.isChild ? childDessertOptions : dessertOptions;
+        const selectedOption = relevantOptions.find(opt => opt.id === dessert);
+        
+        return { 
           ...guest, 
           dessertChoice: { 
             id: dessert,
-            name: dessertOptions.find(opt => opt.id === dessert)?.name || ''
+            name: selectedOption?.name || 'Unknown Option'
           } 
-        } : guest
-      );
+        };
+      });
       saveToLocalStorage(updated);
       return updated;
     });
@@ -509,26 +554,31 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                       <p className="text-red-500 text-sm mt-1">Please select a meal option</p>
                     )}
                   <SelectContent className="bg-black border border-white border-opacity-20 text-white" sideOffset={5}>
-                    {guest.isChild 
-                      ? childMealOptions.map((option) => (
-                          <SelectItem
-                            key={option.id}
-                            value={option.id}
-                            className="text-white hover:bg-white/10 cursor-pointer"
-                          >
-                            {option.name}
-                          </SelectItem>
-                        ))
-                      : mealOptions.map((option) => (
-                          <SelectItem
-                            key={option.id}
-                            value={option.id}
-                            className="text-white hover:bg-white/10 cursor-pointer"
-                          >
-                            {option.name}
-                          </SelectItem>
-                        ))
-                    }
+                    {(() => {
+                      // More detailed debugging
+                      console.log(`Rendering meal options for ${guest.name}:`);
+                      console.log(`  isChild=${guest.isChild}`);
+                      console.log(`  Regular meal options count: ${mealOptions.length}`);
+                      console.log(`  Child meal options count: ${childMealOptions.length}`);
+                      
+                      const optionsToShow = guest.isChild ? childMealOptions : mealOptions;
+                      console.log(`  Options being shown:`, optionsToShow.map(o => o.name));
+                      
+                      if (optionsToShow.length === 0) {
+                        console.warn(`  WARNING: No meal options available for ${guest.isChild ? 'child' : 'adult'} guest!`);
+                        return <div className="p-2 text-red-500">No options available</div>;
+                      }
+                      
+                      return optionsToShow.map((option) => (
+                        <SelectItem
+                          key={option.id}
+                          value={option.id}
+                          className="text-white hover:bg-white/10 cursor-pointer"
+                        >
+                          {option.name}
+                        </SelectItem>
+                      ));
+                    })()}
                   </SelectContent>
                   </Select>
                 </div>
@@ -554,26 +604,31 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                       <p className="text-red-500 text-sm mt-1">Please select a dessert option</p>
                     )}
                   <SelectContent className="bg-black border border-white border-opacity-20 text-white" sideOffset={5}>
-                    {guest.isChild 
-                      ? childDessertOptions.map((option) => (
-                          <SelectItem
-                            key={option.id}
-                            value={option.id}
-                            className="text-white hover:bg-white/10 cursor-pointer"
-                          >
-                            {option.name}
-                          </SelectItem>
-                        ))
-                      : dessertOptions.map((option) => (
-                          <SelectItem
-                            key={option.id}
-                            value={option.id}
-                            className="text-white hover:bg-white/10 cursor-pointer"
-                          >
-                            {option.name}
-                          </SelectItem>
-                        ))
-                    }
+                    {(() => {
+                      // More detailed debugging
+                      console.log(`Rendering dessert options for ${guest.name}:`);
+                      console.log(`  isChild=${guest.isChild}`);
+                      console.log(`  Regular dessert options count: ${dessertOptions.length}`);
+                      console.log(`  Child dessert options count: ${childDessertOptions.length}`);
+                      
+                      const optionsToShow = guest.isChild ? childDessertOptions : dessertOptions;
+                      console.log(`  Options being shown:`, optionsToShow.map(o => o.name));
+                      
+                      if (optionsToShow.length === 0) {
+                        console.warn(`  WARNING: No dessert options available for ${guest.isChild ? 'child' : 'adult'} guest!`);
+                        return <div className="p-2 text-red-500">No options available</div>;
+                      }
+                      
+                      return optionsToShow.map((option) => (
+                        <SelectItem
+                          key={option.id}
+                          value={option.id}
+                          className="text-white hover:bg-white/10 cursor-pointer"
+                        >
+                          {option.name}
+                        </SelectItem>
+                      ));
+                    })()}
                   </SelectContent>
                   </Select>
                 </div>

@@ -33,6 +33,7 @@ export async function POST(request: Request) {
           name: true,
           email: true,
           isAttending: true,
+          isChild: true,
           mealChoice: true, // Include full meal choice data
           dessertChoice: true, // Include full dessert choice data
           dietaryNotes: true,
@@ -96,6 +97,7 @@ export async function POST(request: Request) {
       ...household,
       guests: household?.guests.map(guest => ({
       ...guest,
+      isChild: guest.isChild === true, // Explicitly set isChild property
       responses: guest.responses.map(response => ({
         ...response,
         question: {
@@ -113,6 +115,8 @@ export async function POST(request: Request) {
       }))
       }))
     }
+
+    console.log('Child guest check:', transformedHousehold.guests.map(g => ({ name: g.name, isChild: g.isChild })))
 
     return NextResponse.json({
       success: true,

@@ -49,6 +49,8 @@ export async function GET(
       }))
     }
 
+    console.log('Transformed household data:', JSON.stringify(transformedHousehold, null, 2))
+
     // Transform questions to parse options for multiple choice questions
     const transformedQuestions = questions.map(question => ({
       ...question,
