@@ -35,11 +35,12 @@ interface ProcessingResult {
 }
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  
   noStore()
   
   try {
     console.log('Starting guest upload process with optimized handler')
-    const startTime = Date.now()
     
     // Check if request is multipart form data
     const contentType = request.headers.get('content-type') || ''
