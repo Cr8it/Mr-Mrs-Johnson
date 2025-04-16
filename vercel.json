@@ -1,5 +1,15 @@
 {
   "buildCommand": "prisma generate && next build",
   "installCommand": "npm install",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "functions": {
+    "app/api/admin/upload-guests/route.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
+    "app/api/**/*.ts": {
+      "memory": 512,
+      "maxDuration": 30
+    }
+  }
 } 

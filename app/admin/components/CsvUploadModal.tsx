@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -72,116 +72,144 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault()
-		if (!file) return
-
-		setLoading(true)
+		if (!file) {
+			return
+		}
+		
 		setError("")
 		setErrorList([])
+		setLoading(true)
 		setUploadProgress(0)
-		setUploadStatus("Preparing upload...")
-
-		// Add file size warning for large files (over 1MB)
-		if (file.size > 1024 * 1024) {
-			setError(`Warning: Your file is ${(file.size / (1024 * 1024)).toFixed(1)}MB which is large. The upload may take longer and could time out. Consider splitting into smaller batches if you encounter issues.`)
-		}
-
-		const formData = new FormData()
-		formData.append('file', file)
-
+		
+		// Create abort controller for timeout handling
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+		
 		try {
-			// Create an AbortController for timeout handling
-			const controller = new AbortController()
-			const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 second timeout
+			if (file.size > 1024 * 1024) { // 1MB
+				setError("Warning: This file is larger than 1MB and may take longer to upload. Consider splitting into smaller files if you encounter timeouts.")
+			}
 			
-			// Start the progress simulation
+			// Read the file
+			const fileData = await readFileAsText(file)
+			let parsedData = fileData
+				.split('\n')
+				.filter(line => line.trim())
+				.map(line => line.split(',').map(cell => cell.trim()))
+			
+			// Get headers from first row
+			const headers = parsedData[0]
+			
+			// Process data rows, excluding header row
+			const dataRows = parsedData.slice(1)
+			
+			// Split into batches of 10 rows
+			const BATCH_SIZE = 10
+			const batches = []
+			
+			for (let i = 0; i < dataRows.length; i += BATCH_SIZE) {
+				batches.push(dataRows.slice(i, i + BATCH_SIZE))
+			}
+			
+			setUploadProgress(10)
 			simulateProgress()
 			
-			const response = await fetch('/api/admin/upload-guests', {
-				method: 'POST',
-				body: formData,
-				signal: controller.signal
-			})
+			// Process batches sequentially
+			const results = {
+				totalProcessed: 0,
+				totalHouseholds: 0,
+				errors: [] as string[],
+				processingTime: ""
+			}
 			
-			clearTimeout(timeoutId) // Clear the timeout if request completes
-
-			// Stop progress simulation
-			setUploadStatus("Processing response...")
-			
-			// Handle partial success (HTTP 207)
-			if (response.status === 207) {
-				const data = await response.json()
-				setUploadStatus("Partial success")
+			for (let i = 0; i < batches.length; i++) {
+				setUploadProgress(Math.floor(20 + (60 * (i / batches.length))))
 				
-				// Check if there are warnings about missing households
-				if (data.warnings && data.warnings.length > 0) {
-					setError(`${data.processed.guests} guests were added successfully, but some couldn't be processed. ${data.warnings[0]}`)
-				} else {
-					setError(`The upload was partially completed. ${data.processed.guests} guests were imported successfully, but some entries could not be processed.`)
-				}
+				// Convert batch to CSV rows with headers
+				const batchData = batches[i].map(row => {
+					const record: Record<string, string> = {}
+					headers.forEach((header, i) => {
+						record[header] = row[i] || ''
+					})
+					return record
+				})
 				
-				if (data.errors && Array.isArray(data.errors)) {
-					setErrorList(data.errors)
-				}
-				return
-			}
-
-			// Handle timeouts and large files
-			if (response.status === 504) {
-				setError('The server took too long to process your request. Try splitting your data into smaller batches and check for formatting issues in your CSV file.')
-				return
-			}
-
-			const data = await response.json()
-
-			if (!response.ok) {
-				// Check for different error message formats
-				if (data.message) {
-					setError(data.message)
-				} else {
-					setError(data.error || 'Failed to upload guests')
-				}
+				// Upload this batch
+				const formData = new FormData()
+				const batchBlob = new Blob([JSON.stringify({ records: batchData })], { 
+					type: 'application/json' 
+				})
+				formData.append('data', batchBlob)
 				
-				// Display error list if available
-				if (data.errorList) {
-					setErrorList(data.errorList.split('\n'))
-				} else if (data.details && Array.isArray(data.details)) {
-					// Format detailed errors into an array for display
-					setErrorList(data.details)
-				} else if (data.errors && Array.isArray(data.errors)) {
-					setErrorList(data.errors)
+				try {
+					const res = await fetch('/api/admin/upload-batch', {
+						method: 'POST',
+						body: formData,
+						signal: controller.signal
+					})
+					
+					if (!res.ok) {
+						if (res.status === 504) {
+							throw new Error("Server timeout. Try uploading smaller batches or check for formatting issues in your CSV. You can also try splitting your file into multiple smaller files.")
+						} else {
+							const errorData = await res.json()
+							throw new Error(errorData.message || errorData.error || "Failed to upload file")
+						}
+					}
+					
+					const batchResult = await res.json()
+					
+					// Accumulate results using the new response format
+					results.totalProcessed += batchResult.processed?.guests || 0
+					results.totalHouseholds += batchResult.processed?.households || 0
+					
+					if (batchResult.errors && batchResult.errors.length > 0) {
+						results.errors.push(...batchResult.errors)
+					}
+					
+					// Track processing time of the last batch
+					if (batchResult.processingTime) {
+						results.processingTime = batchResult.processingTime
+					}
+				} catch (batchError) {
+					if (batchError.name === 'AbortError') {
+						throw new Error("Request timed out. Your file may be too large or complex. Try splitting it into smaller batches.")
+					}
+					throw batchError
 				}
-				
-				return
-			}
-
-			// Success - show toast and close modal
-			let successMessage = `Upload successful! ${data.processed ? data.processed.guests : data.imported} guests imported`;
-			
-			// Add skipped duplicates information
-			if (data.skipped) {
-				if (data.skipped.duplicates) {
-					successMessage += `, ${data.skipped.duplicates} duplicates skipped`;
-				}
-			}
-			
-			// Add household creation info
-			if (data.processed && data.processed.households) {
-				successMessage += `. Created ${data.processed.households} new households.`;
 			}
 			
-			toast.success(successMessage);
-			onUpload(data.households || [])
-			onClose()
-		} catch (error: any) {
-			// Better error handling for different failure scenarios
-			if (error.name === 'AbortError') {
-				setError('The upload request timed out. This may be due to the file size being too large. Try splitting your data into smaller batches or check for formatting issues in your CSV file.')
+			setUploadProgress(95)
+			
+			// All batches processed successfully
+			clearTimeout(timeoutId);
+			
+			if (results.errors.length > 0) {
+				setErrorList(results.errors)
+				setError(`Import partially completed with ${results.errors.length} errors.`)
 			} else {
-				setError(error.message || 'An unexpected error occurred')
+				toast.success(`Imported ${results.totalProcessed} guests in ${results.totalHouseholds} households. Processing time: ${results.processingTime}`)
+				onUpload([])
+				onClose()
 			}
+		} catch (error: any) {
+			console.error("Upload error:", error)
+			clearTimeout(timeoutId);
+			setError(error.message || "Failed to upload file: Unknown error")
 		} finally {
 			setLoading(false)
+			setUploadProgress(100)
 		}
+	}
+
+	// Helper function to read file as text
+	const readFileAsText = (file: File): Promise<string> => {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader()
+			reader.onload = () => resolve(reader.result as string)
+			reader.onerror = reject
+			reader.readAsText(file)
+		})
 	}
 
 	// Simulate progress for better user experience
@@ -241,6 +269,9 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 						<Upload className="h-5 w-5 text-gold" />
 						Upload Guest List
 					</DialogTitle>
+					<DialogDescription>
+						Upload a CSV file of guests. The file should have a header row with Name, Household, and optional fields like Email, Child, Teenager, and DietaryNotes.
+					</DialogDescription>
 				</DialogHeader>
 
 				<form onSubmit={handleSubmit} className="space-y-4">

@@ -1,83 +1,82 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-import { revalidatePath } from 'next/cache';
+import { NextResponse } from "next/server"
+import { prisma } from "@/lib/db"
 
-// Configure timeout limit to match vercel.json
+// Add exports to match vercel.json configuration
 export const maxDuration = 30;
 
 // Helper function to generate a random code
 function generateRandomCode() {
-  return Math.random().toString(36).substring(2, 8).toUpperCase();
+  return Math.random().toString(36).substring(2, 8).toUpperCase()
 }
 
-// Interface for better type safety
+// Type definition for better type safety
 interface GuestRecord {
   Name: string;
   Household: string;
   Email?: string;
-  DietaryNotes?: string;
   Child?: string;
   Teenager?: string;
-}
-
-interface ProcessingResult {
-  name: string;
-  householdName: string;
-  success: boolean;
-  error?: string;
+  DietaryNotes?: string;
 }
 
 export async function POST(request: Request) {
-  console.log('Starting text import process');
-  const startTime = Date.now();
+  console.log("Batch upload route called")
+  const startTime = Date.now()
   
   try {
-    const { records } = await request.json();
-
-    if (!Array.isArray(records) || records.length === 0) {
-      return NextResponse.json(
-        { error: 'No valid records provided' },
-        { status: 400 }
-      );
+    // Parse the form data
+    const formData = await request.formData()
+    const dataBlob = formData.get('data') as Blob
+    
+    if (!dataBlob) {
+      return NextResponse.json({ error: "No data provided" }, { status: 400 })
     }
-
-    console.log(`Processing ${records.length} records from text import`);
-
-    // Group records by household for more efficient processing
-    const households = new Map<string, GuestRecord[]>();
+    
+    // Read and parse JSON data
+    const jsonText = await dataBlob.text()
+    const { records } = JSON.parse(jsonText)
+    
+    if (!Array.isArray(records) || records.length === 0) {
+      return NextResponse.json({ error: "No valid records in batch" }, { status: 400 })
+    }
+    
+    console.log(`Processing batch of ${records.length} records`)
+    
+    // Group by household for more efficient processing
+    const households = new Map<string, GuestRecord[]>()
     
     // First pass: group records by household
     for (const record of records) {
       if (!record.Name?.trim() || !record.Household?.trim()) {
-        continue; // Skip invalid records
+        continue // Skip invalid records
       }
       
-      const householdName = record.Household.trim();
+      const householdName = record.Household.trim()
       
       if (!households.has(householdName)) {
-        households.set(householdName, []);
+        households.set(householdName, [])
       }
       
-      households.get(householdName)!.push(record);
+      households.get(householdName)!.push(record)
     }
     
-    console.log(`Grouped into ${households.size} households`);
+    console.log(`Grouped into ${households.size} households`)
     
     // Process in smaller batches
-    const results: ProcessingResult[] = [];
-    const errors: string[] = [];
-    let processedHouseholds = 0;
-    let processedGuests = 0;
+    const results: any[] = []
+    const errors: string[] = []
+    let processedHouseholds = 0
+    let processedGuests = 0
     
-    // Process each household and its guests
+    // Process households in batches
     for (const [householdName, members] of households.entries()) {
-      const batchStartTime = Date.now();
+      const batchStartTime = Date.now()
       
       try {
-        // Find or create the household using upsert
+        // Find or create the household
         const household = await prisma.household.upsert({
           where: { name: householdName },
-          update: {}, // No updates if it exists
+          update: {}, // No updates needed if it exists
           create: {
             name: householdName,
             code: generateRandomCode()
@@ -90,16 +89,16 @@ export async function POST(request: Request) {
               }
             }
           }
-        });
+        })
         
-        processedHouseholds++;
+        processedHouseholds++
         
-        // Get existing guests for duplicate checking
-        const existingGuests = new Set(household.guests.map(g => g.name.toLowerCase()));
+        // Get existing guests to avoid duplicates
+        const existingGuests = new Set(household.guests.map(g => g.name.toLowerCase()))
         
         // Process each guest in the household
         for (const member of members) {
-          const guestName = member.Name.trim();
+          const guestName = member.Name.trim()
           
           // Skip duplicates
           if (existingGuests.has(guestName.toLowerCase())) {
@@ -108,8 +107,8 @@ export async function POST(request: Request) {
               householdName,
               success: false,
               error: "Duplicate guest"
-            });
-            continue;
+            })
+            continue
           }
           
           try {
@@ -123,35 +122,35 @@ export async function POST(request: Request) {
                 dietaryNotes: member.DietaryNotes || null,
                 householdId: household.id
               }
-            });
+            })
             
-            processedGuests++;
+            processedGuests++
             
             results.push({
               name: guestName,
               householdName,
               success: true
-            });
+            })
           } catch (error) {
-            console.error(`Error creating guest ${guestName}:`, error);
+            console.error(`Error creating guest ${guestName}:`, error)
             
             results.push({
               name: guestName,
               householdName,
               success: false,
               error: error instanceof Error ? error.message : "Unknown error"
-            });
+            })
           }
         }
         
-        console.log(`Processed household "${householdName}" with ${members.length} guests in ${Date.now() - batchStartTime}ms`);
+        console.log(`Processed household "${householdName}" with ${members.length} guests in ${Date.now() - batchStartTime}ms`)
       } catch (error) {
-        console.error(`Error processing household ${householdName}:`, error);
+        console.error(`Error processing household ${householdName}:`, error)
         
         if (error instanceof Error) {
-          errors.push(`Error processing household ${householdName}: ${error.message}`);
+          errors.push(`Error processing household ${householdName}: ${error.message}`)
         } else {
-          errors.push(`Error processing household ${householdName}: Unknown error`);
+          errors.push(`Error processing household ${householdName}: Unknown error`)
         }
         
         // Add failure results for all members
@@ -161,21 +160,17 @@ export async function POST(request: Request) {
             householdName,
             success: false,
             error: "Household processing failed"
-          });
+          })
         }
       }
     }
     
-    const totalTime = Date.now() - startTime;
-    console.log(`Text import completed in ${totalTime}ms. Created ${processedHouseholds} households and ${processedGuests} guests.`);
+    const totalTime = Date.now() - startTime
+    console.log(`Batch upload completed in ${totalTime}ms. Created ${processedHouseholds} households and ${processedGuests} guests.`)
     
-    // Revalidate the guests page
-    revalidatePath('/admin/guests');
-    
-    // Return response with detailed information
+    // Return results
     return NextResponse.json({
       success: true,
-      message: `Successfully imported ${processedGuests} guests across ${processedHouseholds} households`,
       processed: {
         households: processedHouseholds,
         guests: processedGuests
@@ -183,17 +178,17 @@ export async function POST(request: Request) {
       results,
       errors: errors.length > 0 ? errors : undefined,
       processingTime: `${(totalTime/1000).toFixed(2)} seconds`
-    });
+    })
   } catch (error: any) {
-    console.error('Text import error:', error);
+    console.error('Batch upload error:', error)
     
     return NextResponse.json(
       { 
-        error: 'Failed to process import',
+        error: 'Failed to process batch', 
         message: error.message || 'Unknown error',
         stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       },
       { status: 500 }
-    );
+    )
   }
 } 

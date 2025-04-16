@@ -3,6 +3,9 @@ import { prisma } from "@/lib/db"
 import { unstable_noStore as noStore } from 'next/cache'
 import { revalidatePath } from 'next/cache'
 
+// Configure timeout limit to match vercel.json
+export const maxDuration = 30;
+
 // Helper function to generate a random code
 function generateRandomCode() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -18,13 +21,20 @@ interface GuestRecord {
   dietaryNotes: string | null;
 }
 
+interface ProcessingResult {
+  name: string;
+  householdName: string;
+  success: boolean;
+  error?: string;
+}
+
 export async function POST(request: Request) {
   noStore()
   
+  console.log('Starting text guest import process')
+  const startTime = Date.now()
+  
   try {
-    console.log('Starting text guest import process')
-    const startTime = Date.now()
-    
     // Get the data from the request
     const data = await request.json()
     const guests = data.guests as GuestRecord[]
@@ -38,46 +48,42 @@ export async function POST(request: Request) {
     console.log(`Processing ${guests.length} guests from pasted data`)
     
     // Group guests by household to be more efficient
-    const householdMap = new Map<string, {
-      name: string,
-      guests: GuestRecord[]
-    }>()
+    const householdMap = new Map<string, GuestRecord[]>()
     
     // Group guests
     for (const guest of guests) {
       // Basic validation
-      if (!guest.name || !guest.household) continue
-      
-      const householdKey = guest.household.toLowerCase()
-      
-      if (!householdMap.has(householdKey)) {
-        householdMap.set(householdKey, {
-          name: guest.household, // Use original casing
-          guests: [guest]
-        })
-      } else {
-        householdMap.get(householdKey)?.guests.push(guest)
+      if (!guest.name || !guest.household) {
+        console.warn('Skipping invalid guest record:', guest)
+        continue
       }
+      
+      if (!householdMap.has(guest.household)) {
+        householdMap.set(guest.household, [])
+      }
+      householdMap.get(guest.household)!.push(guest)
     }
     
     console.log(`Grouped into ${householdMap.size} households`)
     
-    // Process households and guests
+    // Process in smaller batches
+    const results: ProcessingResult[] = []
+    const errors: string[] = []
     let processedHouseholds = 0
     let processedGuests = 0
-    let skippedDuplicates = 0
-    const errors: string[] = []
     
-    // Create households and their guests
-    for (const [key, household] of householdMap.entries()) {
+    // Process each household and its guests
+    for (const [householdName, members] of householdMap.entries()) {
+      const batchStartTime = Date.now()
+      
       try {
-        // Check if household already exists
-        let existingHousehold = await prisma.household.findFirst({
-          where: {
-            name: {
-              equals: household.name,
-              mode: 'insensitive'
-            }
+        // Use upsert to efficiently find or create the household
+        const household = await prisma.household.upsert({
+          where: { name: householdName },
+          update: {}, // No updates if it exists
+          create: {
+            name: householdName,
+            code: generateRandomCode()
           },
           include: {
             guests: {
@@ -89,106 +95,103 @@ export async function POST(request: Request) {
           }
         })
         
-        // Create household if it doesn't exist
-        if (!existingHousehold) {
-          existingHousehold = await prisma.household.create({
-            data: {
-              name: household.name,
-              code: generateRandomCode()
-            },
-            include: {
-              guests: {
-                select: {
-                  id: true,
-                  name: true
-                }
-              }
-            }
-          })
-          processedHouseholds++
-          console.log(`Created new household: ${household.name}`)
-        }
+        processedHouseholds++
+        
+        // Get existing guest names for duplicate checking
+        const existingGuests = new Set(household.guests.map(g => g.name.toLowerCase()))
         
         // Process each guest in the household
-        for (const guest of household.guests) {
+        for (const member of members) {
+          // Skip duplicates
+          if (existingGuests.has(member.name.toLowerCase())) {
+            results.push({
+              name: member.name,
+              householdName,
+              success: false,
+              error: "Duplicate guest"
+            })
+            continue
+          }
+          
           try {
-            // Check if guest already exists in this household
-            const existingGuest = existingHousehold.guests.find(g => 
-              g.name.toLowerCase() === guest.name.toLowerCase()
-            )
-            
-            // Skip if guest already exists
-            if (existingGuest) {
-              console.log(`Skipping duplicate guest: ${guest.name} in household ${household.name}`)
-              skippedDuplicates++
-              continue
-            }
-            
             // Create the guest
             await prisma.guest.create({
               data: {
-                name: guest.name,
-                email: guest.email || null,
-                dietaryNotes: guest.dietaryNotes || null,
-                householdId: existingHousehold.id
+                name: member.name,
+                email: member.email || null,
+                isChild: member.isChild || false,
+                isTeenager: member.isTeenager || false,
+                dietaryNotes: member.dietaryNotes || null,
+                householdId: household.id
               }
             })
+            
             processedGuests++
+            
+            results.push({
+              name: member.name,
+              householdName,
+              success: true
+            })
           } catch (error) {
-            console.error(`Error creating guest ${guest.name}:`, error)
-            errors.push(`Failed to create guest ${guest.name} in household ${household.name}`)
+            console.error(`Error creating guest ${member.name}:`, error)
+            
+            results.push({
+              name: member.name,
+              householdName,
+              success: false,
+              error: error instanceof Error ? error.message : "Unknown error"
+            })
           }
         }
+        
+        console.log(`Processed household "${householdName}" with ${members.length} guests in ${Date.now() - batchStartTime}ms`)
       } catch (error) {
-        console.error(`Error processing household ${household.name}:`, error)
-        errors.push(`Failed to process household ${household.name}`)
+        console.error(`Error processing household ${householdName}:`, error)
+        
+        if (error instanceof Error) {
+          errors.push(`Error processing household ${householdName}: ${error.message}`)
+        } else {
+          errors.push(`Error processing household ${householdName}: Unknown error`)
+        }
+        
+        // Add failure results for all members of this household
+        for (const member of members) {
+          results.push({
+            name: member.name,
+            householdName,
+            success: false,
+            error: "Household processing failed"
+          })
+        }
       }
     }
     
     const totalTime = Date.now() - startTime
-    console.log(`Import completed in ${totalTime}ms. Created ${processedHouseholds} households and ${processedGuests} guests. Skipped ${skippedDuplicates} duplicates.`)
+    console.log(`Import completed in ${totalTime}ms. Created ${processedHouseholds} households and ${processedGuests} guests.`)
     
     // Revalidate the guests page
     revalidatePath('/admin/guests')
     
-    // Return success response with summary and any errors
-    if (errors.length > 0) {
-      return NextResponse.json({ 
-        warning: 'Some guests could not be imported',
-        processed: {
-          households: processedHouseholds,
-          guests: processedGuests
-        },
-        skipped: {
-          duplicates: skippedDuplicates
-        },
-        total: {
-          households: householdMap.size,
-          guests: guests.length
-        },
-        errors
-      }, { status: 207 }) // 207 Multi-Status
-    }
-    
+    // Return a more detailed success response
     return NextResponse.json({ 
       success: true,
-      message: `Successfully imported ${processedGuests} guests across ${processedHouseholds} households${skippedDuplicates > 0 ? `, skipped ${skippedDuplicates} duplicates` : ''}`,
+      message: `Successfully imported ${processedGuests} guests across ${processedHouseholds} households`,
       processed: {
         households: processedHouseholds,
         guests: processedGuests
       },
-      skipped: {
-        duplicates: skippedDuplicates
-      },
+      results,
+      errors: errors.length > 0 ? errors : undefined,
       processingTime: `${(totalTime/1000).toFixed(2)} seconds`
     })
-    
   } catch (error: any) {
     console.error('Error in import-text-guests route:', error)
     
     return NextResponse.json({ 
       error: 'Failed to process guest data',
-      message: error.message || 'Unknown error'
+      message: error.message || 'Unknown error',
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     }, { status: 500 })
   }
 } 

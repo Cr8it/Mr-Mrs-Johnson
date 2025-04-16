@@ -99,68 +99,77 @@ const TextImportModal: React.FC<TextImportModalProps> = ({ open, onOpenChange, o
   }
 
   const handleImport = async () => {
-    setLoading(true)
-    setErrors([])
-
-    if (!inputText.trim()) {
-      setErrors(["Please paste some data to import"])
-      setLoading(false)
-      return
-    }
-
     try {
+      setLoading(true)
+      setErrors([])
+      
+      // Parse the pasted data
       const records = parseTabularData(inputText)
       
       if (records.length === 0) {
         throw new Error("No valid records found in the pasted data")
       }
-
-      const response = await fetch("/api/admin/import-text", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ records })
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to import data")
-      }
-
-      // Check for warnings about missing households
-      if (result.warnings && result.warnings.length > 0) {
-        setErrors(result.warnings.concat(result.errors || []))
-        toast.warning(`Import completed with warnings. See details in the import window.`)
-        setLoading(false)
-        return
-      }
-
-      if (result.errors && result.errors.length > 0) {
-        setErrors(result.errors)
-        toast.warning(`Import completed with ${result.errors.length} errors. See details in the import window.`)
-      } else {
-        let successMessage = `Import successful! ${result.imported} guests imported`;
+      
+      console.log(`Parsed ${records.length} records from text input`)
+      
+      // Create abort controller for timeout handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+      
+      try {
+        // Send the data to the server
+        const response = await fetch("/api/admin/import-text-guests", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            guests: records.map(record => ({
+              name: record.Name?.trim() || "",
+              household: record.Household?.trim() || "",
+              email: record.Email?.trim() || null,
+              isChild: record.Child === "yes" || record.Child === "true" || record.Child === "Y" || record.Child === "C",
+              isTeenager: record.Teenager === "yes" || record.Teenager === "true" || record.Teenager === "Y" || record.Teenager === "T",
+              dietaryNotes: record.DietaryNotes?.trim() || null
+            }))
+          }),
+          signal: controller.signal
+        })
         
-        // Make duplicate notification more prominent if any were skipped
-        if (result.skipped && result.skipped.duplicates > 0) {
-          successMessage += `\n${result.skipped.duplicates} duplicate guests were detected and skipped.`;
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          if (response.status === 504) {
+            throw new Error("Server timeout. Try a smaller batch or check your data for formatting issues.")
+          }
+          
+          const errorData = await response.json()
+          throw new Error(errorData.message || errorData.error || "Failed to import guests")
         }
         
-        // Add household creation info
-        if (result.householdsCreated > 0) {
-          successMessage += `\nCreated ${result.householdsCreated} new households.`;
-        }
+        const result = await response.json()
         
-        toast.success(successMessage)
-        if (onSuccess) onSuccess()
-        onOpenChange(false)
+        if (result.errors && result.errors.length > 0) {
+          setErrors(result.errors)
+          toast.warning(`Partially imported guests with ${result.errors.length} errors. See details below.`)
+        } else {
+          toast.success(`Successfully imported ${result.processed.guests} guests across ${result.processed.households} households. Processing time: ${result.processingTime}`)
+          
+          // Clear input and close on success
+          setInputText("")
+          if (onSuccess) onSuccess()
+          onOpenChange(false)
+        }
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          throw new Error("Request timed out. Your data may be too large or complex. Try splitting it into smaller batches.")
+        }
+        throw error
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Import error:", error)
-      setErrors([error.message || "Failed to import data"])
-      toast.error(`Import failed: ${error.message || "An error occurred while importing"}`)
+      toast.error(error.message || "Failed to import guests")
+      setErrors(error.message ? [error.message] : ["Unknown error"])
     } finally {
       setLoading(false)
     }
