@@ -43,6 +43,7 @@ interface Guest {
   } | null
   dietaryNotes: string | null
   responses: Response[]
+  isChild: boolean
 }
 
 interface GuestFormProps {
@@ -61,7 +62,9 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [mealOptions, setMealOptions] = useState<{ id: string; name: string }[]>([])
+  const [childMealOptions, setChildMealOptions] = useState<{ id: string; name: string }[]>([])
   const [dessertOptions, setDessertOptions] = useState<{ id: string; name: string }[]>([])
+  const [childDessertOptions, setChildDessertOptions] = useState<{ id: string; name: string }[]>([])
   const [validationErrors, setValidationErrors] = useState<Record<string, string[]>>({})
   const [guests, setGuests] = useState<Guest[]>(() => {
     return household.guests.map(guest => ({
@@ -98,8 +101,14 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
       if (optionsData.mealOptions?.length > 0) {
         setMealOptions(optionsData.mealOptions)
       }
+      if (optionsData.childMealOptions?.length > 0) {
+        setChildMealOptions(optionsData.childMealOptions)
+      }
       if (optionsData.dessertOptions?.length > 0) {
         setDessertOptions(optionsData.dessertOptions)
+      }
+      if (optionsData.childDessertOptions?.length > 0) {
+        setChildDessertOptions(optionsData.childDessertOptions)
       }
     } catch (error) {
       console.error('Failed to fetch data:', error)
@@ -201,7 +210,9 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
   // Add debug logging to the render section
   console.log('Rendering GuestForm with:', {
     mealOptions,
+    childMealOptions,
     dessertOptions,
+    childDessertOptions,
     questions,
     guests
   })
@@ -410,7 +421,9 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
   // Add debug logging before render
   console.log('Rendering select options:', {
     mealOptions,
+    childMealOptions,
     dessertOptions,
+    childDessertOptions,
     guestMealChoices: guests.map(g => ({ id: g.id, mealChoice: g.mealChoice })),
     guestDessertChoices: guests.map(g => ({ id: g.id, dessertChoice: g.dessertChoice }))
   })
@@ -496,15 +509,26 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                       <p className="text-red-500 text-sm mt-1">Please select a meal option</p>
                     )}
                   <SelectContent className="bg-black border border-white border-opacity-20 text-white" sideOffset={5}>
-                    {mealOptions.map((option) => (
-                    <SelectItem
-                      key={option.id}
-                      value={option.id}
-                      className="text-white hover:bg-white/10 cursor-pointer"
-                    >
-                      {option.name}
-                    </SelectItem>
-                    ))}
+                    {guest.isChild 
+                      ? childMealOptions.map((option) => (
+                          <SelectItem
+                            key={option.id}
+                            value={option.id}
+                            className="text-white hover:bg-white/10 cursor-pointer"
+                          >
+                            {option.name}
+                          </SelectItem>
+                        ))
+                      : mealOptions.map((option) => (
+                          <SelectItem
+                            key={option.id}
+                            value={option.id}
+                            className="text-white hover:bg-white/10 cursor-pointer"
+                          >
+                            {option.name}
+                          </SelectItem>
+                        ))
+                    }
                   </SelectContent>
                   </Select>
                 </div>
@@ -530,15 +554,26 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                       <p className="text-red-500 text-sm mt-1">Please select a dessert option</p>
                     )}
                   <SelectContent className="bg-black border border-white border-opacity-20 text-white" sideOffset={5}>
-                    {dessertOptions.map((option) => (
-                    <SelectItem
-                      key={option.id}
-                      value={option.id}
-                      className="text-white hover:bg-white/10 cursor-pointer"
-                    >
-                      {option.name}
-                    </SelectItem>
-                    ))}
+                    {guest.isChild 
+                      ? childDessertOptions.map((option) => (
+                          <SelectItem
+                            key={option.id}
+                            value={option.id}
+                            className="text-white hover:bg-white/10 cursor-pointer"
+                          >
+                            {option.name}
+                          </SelectItem>
+                        ))
+                      : dessertOptions.map((option) => (
+                          <SelectItem
+                            key={option.id}
+                            value={option.id}
+                            className="text-white hover:bg-white/10 cursor-pointer"
+                          >
+                            {option.name}
+                          </SelectItem>
+                        ))
+                    }
                   </SelectContent>
                   </Select>
                 </div>

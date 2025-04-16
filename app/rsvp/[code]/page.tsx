@@ -170,11 +170,18 @@ export default function RSVPForm() {
                         <SelectValue placeholder="Select a meal" />
                         </SelectTrigger>
                         <SelectContent>
-                        {(guest.isChild ? childMealOptions : mealOptions).map((option) => (
-                          <SelectItem key={option.id} value={option.id}>
-                          {option.name}
-                          </SelectItem>
-                        ))}
+                        {guest.isChild 
+                          ? childMealOptions.map((option) => (
+                              <SelectItem key={option.id} value={option.id}>
+                              {option.name}
+                              </SelectItem>
+                            ))
+                          : mealOptions.map((option) => (
+                              <SelectItem key={option.id} value={option.id}>
+                              {option.name}
+                              </SelectItem>
+                            ))
+                        }
                         </SelectContent>
                       </Select>
                       </div>
@@ -193,11 +200,18 @@ export default function RSVPForm() {
                         <SelectValue placeholder="Select a dessert" />
                         </SelectTrigger>
                         <SelectContent>
-                        {(guest.isChild ? childDessertOptions : dessertOptions).map((option) => (
-                          <SelectItem key={option.id} value={option.id}>
-                          {option.name}
-                          </SelectItem>
-                        ))}
+                        {guest.isChild 
+                          ? childDessertOptions.map((option) => (
+                              <SelectItem key={option.id} value={option.id}>
+                              {option.name}
+                              </SelectItem>
+                            ))
+                          : dessertOptions.map((option) => (
+                              <SelectItem key={option.id} value={option.id}>
+                              {option.name}
+                              </SelectItem>
+                            ))
+                        }
                         </SelectContent>
                       </Select>
                       </div>
