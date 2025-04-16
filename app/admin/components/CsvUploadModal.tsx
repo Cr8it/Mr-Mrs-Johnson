@@ -171,8 +171,8 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 					if (batchResult.processingTime) {
 						results.processingTime = batchResult.processingTime
 					}
-				} catch (batchError) {
-					if (batchError.name === 'AbortError') {
+				} catch (batchError: unknown) {
+					if (batchError instanceof Error && batchError.name === 'AbortError') {
 						throw new Error("Request timed out. Your file may be too large or complex. Try splitting it into smaller batches.")
 					}
 					throw batchError

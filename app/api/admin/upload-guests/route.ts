@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     
     // Validate and clean up records - do this ONCE up front to avoid repeated work
     const validRecords: GuestRecord[] = []
-    const errors: string[] = []
+    const validationErrors: string[] = []
     
     for (let i = 0; i < records.length; i++) {
       const record = records[i]
@@ -76,12 +76,12 @@ export async function POST(request: NextRequest) {
       
       // Basic validation
       if (!record.Name || record.Name.trim() === '') {
-        errors.push(`Row ${rowNum}: Missing name`)
+        validationErrors.push(`Row ${rowNum}: Missing name`)
         continue
       }
       
       if (!record.Household || record.Household.trim() === '') {
-        errors.push(`Row ${rowNum}: Missing household name`)
+        validationErrors.push(`Row ${rowNum}: Missing household name`)
         continue
       }
       
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     if (validRecords.length === 0) {
       return NextResponse.json({ 
         error: 'No valid records found in the CSV', 
-        details: errors 
+        details: validationErrors 
       }, { status: 400 })
     }
 
@@ -205,31 +205,72 @@ async function processHouseholdBatch(
   for (const [householdName, members] of householdEntries) {
     const batchStartTime = Date.now();
     try {
-      // Generate a unique code for the household
-      const code = generateRandomCode();
-      
-      // Create or update the household
-      const household = await db.household.upsert({
-        where: { name: householdName },
-        update: {},
-        create: {
-          name: householdName,
-          code: code,
+      // Find existing household or generate a unique code for a new one
+      let household = await db.household.findFirst({
+        where: { 
+          name: {
+            equals: householdName,
+            mode: 'insensitive'
+          }
         },
+        include: {
+          guests: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        }
       });
+      
+      // Create the household if it doesn't exist
+      if (!household) {
+        // Generate a unique code for the household
+        const code = generateRandomCode();
+        
+        household = await db.household.create({
+          data: {
+            name: householdName,
+            code: code,
+          },
+          include: {
+            guests: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        });
+      }
 
       // Log time for household creation
       console.log(`Household "${householdName}" processed in ${Date.now() - batchStartTime}ms`);
       
+      // Get existing guest names to avoid duplicates
+      const existingGuestNames = new Set(household.guests.map(g => g.name.toLowerCase()));
+      
       // Prepare guests for this household
       for (const member of members) {
         try {
+          // Skip if guest already exists in this household
+          if (existingGuestNames.has(member.name.toLowerCase())) {
+            results.push({
+              name: member.name,
+              householdName: householdName,
+              success: false,
+              error: "Duplicate guest"
+            });
+            continue;
+          }
+          
           const guest = await db.guest.create({
             data: {
               name: member.name,
               email: member.email || null,
               isChild: member.isChild || false,
               isTeenager: member.isTeenager || false,
+              dietaryNotes: member.dietaryNotes || null,
               householdId: household.id,
             },
           });

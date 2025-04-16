@@ -74,12 +74,12 @@ export async function POST(request: Request) {
       
       try {
         // Find or create the household
-        const household = await prisma.household.upsert({
-          where: { name: householdName },
-          update: {}, // No updates needed if it exists
-          create: {
-            name: householdName,
-            code: generateRandomCode()
+        let household = await prisma.household.findFirst({
+          where: { 
+            name: {
+              equals: householdName,
+              mode: 'insensitive'
+            }
           },
           include: {
             guests: {
@@ -90,6 +90,25 @@ export async function POST(request: Request) {
             }
           }
         })
+        
+        // Create the household if it doesn't exist
+        if (!household) {
+          household = await prisma.household.create({
+            data: {
+              name: householdName,
+              code: generateRandomCode()
+            },
+            include: {
+              guests: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
+            }
+          })
+          console.log(`Created new household: ${householdName}`)
+        }
         
         processedHouseholds++
         

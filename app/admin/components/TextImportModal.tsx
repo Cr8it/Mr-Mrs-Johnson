@@ -160,16 +160,17 @@ const TextImportModal: React.FC<TextImportModalProps> = ({ open, onOpenChange, o
           if (onSuccess) onSuccess()
           onOpenChange(false)
         }
-      } catch (error) {
-        if (error.name === 'AbortError') {
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name === 'AbortError') {
           throw new Error("Request timed out. Your data may be too large or complex. Try splitting it into smaller batches.")
         }
         throw error
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Import error:", error)
-      toast.error(error.message || "Failed to import guests")
-      setErrors(error.message ? [error.message] : ["Unknown error"])
+      const errorMessage = error instanceof Error ? error.message : "Failed to import guests"
+      toast.error(errorMessage)
+      setErrors(errorMessage ? [errorMessage] : ["Unknown error"])
     } finally {
       setLoading(false)
     }
