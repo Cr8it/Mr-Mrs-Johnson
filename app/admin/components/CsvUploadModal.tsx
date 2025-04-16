@@ -111,7 +111,13 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 			if (response.status === 207) {
 				const data = await response.json()
 				setUploadStatus("Partial success")
-				setError(`The upload was partially completed. ${data.processed.guests} guests across ${data.processed.households} households were imported successfully, but some entries could not be processed.`)
+				
+				// Check if there are warnings about missing households
+				if (data.warnings && data.warnings.length > 0) {
+					setError(`${data.processed.guests} guests were added successfully, but some couldn't be processed. ${data.warnings[0]}`)
+				} else {
+					setError(`The upload was partially completed. ${data.processed.guests} guests were imported successfully, but some entries could not be processed.`)
+				}
 				
 				if (data.errors && Array.isArray(data.errors)) {
 					setErrorList(data.errors)
@@ -149,8 +155,24 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 			}
 
 			// Success - show toast and close modal
-			const successMessage = `Upload successful! ${data.processed ? data.processed.guests : data.imported} guests imported` + 
-				(data.skipped ? `, ${data.skipped} duplicates skipped` : "");
+			const successMessage = `Upload successful! ${data.processed ? data.processed.guests : data.imported} guests imported`;
+			
+			// Add skipped duplicates information
+			if (data.skipped) {
+				if (data.skipped.duplicates) {
+					successMessage += `, ${data.skipped.duplicates} duplicates skipped`;
+				}
+				
+				// Add warning about households not found
+				if (data.skipped.households && data.skipped.households > 0) {
+					setError(`Warning: ${data.skipped.households} guests were skipped because their household wasn't found in the database.`);
+					if (data.skipped.missingHouseholds) {
+						setErrorList([`Missing households: ${data.skipped.missingHouseholds.join(', ')}`]);
+					}
+					return;
+				}
+			}
+			
 			toast.success(successMessage);
 			onUpload(data.households || [])
 			onClose()
@@ -307,7 +329,10 @@ export function CsvUploadModal({ isOpen, onClose, onUpload }: CsvUploadModalProp
 									<li>Teenager (Use "yes" to mark as a teenager - optional)</li>
 								</ul>
 								<p className="mt-2 font-medium text-gray-700 dark:text-gray-300">
-									<strong>Note:</strong> Duplicate guests (same name in the same household) will be skipped, not updated or duplicated.
+									<strong>Important:</strong> Households must already exist in the database. Guests for non-existent households will be skipped.
+								</p>
+								<p className="mt-1 text-gray-600 dark:text-gray-400">
+									Duplicate guests (same name in the same household) will also be skipped, not updated or duplicated.
 								</p>
 							</AlertDescription>
 						</Alert>

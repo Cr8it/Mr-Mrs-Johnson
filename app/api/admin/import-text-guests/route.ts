@@ -63,45 +63,48 @@ export async function POST(request: Request) {
     console.log(`Grouped into ${householdMap.size} households`)
     
     // Process households and guests
-    let processedHouseholds = 0
     let processedGuests = 0
     let skippedDuplicates = 0
+    let skippedHouseholds = 0
+    const missingHouseholds: string[] = []
     const errors: string[] = []
     
-    // Create households and their guests
+    // Process each household and its guests
     for (const [key, household] of householdMap.entries()) {
       try {
         // Check if household already exists
-        let existingHousehold = await prisma.household.findFirst({
+        const existingHousehold = await prisma.household.findFirst({
           where: {
-            name: household.name
+            name: {
+              equals: household.name,
+              mode: 'insensitive'
+            }
+          },
+          include: {
+            guests: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
           }
         })
         
-        // Create household if it doesn't exist
+        // Skip if household doesn't exist
         if (!existingHousehold) {
-          existingHousehold = await prisma.household.create({
-            data: {
-              name: household.name,
-              code: generateRandomCode()
-            }
-          })
-          processedHouseholds++
+          console.log(`Skipping household "${household.name}" - not found in database`)
+          skippedHouseholds++
+          missingHouseholds.push(household.name)
+          continue
         }
         
-        // Create all guests for this household
+        // Process each guest in the household
         for (const guest of household.guests) {
           try {
             // Check if guest already exists in this household
-            const existingGuest = await prisma.guest.findFirst({
-              where: {
-                name: {
-                  equals: guest.name.trim(),
-                  mode: 'insensitive'
-                },
-                householdId: existingHousehold.id
-              }
-            })
+            const existingGuest = existingHousehold.guests.find(g => 
+              g.name.toLowerCase() === guest.name.toLowerCase()
+            )
             
             // Skip if guest already exists
             if (existingGuest) {
@@ -110,12 +113,11 @@ export async function POST(request: Request) {
               continue
             }
             
+            // Create the guest
             await prisma.guest.create({
               data: {
                 name: guest.name,
                 email: guest.email || null,
-                isChild: guest.isChild || false,
-                isTeenager: guest.isTeenager || false,
                 dietaryNotes: guest.dietaryNotes || null,
                 householdId: existingHousehold.id
               }
@@ -123,7 +125,7 @@ export async function POST(request: Request) {
             processedGuests++
           } catch (error) {
             console.error(`Error creating guest ${guest.name}:`, error)
-            errors.push(`Failed to create guest ${guest.name}`)
+            errors.push(`Failed to create guest ${guest.name} in household ${household.name}`)
           }
         }
       } catch (error) {
@@ -133,36 +135,39 @@ export async function POST(request: Request) {
     }
     
     const totalTime = Date.now() - startTime
-    console.log(`Import completed in ${totalTime}ms. Created ${processedHouseholds} households and ${processedGuests} guests. Skipped ${skippedDuplicates} duplicates.`)
+    console.log(`Import completed in ${totalTime}ms. Added ${processedGuests} guests to existing households. Skipped ${skippedDuplicates} duplicates and ${skippedHouseholds} households that don't exist.`)
     
     // Revalidate the guests page
     revalidatePath('/admin/guests')
     
     // Return success response with summary and any errors
-    if (errors.length > 0) {
+    if (errors.length > 0 || skippedHouseholds > 0) {
       return NextResponse.json({ 
-        warning: 'Some guests could not be imported',
+        warning: errors.length > 0 ? 'Some guests could not be imported' : 
+                 skippedHouseholds > 0 ? 'Some households were not found in the database' : '',
         processed: {
-          households: processedHouseholds,
           guests: processedGuests
         },
-        skipped: skippedDuplicates,
-        total: {
-          households: householdMap.size,
-          guests: guests.length
+        skipped: {
+          duplicates: skippedDuplicates,
+          households: skippedHouseholds,
+          missingHouseholds: missingHouseholds
         },
-        errors
+        warnings: skippedHouseholds > 0 ? [`${skippedHouseholds} households were not found in the database: ${missingHouseholds.join(', ')}`] : [],
+        errors: errors.length > 0 ? errors : undefined
       }, { status: 207 }) // 207 Multi-Status
     }
     
     return NextResponse.json({ 
       success: true,
-      message: `Successfully imported ${processedGuests} guests across ${processedHouseholds} households${skippedDuplicates > 0 ? `, skipped ${skippedDuplicates} duplicates` : ''}`,
+      message: `Added ${processedGuests} guests to existing households${skippedDuplicates > 0 ? `, skipped ${skippedDuplicates} duplicates` : ''}`,
       processed: {
-        households: processedHouseholds,
         guests: processedGuests
       },
-      skipped: skippedDuplicates,
+      skipped: {
+        duplicates: skippedDuplicates,
+        households: skippedHouseholds
+      },
       processingTime: `${(totalTime/1000).toFixed(2)} seconds`
     })
     

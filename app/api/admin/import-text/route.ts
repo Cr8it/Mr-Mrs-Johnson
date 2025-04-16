@@ -1,11 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
-// Helper function to generate a random code
-function generateRandomCode() {
-  return Math.random().toString(36).substring(2, 8).toUpperCase();
-}
-
 export async function POST(request: Request) {
   try {
     const { records } = await request.json();
@@ -21,8 +16,9 @@ export async function POST(request: Request) {
 
     const importErrors: string[] = [];
     let importedCount = 0;
-    let updatedCount = 0;
-    let skippedCount = 0;
+    let skippedDuplicates = 0;
+    let skippedHouseholds = 0;
+    const missingHouseholds: string[] = [];
 
     // Process each record
     for (let i = 0; i < records.length; i++) {
@@ -41,55 +37,59 @@ export async function POST(request: Request) {
           continue;
         }
 
-        // Check if household exists, create if not
-        let household = await prisma.household.findFirst({
+        // Check if household exists
+        const household = await prisma.household.findFirst({
           where: {
             name: {
               equals: record.Household.trim(),
               mode: 'insensitive'
             }
+          },
+          include: {
+            guests: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
           }
         });
 
+        // Skip if household doesn't exist
         if (!household) {
-          household = await prisma.household.create({
-            data: {
-              name: record.Household.trim(),
-              code: generateRandomCode()
-            }
-          });
-          console.log(`Created new household: ${household.name} with code ${household.code}`);
+          if (!missingHouseholds.includes(record.Household.trim())) {
+            missingHouseholds.push(record.Household.trim());
+            console.log(`Skipping household "${record.Household.trim()}" - not found in database`);
+          }
+          skippedHouseholds++;
+          continue;
         }
 
         // Check if guest exists
-        const existingGuest = await prisma.guest.findFirst({
-          where: {
-            name: {
-              equals: record.Name.trim(),
-              mode: 'insensitive'
-            },
-            householdId: household.id
-          }
-        });
-
-        // Determine if child or teenager - using yes/no strings
-        const childValues = ['yes', 'y', 'true', '1', 'c', 't'];
-        const isChild = record.Child ? childValues.includes(record.Child.toString().trim().toLowerCase()) : false;
-        const isTeenager = record.Teenager ? childValues.includes(record.Teenager.toString().trim().toLowerCase()) : false;
+        const existingGuest = household.guests.find(
+          guest => guest.name.toLowerCase() === record.Name.trim().toLowerCase()
+        );
 
         // Skip duplicates instead of updating them
         if (existingGuest) {
           console.log(`Skipping duplicate guest: ${record.Name.trim()} in household ${household.name}`);
-          skippedCount++;
+          skippedDuplicates++;
           continue;
         } else {
-          // Create new guest using prisma raw query to avoid type issues
-          await prisma.$executeRaw`
-            INSERT INTO "Guest" 
-            ("id", "name", "householdId", "email", "isChild", "isTeenager", "createdAt", "updatedAt") 
-            VALUES 
-            (${crypto.randomUUID()}, ${record.Name.trim()}, ${household.id}, ${record.Email ? record.Email.trim() : null}, ${isChild}, ${isTeenager}, NOW(), NOW())
-          `;
+          // Determine if child or teenager - using yes/no strings
+          const childValues = ['yes', 'y', 'true', '1', 'c', 't'];
+          const isChild = record.Child ? childValues.includes(record.Child.toString().trim().toLowerCase()) : false;
+          const isTeenager = record.Teenager ? childValues.includes(record.Teenager.toString().trim().toLowerCase()) : false;
+          
+          // Create new guest
+          await prisma.guest.create({
+            data: {
+              name: record.Name.trim(),
+              email: record.Email ? record.Email.trim() : null,
+              dietaryNotes: record.DietaryNotes || null,
+              householdId: household.id
+            }
+          });
           
           importedCount++;
         }
@@ -102,9 +102,13 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       imported: importedCount,
-      updated: updatedCount,
-      skipped: skippedCount,
-      errors: importErrors
+      skipped: {
+        duplicates: skippedDuplicates,
+        households: skippedHouseholds,
+        missingHouseholds: missingHouseholds
+      },
+      warnings: skippedHouseholds > 0 ? [`${skippedHouseholds} guests skipped because their households were not found in the database (${missingHouseholds.join(', ')})`] : [],
+      errors: importErrors.length > 0 ? importErrors : undefined
     });
   } catch (error: any) {
     console.error('Text import error:', error);

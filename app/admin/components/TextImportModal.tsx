@@ -129,6 +129,14 @@ const TextImportModal: React.FC<TextImportModalProps> = ({ open, onOpenChange, o
         throw new Error(result.error || "Failed to import data")
       }
 
+      // Check for warnings about missing households
+      if (result.warnings && result.warnings.length > 0) {
+        setErrors(result.warnings.concat(result.errors || []))
+        toast.warning(`Import completed with warnings. See details in the import window.`)
+        setLoading(false)
+        return
+      }
+
       if (result.errors && result.errors.length > 0) {
         setErrors(result.errors)
         toast.warning(`Import completed with ${result.errors.length} errors. See details in the import window.`)
@@ -136,8 +144,8 @@ const TextImportModal: React.FC<TextImportModalProps> = ({ open, onOpenChange, o
         let successMessage = `Import successful! ${result.imported} guests imported`;
         
         // Make duplicate notification more prominent if any were skipped
-        if (result.skipped && result.skipped > 0) {
-          successMessage += `\n${result.skipped} duplicate guests were detected and skipped.`;
+        if (result.skipped && result.skipped.duplicates > 0) {
+          successMessage += `\n${result.skipped.duplicates} duplicate guests were detected and skipped.`;
         }
         
         toast.success(successMessage)
@@ -205,6 +213,11 @@ const TextImportModal: React.FC<TextImportModalProps> = ({ open, onOpenChange, o
                   <span className="text-gray-600 dark:text-gray-300">{help}</span>
                 </div>
               ))}
+            </div>
+            <div className="mt-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-2 rounded-md">
+              <p className="font-semibold text-amber-800 dark:text-amber-300">Important:</p>
+              <p className="text-amber-700 dark:text-amber-400">Households must already exist in the database. Guests for non-existent households will be skipped.</p>
+              <p className="mt-1 text-amber-600 dark:text-amber-500">Duplicate guests (same name in the same household) will also be skipped.</p>
             </div>
           </div>
 
