@@ -100,8 +100,8 @@ export async function POST(request: NextRequest) {
         name: record.Name.trim(),
         household: record.Household.trim(),
         email: record.Email ? record.Email.trim() : null,
-        isChild: record.Child === 'C' || record.Child === 'yes' || record.Child === 'Y' || record.Child === 'true' || false,
-        isTeenager: record.Teenager === 'T' || record.Teenager === 'yes' || record.Teenager === 'Y' || record.Teenager === 'true' || false,
+        isChild: (record.Child === 'C' || record.Child === 'yes' || record.Child === 'Y' || record.Child === 'true'),
+        isTeenager: (record.Teenager === 'T' || record.Teenager === 'yes' || record.Teenager === 'Y' || record.Teenager === 'true'),
         dietaryNotes: record.DietaryRequirements || null
       }
       
@@ -278,8 +278,8 @@ async function processHouseholdBatch(
             data: {
               name: member.name,
               email: member.email || null,
-              isChild: member.isChild || false,
-              isTeenager: member.isTeenager || false,
+              isChild: member.isChild,
+              isTeenager: member.isTeenager,
               dietaryNotes: member.dietaryNotes || null,
               householdId: household.id,
             },
