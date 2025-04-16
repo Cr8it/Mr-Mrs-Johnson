@@ -145,8 +145,16 @@ export async function POST(request: Request) {
               data: {
                 name: guestName,
                 email: member.Email ? member.Email.trim() : null,
-                isChild: member.Child === 'C' || member.Child === 'true' || member.Child === 'YES',
-                isTeenager: member.Teenager === 'T' || member.Teenager === 'true' || member.Teenager === 'YES',
+                isChild: member.Child === 'C' || 
+                         member.Child === 'true' || 
+                         member.Child?.toLowerCase() === 'yes' || 
+                         member.Child === 'Y' || 
+                         member.Child === 'YES',
+                isTeenager: member.Teenager === 'T' || 
+                            member.Teenager === 'true' || 
+                            member.Teenager?.toLowerCase() === 'yes' || 
+                            member.Teenager === 'Y' || 
+                            member.Teenager === 'YES',
                 dietaryNotes: member.DietaryNotes || null,
                 householdId: household.id
               }
