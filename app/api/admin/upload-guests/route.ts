@@ -300,7 +300,7 @@ async function processHouseholdBatch(
           });
         }
       }
-    } catch (error) {
+  } catch (error) {
       console.error(`Error processing household ${householdName}:`, error);
       for (const member of members) {
         results.push({

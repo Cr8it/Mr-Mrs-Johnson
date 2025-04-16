@@ -23,6 +23,7 @@ interface Guest {
   } | null
   dietaryNotes: string | null
   responses: Response[]
+  isChild: boolean
 }
 
 interface Household {
