@@ -84,6 +84,8 @@ export default function MenuOptionsPage() {
 	const [isChildMealOption, setIsChildMealOption] = useState(false)
 	const [newDessertOption, setNewDessertOption] = useState("")
 	const [isChildDessertOption, setIsChildDessertOption] = useState(false)
+	const [isMealAdding, setIsMealAdding] = useState(false)
+	const [isDessertAdding, setIsDessertAdding] = useState(false)
 	const { toast } = useToast()
 	const [statistics, setStatistics] = useState<{
 		mealChoices: { name: string; count: number }[];
@@ -393,10 +395,17 @@ export default function MenuOptionsPage() {
 								onChange={(e) => setNewMealOption(e.target.value)}
 								placeholder="Add new meal option..."
 								className="max-w-xs bg-gray-50 border-gray-200 focus:border-gold focus:ring-gold"
+								disabled={isMealAdding}
 							/>
-							<Button type="submit" className="bg-gold hover:bg-[#c19b2f] text-white">
-								<Plus className="h-4 w-4 mr-2" />
-								Add Option
+							<Button type="submit" className="bg-gold hover:bg-[#c19b2f] text-white" disabled={isMealAdding}>
+								{isMealAdding ? (
+									<>Loading...</>
+								) : (
+									<>
+										<Plus className="h-4 w-4 mr-2" />
+										Add Option
+									</>
+								)}
 							</Button>
 						</div>
 						<div className="flex items-center space-x-2">
@@ -404,6 +413,7 @@ export default function MenuOptionsPage() {
 								id="meal-for-children"
 								checked={isChildMealOption}
 								onCheckedChange={(checked) => setIsChildMealOption(checked === true)}
+								disabled={isMealAdding}
 							/>
 							<label
 								htmlFor="meal-for-children"
@@ -461,10 +471,17 @@ export default function MenuOptionsPage() {
 								onChange={(e) => setNewDessertOption(e.target.value)}
 								placeholder="Add new dessert option..."
 								className="max-w-xs bg-gray-50 border-gray-200 focus:border-gold focus:ring-gold"
+								disabled={isDessertAdding}
 							/>
-							<Button type="submit" className="bg-gold hover:bg-[#c19b2f] text-white">
-								<Plus className="h-4 w-4 mr-2" />
-								Add Option
+							<Button type="submit" className="bg-gold hover:bg-[#c19b2f] text-white" disabled={isDessertAdding}>
+								{isDessertAdding ? (
+									<>Loading...</>
+								) : (
+									<>
+										<Plus className="h-4 w-4 mr-2" />
+										Add Option
+									</>
+								)}
 							</Button>
 						</div>
 						<div className="flex items-center space-x-2">
@@ -472,6 +489,7 @@ export default function MenuOptionsPage() {
 								id="dessert-for-children"
 								checked={isChildDessertOption}
 								onCheckedChange={(checked) => setIsChildDessertOption(checked === true)}
+								disabled={isDessertAdding}
 							/>
 							<label
 								htmlFor="dessert-for-children"
