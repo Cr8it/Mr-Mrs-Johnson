@@ -114,7 +114,7 @@ export async function POST(request: Request) {
         processedHouseholds++;
         
         // Get existing guests for duplicate checking
-        const existingGuests = new Set(household.guests.map(g => g.name.toLowerCase()));
+        const existingGuests = new Set(household.guests.map((g: { name: string }) => g.name.toLowerCase()));
         
         // Process each guest in the household
         for (const member of members) {

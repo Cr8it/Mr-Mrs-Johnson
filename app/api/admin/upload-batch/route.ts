@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
+import { PrismaClient } from '@prisma/client'
 
 // Add exports to match vercel.json configuration
 export const maxDuration = 30;
@@ -17,6 +18,14 @@ interface GuestRecord {
   Child?: string;
   Teenager?: string;
   DietaryNotes?: string;
+}
+
+// Interface for processing results
+interface ProcessingResult {
+  name: string;
+  householdName: string;
+  success: boolean;
+  error?: string;
 }
 
 export async function POST(request: Request) {
@@ -63,7 +72,7 @@ export async function POST(request: Request) {
     console.log(`Grouped into ${households.size} households`)
     
     // Process in smaller batches
-    const results: any[] = []
+    const results: ProcessingResult[] = []
     const errors: string[] = []
     let processedHouseholds = 0
     let processedGuests = 0
@@ -113,7 +122,7 @@ export async function POST(request: Request) {
         processedHouseholds++
         
         // Get existing guests to avoid duplicates
-        const existingGuests = new Set(household.guests.map(g => g.name.toLowerCase()))
+        const existingGuests = new Set(household.guests.map((g: { name: string }) => g.name.toLowerCase()))
         
         // Process each guest in the household
         for (const member of members) {

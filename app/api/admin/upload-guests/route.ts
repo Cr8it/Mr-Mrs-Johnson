@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db"
 import { unstable_noStore as noStore } from 'next/cache'
 import { parse } from 'csv-parse/sync'
 import { revalidatePath } from 'next/cache'
+import { PrismaClient } from '@prisma/client'
 
 // Helper function to generate a random code
 function generateRandomCode() {
@@ -23,6 +24,14 @@ interface GuestRecord {
   isChild: boolean;
   isTeenager: boolean;
   dietaryNotes: string | null;
+}
+
+// Interface for processing results
+interface ProcessingResult {
+  name: string;
+  householdName: string;
+  success: boolean;
+  error?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -248,7 +257,7 @@ async function processHouseholdBatch(
       console.log(`Household "${householdName}" processed in ${Date.now() - batchStartTime}ms`);
       
       // Get existing guest names to avoid duplicates
-      const existingGuestNames = new Set(household.guests.map(g => g.name.toLowerCase()));
+      const existingGuestNames = new Set(household.guests.map((g: { name: string }) => g.name.toLowerCase()));
       
       // Prepare guests for this household
       for (const member of members) {
