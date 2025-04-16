@@ -32,12 +32,13 @@ model MealOption {
 }
 
 model DessertOption {
-  id        String   @id @default(cuid())
-  name      String
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  guests    Guest[]  @relation("GuestDessert")
+  id           String   @id @default(cuid())
+  name         String
+  isActive     Boolean  @default(true)
+  isChildOption Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  guests       Guest[]  @relation("GuestDessert")
 }
 
 model Guest {

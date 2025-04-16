@@ -27,18 +27,33 @@ export async function GET() {
 		})
 		console.log('Found child meal options:', childMealOptions)
 
-		// Fetch dessert options
-		const dessertOptions = await prisma.dessertOption.findMany({
-			where: { isActive: true },
+		// Fetch regular dessert options
+		const regularDessertOptions = await prisma.dessertOption.findMany({
+			where: { 
+				isActive: true,
+				isChildOption: false
+			},
 			orderBy: { createdAt: 'asc' },
-			select: { id: true, name: true }
+			select: { id: true, name: true, isChildOption: true }
 		})
-		console.log('Found dessert options:', dessertOptions)
+		console.log('Found regular dessert options:', regularDessertOptions)
+
+		// Fetch child dessert options
+		const childDessertOptions = await prisma.dessertOption.findMany({
+			where: { 
+				isActive: true,
+				isChildOption: true
+			},
+			orderBy: { createdAt: 'asc' },
+			select: { id: true, name: true, isChildOption: true }
+		})
+		console.log('Found child dessert options:', childDessertOptions)
 
 		return NextResponse.json({ 
 			mealOptions: regularMealOptions, 
 			childMealOptions: childMealOptions,
-			dessertOptions 
+			dessertOptions: regularDessertOptions,
+			childDessertOptions: childDessertOptions
 		})
 	} catch (error) {
 		console.error("GET options error:", error)

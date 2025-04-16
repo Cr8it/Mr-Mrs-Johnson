@@ -45,6 +45,7 @@ export default function RSVPForm() {
   const [mealOptions, setMealOptions] = useState<Option[]>([])
   const [childMealOptions, setChildMealOptions] = useState<Option[]>([])
   const [dessertOptions, setDessertOptions] = useState<Option[]>([])
+  const [childDessertOptions, setChildDessertOptions] = useState<Option[]>([])
 
   useEffect(() => {
     const fetchData = async () => {
@@ -62,6 +63,7 @@ export default function RSVPForm() {
         setMealOptions(optionsData.mealOptions)
         setChildMealOptions(optionsData.childMealOptions || [])
         setDessertOptions(optionsData.dessertOptions)
+        setChildDessertOptions(optionsData.childDessertOptions || [])
       } catch (error) {
         toast({
           title: "Error",
@@ -191,7 +193,7 @@ export default function RSVPForm() {
                         <SelectValue placeholder="Select a dessert" />
                         </SelectTrigger>
                         <SelectContent>
-                        {dessertOptions.map((option) => (
+                        {(guest.isChild ? childDessertOptions : dessertOptions).map((option) => (
                           <SelectItem key={option.id} value={option.id}>
                           {option.name}
                           </SelectItem>

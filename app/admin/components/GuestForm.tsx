@@ -70,6 +70,7 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
   const [mealOptions, setMealOptions] = useState<Option[]>([])
   const [childMealOptions, setChildMealOptions] = useState<Option[]>([])
   const [dessertOptions, setDessertOptions] = useState<Option[]>([])
+  const [childDessertOptions, setChildDessertOptions] = useState<Option[]>([])
   const { toast } = useToast()
 
   useEffect(() => {
@@ -92,6 +93,7 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
       setMealOptions(data.mealOptions)
       setChildMealOptions(data.childMealOptions || [])
       setDessertOptions(data.dessertOptions)
+      setChildDessertOptions(data.childDessertOptions || [])
     } catch (error) {
       console.error('Fetch options error:', error)
       toast({
@@ -287,14 +289,14 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
                         value={formData.dessertChoice?.id || ""}
                         onValueChange={(value) => setFormData({ 
                           ...formData, 
-                          dessertChoice: dessertOptions.find(option => option.id === value) || null 
+                          dessertChoice: (formData.isChild ? childDessertOptions : dessertOptions).find(option => option.id === value) || null 
                         })}
                       >
                         <SelectTrigger className="h-9">
                           <SelectValue placeholder="Select dessert" />
                         </SelectTrigger>
                         <SelectContent>
-                          {dessertOptions.map((option) => (
+                          {(formData.isChild ? childDessertOptions : dessertOptions).map((option) => (
                             <SelectItem key={option.id} value={option.id}>
                               {option.name}
                             </SelectItem>

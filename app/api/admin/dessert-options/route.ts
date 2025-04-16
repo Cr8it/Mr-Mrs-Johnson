@@ -29,34 +29,32 @@ export async function GET() {
 
 export async function POST(request: Request) {
 	try {
-		const body = await request.json()
-		
-		if (!body.name || typeof body.name !== 'string') {
-			return NextResponse.json(
-				{ error: "Name is required and must be a string" },
-				{ status: 400 }
-			)
+		const data = await request.json()
+
+		if (!data.name || typeof data.name !== 'string' || !data.name.trim()) {
+			return new Response(JSON.stringify({ error: 'Name is required' }), {
+				status: 400,
+				headers: { 'Content-Type': 'application/json' }
+			})
 		}
 
-		const { name } = body
-		console.log("Creating dessert option:", name)
-		
 		const option = await prisma.dessertOption.create({
 			data: {
-				name,
-				isActive: true,
-				updatedAt: new Date()
+				name: data.name.trim(),
+				isChildOption: data.isChildOption === true
 			}
 		})
-		
-		console.log("Created dessert option:", option)
-		return NextResponse.json({ option })
+
+		return new Response(JSON.stringify({ option }), {
+			status: 201,
+			headers: { 'Content-Type': 'application/json' }
+		})
 	} catch (error) {
-		console.error("POST dessert option error:", error)
-		return NextResponse.json(
-			{ error: "Failed to create dessert option" },
-			{ status: 500 }
-		)
+		console.error('Error creating dessert option:', error)
+		return new Response(JSON.stringify({ error: 'Failed to create dessert option' }), {
+			status: 500,
+			headers: { 'Content-Type': 'application/json' }
+		})
 	}
 }
 

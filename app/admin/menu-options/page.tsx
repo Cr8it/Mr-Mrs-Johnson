@@ -83,6 +83,7 @@ export default function MenuOptionsPage() {
 	const [newMealOption, setNewMealOption] = useState("")
 	const [isChildMealOption, setIsChildMealOption] = useState(false)
 	const [newDessertOption, setNewDessertOption] = useState("")
+	const [isChildDessertOption, setIsChildDessertOption] = useState(false)
 	const { toast } = useToast()
 	const [statistics, setStatistics] = useState<{
 		mealChoices: { name: string; count: number }[];
@@ -250,16 +251,35 @@ export default function MenuOptionsPage() {
 
 	const handleAddDessertOption = async (e: React.FormEvent) => {
 		e.preventDefault()
+		if (!newDessertOption.trim()) {
+			toast({
+				variant: "destructive",
+				title: "Error",
+				description: "Please enter a dessert option name"
+			})
+			return
+		}
+
 		try {
 			const response = await fetch('/api/admin/dessert-options', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ name: newDessertOption })
+				body: JSON.stringify({ 
+					name: newDessertOption.trim(),
+					isChildOption: isChildDessertOption
+				})
 			})
 
-			if (response.ok) {
-				await fetchOptions()
+			const data = await response.json()
+			
+			if (!response.ok) {
+				throw new Error(data.error || 'Failed to add dessert option')
+			}
+
+			if (data.option) {
+				setDessertOptions(prev => [...prev, data.option])
 				setNewDessertOption("")
+				setIsChildDessertOption(false)
 				toast({
 					title: "Success",
 					description: "Dessert option added successfully"
@@ -268,10 +288,11 @@ export default function MenuOptionsPage() {
 				await fetchStatistics()
 			}
 		} catch (error) {
+			console.error('Error adding dessert option:', error)
 			toast({
 				variant: "destructive",
 				title: "Error",
-				description: "Failed to add dessert option"
+				description: error instanceof Error ? error.message : "Failed to add dessert option"
 			})
 		}
 	}
@@ -413,19 +434,34 @@ export default function MenuOptionsPage() {
 					</DndContext>
 				</div>
 
-				<div className="bg-white p-6 rounded-lg shadow-sm">
+				<div className="bg-white p-6 rounded-lg shadow-sm mt-10">
 					<h2 className="text-2xl font-bold text-gray-900 mb-4">Dessert Options</h2>
-					<form onSubmit={handleAddDessertOption} className="flex gap-2 mb-6">
-						<Input
-							value={newDessertOption}
-							onChange={(e) => setNewDessertOption(e.target.value)}
-							placeholder="Add new dessert option..."
-							className="max-w-xs bg-gray-50 border-gray-200 focus:border-gold focus:ring-gold"
-						/>
-						<Button type="submit" className="bg-gold hover:bg-[#c19b2f] text-white">
-							<Plus className="h-4 w-4 mr-2" />
-							Add Option
-						</Button>
+					<form onSubmit={handleAddDessertOption} className="space-y-4 mb-6">
+						<div className="flex gap-2">
+							<Input
+								value={newDessertOption}
+								onChange={(e) => setNewDessertOption(e.target.value)}
+								placeholder="Add new dessert option..."
+								className="max-w-xs bg-gray-50 border-gray-200 focus:border-gold focus:ring-gold"
+							/>
+							<Button type="submit" className="bg-gold hover:bg-[#c19b2f] text-white">
+								<Plus className="h-4 w-4 mr-2" />
+								Add Option
+							</Button>
+						</div>
+						<div className="flex items-center space-x-2">
+							<Checkbox 
+								id="isChildDessertOption"
+								checked={isChildDessertOption}
+								onCheckedChange={(checked) => setIsChildDessertOption(checked === true)}
+							/>
+							<label
+								htmlFor="isChildDessertOption"
+								className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+							>
+								This is a children's dessert option
+							</label>
+						</div>
 					</form>
 					<DndContext
 						sensors={sensors}
@@ -439,7 +475,14 @@ export default function MenuOptionsPage() {
 							<div className="space-y-2">
 								{dessertOptions.map((option) => (
 									<SortableItem key={option.id} id={option.id}>
-										<span className="flex-1 text-gray-900">{option.name}</span>
+										<div className="flex items-center gap-2">
+											<span className="flex-1 text-gray-900">{option.name}</span>
+											{option.isChildOption && (
+												<Badge variant="outline" className="mr-2 bg-blue-50 text-blue-700 border-blue-200">
+													Child
+												</Badge>
+											)}
+										</div>
 										<Button
 											variant="ghost"
 											size="sm"
