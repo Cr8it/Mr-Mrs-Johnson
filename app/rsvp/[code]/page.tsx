@@ -36,6 +36,8 @@ interface Question {
   order: number
 }
 
+const MotionDiv = motion.div
+
 export default function RSVPForm() {
   const params = useParams()
   const { toast } = useToast()
@@ -197,7 +199,7 @@ export default function RSVPForm() {
 
   return (
     <div className="min-h-screen bg-black text-white p-8">
-      <motion.div
+      <MotionDiv
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
@@ -215,130 +217,217 @@ export default function RSVPForm() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id={`attending-${guest.id}`}
-                      checked={responses[`attending-${guest.id}`] === true}
-                      onCheckedChange={(checked) =>
+                      checked={responses[`attending-${guest.id}`]}
+                      onCheckedChange={(checked) => {
                         setResponses({
                           ...responses,
-                          [`attending-${guest.id}`]: checked,
+                          [`attending-${guest.id}`]: checked
                         })
-                      }
+                      }}
                     />
-                    <label htmlFor={`attending-${guest.id}`}>Attending</label>
+                    <label htmlFor={`attending-${guest.id}`}>Will you be attending?</label>
                   </div>
-                    {responses[`attending-${guest.id}`] && (
+
+                  {responses[`attending-${guest.id}`] && (
                     <>
                       <div className="space-y-2">
-                      <label>Meal Preference</label>
-                      <Select
-                        value={responses[`meal-${guest.id}`]}
-                        onValueChange={(value) =>
-                        setResponses({
-                          ...responses,
-                          [`meal-${guest.id}`]: value,
-                        })
-                        }
-                      >
-                        <SelectTrigger>
-                        <SelectValue placeholder="Select a meal" />
-                        </SelectTrigger>
-                        <SelectContent>
-                        {guest.isChild 
-                          ? childMealOptions.map((option) => (
-                              <SelectItem key={option.id} value={option.id}>
-                              {option.name}
-                              </SelectItem>
-                            ))
-                          : mealOptions.map((option) => (
-                              <SelectItem key={option.id} value={option.id}>
-                              {option.name}
-                              </SelectItem>
-                            ))
-                        }
-                        </SelectContent>
-                      </Select>
+                        <label>Meal Choice</label>
+                        <Select
+                          value={responses[`meal-${guest.id}`]}
+                          onValueChange={(value) => {
+                            setResponses({
+                              ...responses,
+                              [`meal-${guest.id}`]: value
+                            })
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a meal" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {guest.isChild
+                              ? childMealOptions.map((option) => (
+                                  <SelectItem key={option.id} value={option.id}>
+                                    {option.name}
+                                  </SelectItem>
+                                ))
+                              : mealOptions.map((option) => (
+                                  <SelectItem key={option.id} value={option.id}>
+                                    {option.name}
+                                  </SelectItem>
+                                ))}
+                          </SelectContent>
+                        </Select>
                       </div>
+
                       <div className="space-y-2">
-                      <label>Dessert Choice</label>
-                      <Select
-                        value={responses[`dessert-${guest.id}`]}
-                        onValueChange={(value) =>
-                        setResponses({
-                          ...responses,
-                          [`dessert-${guest.id}`]: value,
-                        })
-                        }
-                      >
-                        <SelectTrigger>
-                        <SelectValue placeholder="Select a dessert" />
-                        </SelectTrigger>
-                        <SelectContent>
-                        {guest.isChild 
-                          ? childDessertOptions.map((option) => (
-                              <SelectItem key={option.id} value={option.id}>
-                              {option.name}
-                              </SelectItem>
-                            ))
-                          : dessertOptions.map((option) => (
-                              <SelectItem key={option.id} value={option.id}>
-                              {option.name}
-                              </SelectItem>
-                            ))
-                        }
-                        </SelectContent>
-                      </Select>
+                        <label>Dessert Choice</label>
+                        <Select
+                          value={responses[`dessert-${guest.id}`]}
+                          onValueChange={(value) => {
+                            setResponses({
+                              ...responses,
+                              [`dessert-${guest.id}`]: value
+                            })
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a dessert" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {guest.isChild
+                              ? childDessertOptions.map((option) => (
+                                  <SelectItem key={option.id} value={option.id}>
+                                    {option.name}
+                                  </SelectItem>
+                                ))
+                              : dessertOptions.map((option) => (
+                                  <SelectItem key={option.id} value={option.id}>
+                                    {option.name}
+                                  </SelectItem>
+                                ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label>Dietary Requirements</label>
+                        <Input
+                          value={responses[`dietary-${guest.id}`] || ""}
+                          onChange={(e) => {
+                            setResponses({
+                              ...responses,
+                              [`dietary-${guest.id}`]: e.target.value
+                            })
+                          }}
+                          placeholder="Any dietary requirements or allergies?"
+                        />
                       </div>
                     </>
-                    )}
-                    {responses[`attending-${guest.id}`] &&
-                    questions
-                      .filter((q) => q.perGuest)
-                      .map((question) => (
-                        <div key={question.id} className="space-y-2">
-                          <label>{question.question}</label>
-                          {question.type === "MULTIPLE_CHOICE" ? (
-                            <Select
-                              value={responses[`${question.id}-${guest.id}`]}
-                              onValueChange={(value) =>
+                  )}
+
+                  {questions
+                    .filter((q) => q.perGuest)
+                    .map((question) => (
+                      <div key={question.id} className="space-y-2">
+                        <label>{question.question}</label>
+                        {question.type === "MULTIPLE_CHOICE" ? (
+                          <Select
+                            value={responses[`${question.id}-${guest.id}`]}
+                            onValueChange={(value) => {
+                              setResponses({
+                                ...responses,
+                                [`${question.id}-${guest.id}`]: value
+                              })
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select an option" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {question.options.map((option: string) => (
+                                <SelectItem key={option} value={option}>
+                                  {option}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : question.type === "BOOLEAN" ? (
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`${question.id}-${guest.id}`}
+                              checked={responses[`${question.id}-${guest.id}`]}
+                              onCheckedChange={(checked) => {
                                 setResponses({
                                   ...responses,
-                                  [`${question.id}-${guest.id}`]: value,
+                                  [`${question.id}-${guest.id}`]: checked
                                 })
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select an option" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {(() => {
-                                  try {
-                                    const parsedOptions = JSON.parse(question.options);
-                                    return parsedOptions.map((option: string) => (
-                                      <SelectItem key={option} value={option}>
-                                        {option}
-                                      </SelectItem>
-                                    ));
-                                  } catch {
-                                    return null;
-                                  }
-                                })()}
-                              </SelectContent>
-                            </Select>
-                          ) : question.type === "TEXT" ? (
-                            <Input
-                              value={responses[`${question.id}-${guest.id}`] || ""}
-                              onChange={(e) =>
-                                setResponses({
-                                  ...responses,
-                                  [`${question.id}-${guest.id}`]: e.target.value,
-                                })
-                              }
+                              }}
                             />
-                          ) : (
-                            <div className="flex items-center space-x-2">
-                              <Checkbox
-                                id={`${question.id}-${guest.id}`}
-                                checked={responses[`${question.id}-${guest.id}`]}
-                                onCheckedChange={(checked) =>
-                                  setResponses({
-                                    ...responses,
-                                    [`${question.id}-${guest.id}`
+                            <label htmlFor={`${question.id}-${guest.id}`}>Yes</label>
+                          </div>
+                        ) : (
+                          <Input
+                            value={responses[`${question.id}-${guest.id}`] || ""}
+                            onChange={(e) => {
+                              setResponses({
+                                ...responses,
+                                [`${question.id}-${guest.id}`]: e.target.value
+                              })
+                            }}
+                            placeholder="Your answer"
+                          />
+                        )}
+                      </div>
+                    ))}
+                </div>
+              ))}
+
+              {questions
+                .filter((q) => !q.perGuest)
+                .map((question) => (
+                  <div key={question.id} className="space-y-2">
+                    <label>{question.question}</label>
+                    {question.type === "MULTIPLE_CHOICE" ? (
+                      <Select
+                        value={responses[question.id]}
+                        onValueChange={(value) => {
+                          setResponses({
+                            ...responses,
+                            [question.id]: value
+                          })
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select an option" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {question.options.map((option: string) => (
+                            <SelectItem key={option} value={option}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : question.type === "BOOLEAN" ? (
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id={question.id}
+                          checked={responses[question.id]}
+                          onCheckedChange={(checked) => {
+                            setResponses({
+                              ...responses,
+                              [question.id]: checked
+                            })
+                          }}
+                        />
+                        <label htmlFor={question.id}>Yes</label>
+                      </div>
+                    ) : (
+                      <Input
+                        value={responses[question.id] || ""}
+                        onChange={(e) => {
+                          setResponses({
+                            ...responses,
+                            [question.id]: e.target.value
+                          })
+                        }}
+                        placeholder="Your answer"
+                      />
+                    )}
+                  </div>
+                ))}
+
+              <div className="flex justify-end space-x-4">
+                <Button variant="outline" type="button" onClick={onBack}>
+                  Back
+                </Button>
+                <Button type="submit">Submit RSVP</Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </MotionDiv>
+    </div>
+  )
+}
