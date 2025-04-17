@@ -41,7 +41,7 @@ interface RSVPProps {
 
 export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
   const [code, setCode] = useState("")
-  const [loading, setLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [household, setHousehold] = useState<Household | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
   const [showForm, setShowForm] = useState(false)
@@ -96,7 +96,7 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
+    setIsSubmitting(true)
     setShowSuccess(false)
 
     try {
@@ -166,7 +166,7 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
       })
       setHousehold(null)
     } finally {
-      setLoading(false)
+      setIsSubmitting(false)
     }
   }
 
@@ -391,9 +391,9 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
                 <Button 
                   type="submit" 
                   className="w-full bg-white text-black hover:bg-gray-200" 
-                  disabled={loading}
+                  disabled={isSubmitting}
                 >
-                  {loading ? "Searching..." : "Find My Invitation"}
+                  {isSubmitting ? "Searching..." : "Find My Invitation"}
                 </Button>
               </form>
             </div>
