@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -29,7 +29,7 @@ interface Question {
   id: string
   type: "TEXT" | "MULTIPLE_CHOICE" | "BOOLEAN" | "DATE"
   question: string
-  options: string
+  options: string // This is a JSON string that needs to be parsed
   isRequired: boolean
   perGuest: boolean
   isActive: boolean
@@ -40,6 +40,7 @@ const MotionDiv = motion.div
 
 export default function RSVPForm() {
   const params = useParams()
+  const router = useRouter()
   const { toast } = useToast()
   const [household, setHousehold] = useState<{ name: string; guests: Guest[] } | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
@@ -185,6 +186,20 @@ export default function RSVPForm() {
     }
   }
 
+  const getQuestionOptions = (question: Question): string[] => {
+    if (question.type !== "MULTIPLE_CHOICE") return []
+    try {
+      return JSON.parse(question.options)
+    } catch {
+      console.error(`Failed to parse options for question ${question.id}`)
+      return []
+    }
+  }
+
+  const onBack = () => {
+    router.push('/')
+  }
+
   if (loading) {
     return <div>Loading...</div>
   }
@@ -325,7 +340,7 @@ export default function RSVPForm() {
                               <SelectValue placeholder="Select an option" />
                             </SelectTrigger>
                             <SelectContent>
-                              {question.options.map((option: string) => (
+                              {getQuestionOptions(question).map((option) => (
                                 <SelectItem key={option} value={option}>
                                   {option}
                                 </SelectItem>
@@ -382,7 +397,7 @@ export default function RSVPForm() {
                           <SelectValue placeholder="Select an option" />
                         </SelectTrigger>
                         <SelectContent>
-                          {question.options.map((option: string) => (
+                          {getQuestionOptions(question).map((option) => (
                             <SelectItem key={option} value={option}>
                               {option}
                             </SelectItem>
