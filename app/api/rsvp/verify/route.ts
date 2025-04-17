@@ -100,8 +100,10 @@ export async function POST(request: Request) {
         const rawValue = guest.isChild;
         const isChildValue = (() => {
           if (typeof rawValue === 'string') {
+            // Assert rawValue as string to satisfy TypeScript
+            const strValue = rawValue as string;
             // Handle common string representations of true
-            return rawValue.toLowerCase() === 'true' || rawValue === '1' || rawValue.toLowerCase() === 'yes' || rawValue.toLowerCase() === 'y';
+            return strValue.toLowerCase() === 'true' || strValue === '1' || strValue.toLowerCase() === 'yes' || strValue.toLowerCase() === 'y';
           }
           // Handle numeric representations (1 is true, 0 is false)
           if (typeof rawValue === 'number') {
