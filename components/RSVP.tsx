@@ -210,10 +210,17 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
+    setError("");
+    setIsSubmitting(true);
 
     try {
+      // Add null check for household
+      if (!household) {
+        setError("No household data found. Please try again.");
+        setIsSubmitting(false);
+        return;
+      }
+
       // Normalize guest data before submission
       const normalizedGuests = household.guests.map(guest => ({
         ...guest,
@@ -221,7 +228,7 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
         isChild: guest.isChild === true
       }));
 
-      const normalizedHousehold = {
+      const requestBody = {
         ...household,
         guests: normalizedGuests
       };
@@ -231,7 +238,7 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(normalizedHousehold),
+        body: JSON.stringify(requestBody),
       });
 
       if (response.ok) {
@@ -248,7 +255,7 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
         description: error instanceof Error ? error.message : "Failed to submit RSVP",
       });
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
