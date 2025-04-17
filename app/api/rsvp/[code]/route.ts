@@ -123,37 +123,11 @@ export async function POST(request: Request, { params }: { params: { code: strin
     // Process responses for each guest
     for (const guest of household.guests) {
       console.log(`Processing responses for guest: ${guest.name}`)
+      console.log(`Current isChild value: ${guest.isChild} (${typeof guest.isChild})`)
       
       const isAttending = responses[`attending-${guest.id}`]
       const mealOptionId = responses[`meal-${guest.id}`]
       const dessertOptionId = responses[`dessert-${guest.id}`]
-      
-      // Get the current guest data to preserve isChild status
-      const currentGuest = await prisma.guest.findUnique({
-        where: { id: guest.id }
-      })
-
-      if (!currentGuest) {
-        console.error(`Guest ${guest.id} not found in database`)
-        continue
-      }
-
-      // Ensure isChild is properly preserved as a boolean
-      const isChildValue = (() => {
-        const rawValue = currentGuest.isChild
-        if (typeof rawValue === 'string') {
-          return rawValue === 'true' || rawValue === 'TRUE'
-        }
-        return Boolean(rawValue)
-      })()
-
-      console.log(`Updating guest ${guest.name}:`, {
-        isAttending,
-        mealOptionId,
-        dessertOptionId,
-        currentIsChild: currentGuest.isChild,
-        normalizedIsChild: isChildValue
-      })
 
       await prisma.guest.update({
         where: {
@@ -163,7 +137,7 @@ export async function POST(request: Request, { params }: { params: { code: strin
           isAttending,
           mealOptionId: isAttending ? mealOptionId : null,
           dessertOptionId: isAttending ? dessertOptionId : null,
-          isChild: isChildValue // Explicitly set the normalized boolean value
+          // We're intentionally NOT updating isChild here to preserve it
         },
       })
 
@@ -211,6 +185,21 @@ export async function POST(request: Request, { params }: { params: { code: strin
           data: guestResponses,
         })
       }
+    }
+
+    // Save household-level responses
+    const householdResponses = Object.entries(responses)
+      .filter(([key]) => !key.includes("-"))
+      .map(([questionId, value]) => ({
+        questionId,
+        guestId: household.guests[0].id,
+        answer: String(value),
+      }))
+
+    if (householdResponses.length > 0) {
+      await prisma.questionResponse.createMany({
+        data: householdResponses,
+      })
     }
 
     return NextResponse.json({ success: true })
