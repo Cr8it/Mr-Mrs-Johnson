@@ -25,6 +25,14 @@ export async function POST(request: Request) {
       rawValue: guest.isChild
     })
     
+    // Safely normalize isChild to a boolean value
+    const normalizedIsChild = (() => {
+      if (typeof guest.isChild === 'string') {
+        return guest.isChild === 'true' || guest.isChild === 'TRUE';
+      }
+      return Boolean(guest.isChild);
+    })();
+    
     // Update guest while preserving the isChild status
     const updatedGuest = await prisma.guest.update({
       where: {
@@ -34,7 +42,8 @@ export async function POST(request: Request) {
         isAttending,
         mealOptionId: isAttending ? mealOptionId : null,
         dessertOptionId: isAttending ? dessertOptionId : null,
-        // Note: We don't update isChild - it remains as set in the database
+        // Explicitly update isChild with a properly normalized boolean value
+        isChild: normalizedIsChild,
       },
     })
     

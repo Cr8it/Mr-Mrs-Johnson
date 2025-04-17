@@ -326,7 +326,13 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
         if (guest.id !== guestId) return guest;
         
         // Get the appropriate options based on whether guest is a child
-        const isChildGuest = !!guest.isChild; // Force boolean conversion
+        const isChildGuest = (() => {
+          if (typeof guest.isChild === 'string') {
+            return guest.isChild === 'true' || guest.isChild === 'TRUE';
+          }
+          return Boolean(guest.isChild);
+        })();
+        
         const relevantOptions = isChildGuest ? childMealOptions : mealOptions;
         const selectedOption = relevantOptions.find(opt => opt.id === meal);
         
@@ -350,7 +356,13 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
         if (guest.id !== guestId) return guest;
         
         // Get the appropriate options based on whether guest is a child
-        const isChildGuest = !!guest.isChild; // Force boolean conversion
+        const isChildGuest = (() => {
+          if (typeof guest.isChild === 'string') {
+            return guest.isChild === 'true' || guest.isChild === 'TRUE';
+          }
+          return Boolean(guest.isChild);
+        })();
+        
         const relevantOptions = isChildGuest ? childDessertOptions : dessertOptions;
         const selectedOption = relevantOptions.find(opt => opt.id === dessert);
         
@@ -455,8 +467,20 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
     }
 
     try {
+      // Ensure all guests have a properly normalized isChild property before submission
+      const normalizedGuests = guests.map(guest => ({
+        ...guest,
+        // Force boolean conversion of isChild 
+        isChild: (() => {
+          if (typeof guest.isChild === 'string') {
+            return guest.isChild === 'true' || guest.isChild === 'TRUE';
+          }
+          return Boolean(guest.isChild);
+        })()
+      }));
+      
       // Add detailed logging before submission
-      console.log("About to submit RSVP with these guests:", JSON.stringify(guests.map(g => ({
+      console.log("About to submit RSVP with normalized guests:", JSON.stringify(normalizedGuests.map(g => ({
         id: g.id,
         name: g.name,
         isAttending: g.isAttending,
@@ -469,7 +493,7 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
       const response = await fetch("/api/rsvp/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ guests }),
+        body: JSON.stringify({ guests: normalizedGuests }),
       });
 
       const data = await response.json();
@@ -593,7 +617,13 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                   <SelectContent className="bg-black border border-white border-opacity-20 text-white" sideOffset={5}>
                     {(() => {
                       // More detailed debugging
-                      const isChildGuest = !!guest.isChild; // Force boolean conversion
+                      const isChildGuest = (() => {
+                        if (typeof guest.isChild === 'string') {
+                          return guest.isChild === 'true' || guest.isChild === 'TRUE';
+                        }
+                        return Boolean(guest.isChild);
+                      })();
+                      
                       console.log(`Rendering meal options for ${guest.name}:`);
                       console.log(`  isChild=${isChildGuest} (${typeof guest.isChild})`);
                       console.log(`  Regular meal options count: ${mealOptions.length}`);
@@ -644,7 +674,13 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                   <SelectContent className="bg-black border border-white border-opacity-20 text-white" sideOffset={5}>
                     {(() => {
                       // More detailed debugging
-                      const isChildGuest = !!guest.isChild; // Force boolean conversion
+                      const isChildGuest = (() => {
+                        if (typeof guest.isChild === 'string') {
+                          return guest.isChild === 'true' || guest.isChild === 'TRUE';
+                        }
+                        return Boolean(guest.isChild);
+                      })();
+                      
                       console.log(`Rendering dessert options for ${guest.name}:`);
                       console.log(`  isChild=${isChildGuest} (${typeof guest.isChild})`);
                       console.log(`  Regular dessert options count: ${dessertOptions.length}`);
@@ -672,136 +708,26 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                   </Select>
                 </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                Dietary Requirements
-                </label>
-                <Textarea
-                value={guest.dietaryNotes || ""}
-                onChange={(e) => handleDietaryNotes(guest.id, e.target.value)}
-                placeholder="Any allergies or dietary requirements?"
-                className="bg-transparent border-white border-opacity-20 text-white placeholder-gray-400"
-                />
-              </div>
-
-                {questions.map((question) => (
-                  <div key={question.id} className="space-y-2">
-                  <label className="text-sm font-medium text-gray-300">
-                    {question.question}
-                    {question.isRequired && <span className="text-red-500 ml-1">*</span>}
-                  </label>
-                    {question.type === "MULTIPLE_SELECT" ? (
-                      <div className="space-y-3">
-                        {(() => {
-                          try {
-                            const options = typeof question.options === 'string' ? 
-                              JSON.parse(question.options) : 
-                              question.options;
-                            const selectedOptions = guest.responses?.find(r => r.questionId === question.id)?.answer || "[]";
-                            const selectedValues = JSON.parse(selectedOptions);
-                            
-                            return Array.isArray(options) ? options.map((option: string) => (
-                              <div key={option} className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={`${guest.id}-${question.id}-${option}`}
-                                  checked={selectedValues.includes(option)}
-                                  onCheckedChange={(checked) => {
-                                    const currentValues = [...selectedValues];
-                                    if (checked) {
-                                      currentValues.push(option);
-                                    } else {
-                                      const index = currentValues.indexOf(option);
-                                      if (index > -1) {
-                                        currentValues.splice(index, 1);
-                                      }
-                                    }
-                                    handleQuestionResponse(guest.id, question.id, JSON.stringify(currentValues));
-                                  }}
-                                  className="data-[state=checked]:bg-gold data-[state=checked]:border-gold"
-                                />
-                                <label
-                                  htmlFor={`${guest.id}-${question.id}-${option}`}
-                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-white"
-                                >
-                                  {option}
-                                </label>
-                              </div>
-                            )) : [];
-                          } catch {
-                            return [];
-                          }
-                        })()}
-                        {validationErrors[guest.id]?.includes(question.question) && (
-                          <p className="text-red-500 text-sm mt-1">Please select at least one option</p>
-                        )}
-                      </div>
-                    ) : question.type === "MULTIPLE_CHOICE" ? (
-                      <>
-                        <Select
-                          value={guest.responses?.find(r => r.questionId === question.id)?.answer || ""}
-                          onValueChange={(value) => handleQuestionResponse(guest.id, question.id, value)}
-                        >
-                          <SelectTrigger 
-                            className={`bg-transparent border-white border-opacity-20 text-white h-12 ${
-                              validationErrors[guest.id]?.includes(question.question) ? 'border-red-500' : ''
-                            }`}
-                          >
-                            <SelectValue placeholder="Select an option" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-black border-white border-opacity-20">
-                            {(() => {
-                              try {
-                                const options = typeof question.options === 'string' ? 
-                                  JSON.parse(question.options) : 
-                                  question.options;
-                                return Array.isArray(options) ? options.map((option: string) => (
-                                  <SelectItem key={option} value={option}>{option}</SelectItem>
-                                )) : [];
-                              } catch {
-                                return [];
-                              }
-                            })()}
-                          </SelectContent>
-                        </Select>
-                        {validationErrors[guest.id]?.includes(question.question) && (
-                          <p className="text-red-500 text-sm mt-1">Please select an option</p>
-                        )}
-                      </>
-                    ) : (
-                    <>
+                <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Dietary Notes
+                    </label>
                     <Textarea
-                      value={guest.responses?.find(r => r.questionId === question.id)?.answer || ""}
-                      onChange={(e) => handleQuestionResponse(guest.id, question.id, e.target.value)}
-                      placeholder="Your answer"
-                      className={`min-h-[80px] resize-none ${
-                      validationErrors[guest.id]?.includes(`${question.question} is required`)
-                        ? 'border-red-500'
-                        : ''
-                      }`}
+                    value={guest.dietaryNotes || ''}
+                    onChange={(e) => handleDietaryNotes(guest.id, e.target.value)}
                     />
-                    {validationErrors[guest.id]?.includes(`${question.question} is required`) && (
-                      <p className="text-red-500 text-sm mt-1">This field is required</p>
-                    )}
-                    </>
-                  )}
-                  </div>
-                ))}
+                </div>
                 </MotionDiv>
-              )}
+            )}
             </AnimatePresence>
-            </MotionDiv>
+            </div>
           ))}
-          <Button 
-            type="submit" 
-            className="w-full bg-white text-black hover:bg-gray-200" 
-            disabled={loading}
-          >
-            {loading ? "Submitting..." : "Submit RSVP"}
+
+          <Button type="submit" disabled={loading} className="w-full">
+            {loading ? 'Submitting...' : 'Submit RSVP'}
           </Button>
-          </form>
+        </form>
         </div>
-        </MotionDiv>
-        );
-    }
-
-
+    </MotionDiv>
+  )
+}

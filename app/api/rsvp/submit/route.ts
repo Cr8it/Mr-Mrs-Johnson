@@ -41,6 +41,14 @@ export async function POST(request: Request) {
         typeOfIsChild: typeof guest.isChild
       });
       
+      // Safely normalize isChild to a boolean value
+      const normalizedIsChild = (() => {
+        if (typeof guest.isChild === 'string') {
+          return guest.isChild === 'true' || guest.isChild === 'TRUE';
+        }
+        return Boolean(guest.isChild);
+      })();
+      
       // Update the guest with normalized isChild value
       const updatedGuest = await prisma.guest.update({
         where: {
@@ -51,7 +59,8 @@ export async function POST(request: Request) {
           mealOptionId: guest.isAttending ? guest.mealChoice?.id : null,
           dessertOptionId: guest.isAttending ? guest.dessertChoice?.id : null,
           dietaryNotes: guest.dietaryNotes,
-          // We explicitly don't update isChild, as it should already be set correctly in the database
+          // Now explicitly update isChild with a properly normalized boolean value
+          isChild: normalizedIsChild,
         },
         // Include relations to get full objects for the email
         include: {
