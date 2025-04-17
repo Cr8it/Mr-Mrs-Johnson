@@ -6,6 +6,8 @@ export async function GET(
   { params }: { params: { code: string } }
 ) {
   try {
+    console.log(`Fetching RSVP data for code: ${params.code}`);
+    
     const household = await prisma.household.findFirst({
       where: {
         code: params.code,
@@ -29,6 +31,13 @@ export async function GET(
       return NextResponse.json({ error: "Household not found" }, { status: 404 })
     }
 
+    // Log raw guest data from the database
+    console.log('Raw guest data from database:', household.guests.map(g => ({
+      name: g.name, 
+      isChild: g.isChild,
+      typeOfIsChild: typeof g.isChild
+    })));
+
     const questions = await prisma.question.findMany({
       where: { isActive: true },
       orderBy: { order: 'asc' }
@@ -37,19 +46,29 @@ export async function GET(
     // Transform the data to include existing choices
     const transformedHousehold = {
       ...household,
-      guests: household.guests.map(guest => ({
-        ...guest,
-        mealChoice: guest.mealChoice?.id || null,
-        dessertChoice: guest.dessertChoice?.id || null,
-        isChild: guest.isChild === true,
-        responses: guest.responses.map(response => ({
-          questionId: response.questionId,
-          answer: response.answer
-        }))
-      }))
+      guests: household.guests.map(guest => {
+        // Force isChild to be a proper boolean value
+        const isChildValue = guest.isChild === true || guest.isChild === "TRUE" || guest.isChild === "true";
+        console.log(`Transforming guest ${guest.name}: raw isChild=${guest.isChild} → transformed=${isChildValue}`);
+        
+        return {
+          ...guest,
+          mealChoice: guest.mealChoice?.id || null,
+          dessertChoice: guest.dessertChoice?.id || null,
+          isChild: isChildValue,
+          responses: guest.responses.map(response => ({
+            questionId: response.questionId,
+            answer: response.answer
+          }))
+        };
+      })
     }
 
-    console.log('Transformed household data:', JSON.stringify(transformedHousehold, null, 2))
+    console.log('Transformed household data:', JSON.stringify(transformedHousehold.guests.map(g => ({
+      name: g.name,
+      isChild: g.isChild,
+      typeOfIsChild: typeof g.isChild
+    })), null, 2));
 
     // Transform questions to parse options for multiple choice questions
     const transformedQuestions = questions.map(question => ({
@@ -78,6 +97,8 @@ export async function GET(
 export async function POST(request: Request, { params }: { params: { code: string } }) {
   try {
     const { responses } = await request.json()
+    console.log("RSVP responses received:", responses)
+    
     const household = await prisma.household.findFirst({
       where: {
         code: params.code,
@@ -93,6 +114,9 @@ export async function POST(request: Request, { params }: { params: { code: strin
 
     // Process responses for each guest
     for (const guest of household.guests) {
+      console.log(`Processing responses for guest: ${guest.name}`)
+      console.log(`Current isChild value: ${guest.isChild} (${typeof guest.isChild})`)
+      
       const isAttending = responses[`attending-${guest.id}`]
       const mealOptionId = responses[`meal-${guest.id}`]
       const dessertOptionId = responses[`dessert-${guest.id}`]
@@ -105,6 +129,7 @@ export async function POST(request: Request, { params }: { params: { code: strin
           isAttending,
           mealOptionId: isAttending ? mealOptionId : null,
           dessertOptionId: isAttending ? dessertOptionId : null,
+          // We're intentionally NOT updating isChild here to preserve it
         },
       })
 

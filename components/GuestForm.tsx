@@ -66,9 +66,17 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
   const [dessertOptions, setDessertOptions] = useState<{ id: string; name: string }[]>([])
   const [childDessertOptions, setChildDessertOptions] = useState<{ id: string; name: string }[]>([])
   const [validationErrors, setValidationErrors] = useState<Record<string, string[]>>({})
+  
+  // Add explicit boolean conversion for all guests' isChild property
   const [guests, setGuests] = useState<Guest[]>(() => {
+    // Debug the raw values coming from the household object
+    console.log('RAW GUEST DATA:', JSON.stringify(household.guests, null, 2));
+    console.log('RAW isChild values:', household.guests.map(g => ({ name: g.name, isChild: g.isChild, rawValue: g.isChild })));
+    
     return household.guests.map(guest => ({
       ...guest,
+      // Force isChild to be a proper boolean with double negation
+      isChild: !!guest.isChild,
       mealChoice: guest.mealChoice || null,
       dessertChoice: guest.dessertChoice || null,
       responses: guest.responses || [],
@@ -76,12 +84,9 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
     }));
   });
   
-  console.log('DEBUGGING CHILD OPTIONS:');
-  console.log('Guest isChild values:', guests.map(g => ({ name: g.name, isChild: g.isChild })));
-  
-  // Log children count
-  const childGuestCount = guests.filter(g => g.isChild).length;
-  console.log(`Found ${childGuestCount} child guests in household`);
+  console.log('GUEST DATA AFTER TRANSFORMATION:');
+  console.log('isChild after conversion:', guests.map(g => ({ name: g.name, isChild: g.isChild })));
+  console.log(`Found ${guests.filter(g => g.isChild).length} child guests in household`);
 
   // Add handleBack function
   const handleBack = () => {
@@ -302,7 +307,8 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
         if (guest.id !== guestId) return guest;
         
         // Get the appropriate options based on whether guest is a child
-        const relevantOptions = guest.isChild ? childMealOptions : mealOptions;
+        const isChildGuest = !!guest.isChild; // Force boolean conversion
+        const relevantOptions = isChildGuest ? childMealOptions : mealOptions;
         const selectedOption = relevantOptions.find(opt => opt.id === meal);
         
         return { 
@@ -325,7 +331,8 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
         if (guest.id !== guestId) return guest;
         
         // Get the appropriate options based on whether guest is a child
-        const relevantOptions = guest.isChild ? childDessertOptions : dessertOptions;
+        const isChildGuest = !!guest.isChild; // Force boolean conversion
+        const relevantOptions = isChildGuest ? childDessertOptions : dessertOptions;
         const selectedOption = relevantOptions.find(opt => opt.id === dessert);
         
         return { 
@@ -429,6 +436,17 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
     }
 
     try {
+      // Add detailed logging before submission
+      console.log("About to submit RSVP with these guests:", JSON.stringify(guests.map(g => ({
+        id: g.id,
+        name: g.name,
+        isAttending: g.isAttending,
+        mealChoice: g.mealChoice,
+        dessertChoice: g.dessertChoice,
+        isChild: g.isChild,
+        typeOfIsChild: typeof g.isChild
+      })), null, 2));
+      
       const response = await fetch("/api/rsvp/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -556,16 +574,17 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                   <SelectContent className="bg-black border border-white border-opacity-20 text-white" sideOffset={5}>
                     {(() => {
                       // More detailed debugging
+                      const isChildGuest = !!guest.isChild; // Force boolean conversion
                       console.log(`Rendering meal options for ${guest.name}:`);
-                      console.log(`  isChild=${guest.isChild}`);
+                      console.log(`  isChild=${isChildGuest} (${typeof guest.isChild})`);
                       console.log(`  Regular meal options count: ${mealOptions.length}`);
                       console.log(`  Child meal options count: ${childMealOptions.length}`);
                       
-                      const optionsToShow = guest.isChild ? childMealOptions : mealOptions;
+                      const optionsToShow = isChildGuest ? childMealOptions : mealOptions;
                       console.log(`  Options being shown:`, optionsToShow.map(o => o.name));
                       
                       if (optionsToShow.length === 0) {
-                        console.warn(`  WARNING: No meal options available for ${guest.isChild ? 'child' : 'adult'} guest!`);
+                        console.warn(`  WARNING: No meal options available for ${isChildGuest ? 'child' : 'adult'} guest!`);
                         return <div className="p-2 text-red-500">No options available</div>;
                       }
                       
@@ -606,16 +625,17 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                   <SelectContent className="bg-black border border-white border-opacity-20 text-white" sideOffset={5}>
                     {(() => {
                       // More detailed debugging
+                      const isChildGuest = !!guest.isChild; // Force boolean conversion
                       console.log(`Rendering dessert options for ${guest.name}:`);
-                      console.log(`  isChild=${guest.isChild}`);
+                      console.log(`  isChild=${isChildGuest} (${typeof guest.isChild})`);
                       console.log(`  Regular dessert options count: ${dessertOptions.length}`);
                       console.log(`  Child dessert options count: ${childDessertOptions.length}`);
                       
-                      const optionsToShow = guest.isChild ? childDessertOptions : dessertOptions;
+                      const optionsToShow = isChildGuest ? childDessertOptions : dessertOptions;
                       console.log(`  Options being shown:`, optionsToShow.map(o => o.name));
                       
                       if (optionsToShow.length === 0) {
-                        console.warn(`  WARNING: No dessert options available for ${guest.isChild ? 'child' : 'adult'} guest!`);
+                        console.warn(`  WARNING: No dessert options available for ${isChildGuest ? 'child' : 'adult'} guest!`);
                         return <div className="p-2 text-red-500">No options available</div>;
                       }
                       

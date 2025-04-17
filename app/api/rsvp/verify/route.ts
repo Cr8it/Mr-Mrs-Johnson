@@ -95,28 +95,41 @@ export async function POST(request: Request) {
     // Transform the household data to parse options in responses
     const transformedHousehold = {
       ...household,
-      guests: household?.guests.map(guest => ({
-      ...guest,
-      isChild: guest.isChild === true, // Explicitly set isChild property
-      responses: guest.responses.map(response => ({
-        ...response,
-        question: {
-        ...response.question,
-        options: response.question.type === "MULTIPLE_CHOICE" ? 
-          (() => {
-          try {
-            return JSON.parse(response.question.options)
-          } catch {
-            return []
-          }
-          })() : 
-          []
-        }
-      }))
-      }))
+      guests: household?.guests.map(guest => {
+        // Log the raw data from the database
+        console.log(`Raw guest data for ${guest.name}:`, { 
+          isChild: guest.isChild, 
+          typeOf: typeof guest.isChild
+        });
+        
+        return {
+          ...guest,
+          // Force isChild to be a boolean - might be coming as a string "TRUE" or "FALSE"
+          isChild: guest.isChild === true || guest.isChild === "TRUE" || guest.isChild === "true",
+          responses: guest.responses.map(response => ({
+            ...response,
+            question: {
+              ...response.question,
+              options: response.question.type === "MULTIPLE_CHOICE" ? 
+                (() => {
+                  try {
+                    return JSON.parse(response.question.options)
+                  } catch {
+                    return []
+                  }
+                })() : 
+                []
+            }
+          }))
+        };
+      })
     }
-
-    console.log('Child guest check:', transformedHousehold.guests.map(g => ({ name: g.name, isChild: g.isChild })))
+    
+    console.log('Child guest check (after transformation):', transformedHousehold.guests.map(g => ({ 
+      name: g.name, 
+      isChild: g.isChild, 
+      typeOfIsChild: typeof g.isChild 
+    })));
 
     return NextResponse.json({
       success: true,
