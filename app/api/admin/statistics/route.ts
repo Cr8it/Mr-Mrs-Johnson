@@ -1,68 +1,99 @@
 import { NextResponse } from "next/server"
-import { StatisticsService } from "@/lib/services/statistics"
+import { prisma } from "@/lib/db"
 
 export async function GET() {
   try {
-    const statisticsService = StatisticsService.getInstance()
-    const stats = await statisticsService.getStatistics()
+    // Get basic statistics
+    const [
+      totalGuests,
+      respondedGuests,
+      attendingGuests,
+      notAttendingGuests,
+      totalHouseholds,
+      dietaryRequirements
+    ] = await Promise.all([
+      prisma.guest.count(),
+      prisma.guest.count({
+        where: { isAttending: { not: null } }
+      }),
+      prisma.guest.count({
+        where: { isAttending: true }
+      }),
+      prisma.guest.count({
+        where: { isAttending: false }
+      }),
+      prisma.household.count(),
+      prisma.guest.count({
+        where: {
+          NOT: { dietaryNotes: null }
+        }
+      })
+    ]);
 
-    if (!stats) {
-      return NextResponse.json(
-        { error: "Failed to fetch statistics" },
-        { status: 500 }
-      )
-    }
-
-    // Transform the stats into the expected format, separating child and adult options
-    const mealStats = stats.mealStats as any
-    const dessertStats = stats.dessertStats as any
-
-    const adultMealChoices = Object.values(mealStats)
-      .filter((meal: any) => !meal.isChildOption)
-      .map((meal: any) => ({
+    // Get meal choices with counts
+    const mealChoices = await prisma.mealOption.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        _count: {
+          select: {
+            guests: true
+          }
+        }
+      }
+    }).then(meals => 
+      meals.map(meal => ({
         name: meal.name,
-        count: meal.count
+        count: meal._count.guests
       }))
+    );
 
-    const childMealChoices = Object.values(mealStats)
-      .filter((meal: any) => meal.isChildOption)
-      .map((meal: any) => ({
-        name: meal.name,
-        count: meal.count
-      }))
-
-    const adultDessertChoices = Object.values(dessertStats)
-      .filter((dessert: any) => !dessert.isChildOption)
-      .map((dessert: any) => ({
+    // Get dessert choices with counts
+    const dessertChoices = await prisma.dessertOption.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        _count: {
+          select: {
+            guests: true
+          }
+        }
+      }
+    }).then(desserts => 
+      desserts.map(dessert => ({
         name: dessert.name,
-        count: dessert.count
+        count: dessert._count.guests
       }))
+    );
 
-    const childDessertChoices = Object.values(dessertStats)
-      .filter((dessert: any) => dessert.isChildOption)
-      .map((dessert: any) => ({
-        name: dessert.name,
-        count: dessert.count
-      }))
+    const responseRate = totalGuests > 0 
+      ? Math.round((respondedGuests / totalGuests) * 100) 
+      : 0;
 
-    const responseRate = stats.totalGuests > 0 
-      ? Math.round((stats.respondedGuests / stats.totalGuests) * 100) 
-      : 0
+    console.log("Statistics data:", {
+      totalGuests,
+      respondedGuests,
+      attendingGuests,
+      notAttendingGuests,
+      totalHouseholds,
+      dietaryRequirements,
+      responseRate,
+      mealChoices,
+      dessertChoices
+    });
 
     return NextResponse.json({
-      totalGuests: stats.totalGuests,
-      respondedGuests: stats.respondedGuests,
-      attendingGuests: stats.attendingGuests,
-      notAttendingGuests: stats.notAttendingGuests,
+      totalGuests,
+      respondedGuests,
+      attendingGuests,
+      notAttendingGuests,
+      totalHouseholds,
+      dietaryRequirements,
       responseRate,
-      mealChoices: {
-        adult: adultMealChoices,
-        child: childMealChoices
-      },
-      dessertChoices: {
-        adult: adultDessertChoices,
-        child: childDessertChoices
-      }
+      mealChoices,
+      dessertChoices
     })
   } catch (error) {
     console.error("Statistics error:", error)

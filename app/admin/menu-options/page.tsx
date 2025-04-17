@@ -34,12 +34,6 @@ import {
 import { CSS } from "@dnd-kit/utilities"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
-import {
-	DragDropContext,
-	Droppable,
-	Draggable,
-} from "@hello-pangea/dnd"
-import { Label } from "@/components/ui/label"
 
 interface Option {
 	id: string
@@ -47,7 +41,6 @@ interface Option {
 	isActive: boolean
 	isChildOption?: boolean
 	order: number
-	guestCount?: number
 }
 
 interface DeleteConfirmation {
@@ -84,112 +77,15 @@ function SortableItem({ id, children }: { id: string; children: React.ReactNode 
 	)
 }
 
-function MealOptionsList({ options, onReorder, onRemove }: { options: Option[]; onReorder: (event: any) => void; onRemove: (id: string) => void }) {
-	return (
-		<DragDropContext onDragEnd={onReorder}>
-			<Droppable droppableId="meal-options">
-				{(provided) => (
-					<div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
-						{options.map((option, index) => (
-							<Draggable key={option.id} draggableId={option.id} index={index}>
-								{(provided) => (
-									<div
-										ref={provided.innerRef}
-										{...provided.draggableProps}
-										{...provided.dragHandleProps}
-										className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center justify-between"
-									>
-										<div className="flex items-center gap-4">
-											<GripVertical className="h-5 w-5 text-gray-400" />
-											<div>
-												<div className="font-medium">{option.name}</div>
-												{option.isChildOption && (
-													<span className="text-xs text-gray-500">Children's Option</span>
-												)}
-											</div>
-										</div>
-										<div className="flex items-center space-x-4">
-											{(option.guestCount ?? 0) > 0 && (
-												<span className="text-sm text-gray-500">
-													{option.guestCount} {(option.guestCount ?? 0) === 1 ? 'guest' : 'guests'}
-												</span>
-											)}
-											<button
-												onClick={() => onRemove(option.id)}
-												className="text-red-500 hover:text-red-700 transition-colors"
-											>
-												<Trash className="h-4 w-4" />
-											</button>
-										</div>
-									</div>
-								)}
-							</Draggable>
-						))}
-						{provided.placeholder}
-					</div>
-				)}
-			</Droppable>
-		</DragDropContext>
-	)
-}
-
-function DessertOptionsList({ options, onReorder, onRemove }: { options: Option[]; onReorder: (event: any) => void; onRemove: (id: string) => void }) {
-	return (
-		<DragDropContext onDragEnd={onReorder}>
-			<Droppable droppableId="dessert-options">
-				{(provided) => (
-					<div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
-						{options.map((option, index) => (
-							<Draggable key={option.id} draggableId={option.id} index={index}>
-								{(provided) => (
-									<div
-										ref={provided.innerRef}
-										{...provided.draggableProps}
-										{...provided.dragHandleProps}
-										className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center justify-between"
-									>
-										<div className="flex items-center gap-4">
-											<GripVertical className="h-5 w-5 text-gray-400" />
-											<div>
-												<div className="font-medium">{option.name}</div>
-												{option.isChildOption && (
-													<span className="text-xs text-gray-500">Children's Option</span>
-												)}
-											</div>
-										</div>
-										<div className="flex items-center space-x-4">
-											{(option.guestCount ?? 0) > 0 && (
-												<span className="text-sm text-gray-500">
-													{option.guestCount} {(option.guestCount ?? 0) === 1 ? 'guest' : 'guests'}
-												</span>
-											)}
-											<button
-												onClick={() => onRemove(option.id)}
-												className="text-red-500 hover:text-red-700 transition-colors"
-											>
-												<Trash className="h-4 w-4" />
-											</button>
-										</div>
-									</div>
-								)}
-							</Draggable>
-						))}
-						{provided.placeholder}
-					</div>
-				)}
-			</Droppable>
-		</DragDropContext>
-	)
-}
-
 export default function MenuOptionsPage() {
 	const [mealOptions, setMealOptions] = useState<Option[]>([])
 	const [dessertOptions, setDessertOptions] = useState<Option[]>([])
-	const [loading, setLoading] = useState(true)
-	const [error, setError] = useState<string | null>(null)
-	const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation>({ isOpen: false, optionId: '', optionType: 'meal' })
-	const [newMealOption, setNewMealOption] = useState({ name: '', isChildOption: false })
-	const [newDessertOption, setNewDessertOption] = useState({ name: '', isChildOption: false })
+	const [newMealOption, setNewMealOption] = useState("")
+	const [isChildMealOption, setIsChildMealOption] = useState(false)
+	const [newDessertOption, setNewDessertOption] = useState("")
+	const [isChildDessertOption, setIsChildDessertOption] = useState(false)
+	const [isMealAdding, setIsMealAdding] = useState(false)
+	const [isDessertAdding, setIsDessertAdding] = useState(false)
 	const { toast } = useToast()
 	const [statistics, setStatistics] = useState<{
 		mealChoices: { name: string; count: number }[];
@@ -199,6 +95,11 @@ export default function MenuOptionsPage() {
 		mealChoices: [],
 		dessertChoices: [],
 		totalGuests: 0
+	})
+	const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation>({
+		isOpen: false,
+		optionId: '',
+		optionType: 'meal'
 	})
 
 	const sensors = useSensors(
@@ -235,260 +136,408 @@ export default function MenuOptionsPage() {
 
 	const fetchOptions = async () => {
 		try {
-			setLoading(true)
-			const response = await fetch('/api/admin/menu-options')
-			if (!response.ok) throw new Error('Failed to fetch options')
-			const data = await response.json()
-			
-			// Sort options by their order
-			const sortedMealOptions = data.mealOptions.sort((a: Option, b: Option) => a.order - b.order)
-			const sortedDessertOptions = data.dessertOptions.sort((a: Option, b: Option) => a.order - b.order)
-			
-			setMealOptions(sortedMealOptions)
-			setDessertOptions(sortedDessertOptions)
-			setError(null)
-		} catch (err) {
-			setError('Failed to load menu options')
+			const [mealResponse, dessertResponse] = await Promise.all([
+				fetch('/api/admin/meal-options'),
+				fetch('/api/admin/dessert-options')
+			])
+
+			if (mealResponse.ok) {
+				const mealData = await mealResponse.json()
+				setMealOptions(mealData.options)
+			}
+
+			if (dessertResponse.ok) {
+				const dessertData = await dessertResponse.json()
+				setDessertOptions(dessertData.options)
+			}
+
+			// Refresh statistics after fetching options
+			await fetchStatistics()
+		} catch (error) {
 			toast({
 				variant: "destructive",
 				title: "Error",
-				description: "Failed to load menu options"
+				description: "Failed to fetch options"
 			})
-		} finally {
-			setLoading(false)
 		}
 	}
 
-	const handleDragEnd = async (result: any, type: 'meal' | 'dessert') => {
-		if (!result.destination) return
+	const handleDragEnd = async (event: any, type: 'meal' | 'dessert') => {
+		if (!event.active || !event.over) return
 
-		const items = type === 'meal' ? [...mealOptions] : [...dessertOptions]
-		const [reorderedItem] = items.splice(result.source.index, 1)
-		items.splice(result.destination.index, 0, reorderedItem)
+		const oldIndex = type === 'meal'
+			? mealOptions.findIndex(item => item.id === event.active.id)
+			: dessertOptions.findIndex(item => item.id === event.active.id)
+		const newIndex = type === 'meal'
+			? mealOptions.findIndex(item => item.id === event.over.id)
+			: dessertOptions.findIndex(item => item.id === event.over.id)
 
-		// Update the order property for each item
-		const updatedItems = items.map((item, index) => ({
-			...item,
-			order: index
-		}))
-
-		if (type === 'meal') {
-			setMealOptions(updatedItems)
-		} else {
-			setDessertOptions(updatedItems)
-		}
+		if (oldIndex === -1 || newIndex === -1) return
 
 		try {
-			const response = await fetch('/api/admin/menu-options/reorder', {
-				method: 'PUT',
+			const options = type === 'meal' ? mealOptions : dessertOptions
+			const reorderedOptions = arrayMove(options, oldIndex, newIndex)
+
+			if (type === 'meal') {
+				setMealOptions(reorderedOptions)
+			} else {
+				setDessertOptions(reorderedOptions)
+			}
+
+			const response = await fetch(`/api/admin/${type}-options/reorder`, {
+				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					type,
-					items: updatedItems.map(item => ({
-						id: item.id,
-						order: item.order
-					}))
-				})
+				body: JSON.stringify({ options: reorderedOptions })
 			})
 
-			if (!response.ok) throw new Error('Failed to update order')
+			if (!response.ok) throw new Error(`Failed to reorder ${type} options`)
+
+			// Refresh statistics after reordering
+			await fetchStatistics()
+		} catch (error) {
 			toast({
-				description: "Order updated successfully",
-				variant: "default"
+				variant: "destructive",
+				title: "Error",
+				description: `Failed to reorder ${type} options`
 			})
-		} catch (err) {
-			toast({
-				description: "Failed to update order",
-				variant: "destructive"
-			})
-			// Revert the changes
-			fetchOptions()
 		}
 	}
 
 	const handleAddMealOption = async (e: React.FormEvent) => {
 		e.preventDefault()
-		if (!newMealOption.name.trim()) return
-
-		try {
-			const response = await fetch('/api/admin/menu-options', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					type: 'meal',
-					name: newMealOption.name,
-					isChildOption: newMealOption.isChildOption,
-					order: mealOptions.length
-				})
+		
+		if (!newMealOption.trim()) {
+			toast({
+				title: "Error",
+				description: "Please enter a meal option name.",
+				variant: "destructive",
 			})
-
-			if (!response.ok) throw new Error('Failed to add meal option')
+			return
+		}
+		
+		setIsMealAdding(true)
+		
+		try {
+			// Extract isChildOption from the form
+			const form = e.target as HTMLFormElement;
+			const isChildOptionCheckbox = form.querySelector('#meal-for-children') as HTMLInputElement;
+			const isChildOption = isChildOptionCheckbox ? isChildOptionCheckbox.checked : false;
+			
+			const response = await fetch('/api/admin/meal-options', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					name: newMealOption.trim(),
+					isChildOption: isChildOption
+				}),
+			})
+			
+			const data = await response.json()
+			
+			if (!response.ok) {
+				throw new Error(data.error || 'Failed to add meal option')
+			}
+			
+			fetchOptions()
+			fetchStatistics()
+			setNewMealOption('')
 			
 			toast({
-				description: "Meal option added successfully",
-				variant: "default"
+				title: "Success",
+				description: `Added ${isChildOption ? "children's" : ""} meal option: ${newMealOption}`,
 			})
-			setNewMealOption({ name: '', isChildOption: false })
-			fetchOptions()
-		} catch (err) {
+		} catch (error) {
+			console.error('Error adding meal option:', error)
 			toast({
-				description: "Failed to add meal option",
-				variant: "destructive"
+				title: "Error",
+				description: "Failed to add meal option.",
+				variant: "destructive",
 			})
+		} finally {
+			setIsMealAdding(false)
 		}
 	}
 
 	const handleAddDessertOption = async (e: React.FormEvent) => {
 		e.preventDefault()
-		if (!newDessertOption.name.trim()) return
-
+		
+		if (!newDessertOption.trim()) {
+			toast({
+				title: "Error",
+				description: "Please enter a dessert option name.",
+				variant: "destructive",
+			})
+			return
+		}
+		
+		setIsDessertAdding(true)
+		
 		try {
-			const response = await fetch('/api/admin/menu-options', {
+			// Extract isChildOption from the form
+			const form = e.target as HTMLFormElement;
+			const isChildOptionCheckbox = form.querySelector('#dessert-for-children') as HTMLInputElement;
+			const isChildOption = isChildOptionCheckbox ? isChildOptionCheckbox.checked : false;
+			
+			const response = await fetch('/api/admin/dessert-options', {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+				headers: {
+					'Content-Type': 'application/json',
+				},
 				body: JSON.stringify({
-					type: 'dessert',
-					name: newDessertOption.name,
-					isChildOption: newDessertOption.isChildOption,
-					order: dessertOptions.length
-				})
+					name: newDessertOption.trim(),
+					isChildOption: isChildOption
+				}),
 			})
-
-			if (!response.ok) throw new Error('Failed to add dessert option')
+			
+			const data = await response.json()
+			
+			if (!response.ok) {
+				throw new Error(data.error || 'Failed to add dessert option')
+			}
+			
+			fetchOptions()
+			fetchStatistics()
+			setNewDessertOption('')
 			
 			toast({
-				description: "Dessert option added successfully",
-				variant: "default"
+				title: "Success",
+				description: `Added ${isChildOption ? "children's" : ""} dessert option: ${newDessertOption}`,
 			})
-			setNewDessertOption({ name: '', isChildOption: false })
-			fetchOptions()
-		} catch (err) {
+		} catch (error) {
+			console.error('Error adding dessert option:', error)
 			toast({
-				description: "Failed to add dessert option",
-				variant: "destructive"
+				title: "Error",
+				description: "Failed to add dessert option.",
+				variant: "destructive",
 			})
+		} finally {
+			setIsDessertAdding(false)
 		}
 	}
 
-	const handleRemoveOption = async (optionId: string, type: 'meal' | 'dessert') => {
+	const handleRemoveOption = async (id: string, type: 'meal' | 'dessert') => {
 		try {
-			const response = await fetch(`/api/admin/menu-options/${optionId}`, {
-				method: 'DELETE'
+			const response = await fetch(`/api/admin/${type}-options/${id}`, {
+				method: 'DELETE',
 			})
 
-			if (!response.ok) throw new Error('Failed to remove option')
-			
+			if (response.ok) {
+				await fetchOptions()
+				toast({
+					title: "Success",
+					description: `${type.charAt(0).toUpperCase() + type.slice(1)} option removed successfully`
+				})
+				// Refresh statistics after removing option
+				await fetchStatistics()
+			}
+		} catch (error) {
 			toast({
-				description: `${type === 'meal' ? 'Meal' : 'Dessert'} option removed successfully`,
-				variant: "default"
-			})
-			fetchOptions()
-		} catch (err) {
-			toast({
-				description: "Failed to remove option",
-				variant: "destructive"
+				variant: "destructive",
+				title: "Error",
+				description: `Failed to remove ${type} option`
 			})
 		}
-		setDeleteConfirmation({ isOpen: false, optionId: '', optionType: 'meal' })
 	}
-
-	if (loading) return <div>Loading...</div>
-	if (error) return <div>Error: {error}</div>
 
 	return (
-		<div className="container mx-auto p-4">
-			<h1 className="text-2xl font-bold mb-6">Menu Options</h1>
-			
-			<div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-				<div>
-					<h2 className="text-xl font-semibold mb-4">Meal Options</h2>
-					<form onSubmit={handleAddMealOption} className="mb-4">
-						<div className="flex gap-4 mb-4">
-							<div className="flex-1">
-								<Input
-									type="text"
-									placeholder="Add new meal option"
-									value={newMealOption.name}
-									onChange={(e) => setNewMealOption(prev => ({ ...prev, name: e.target.value }))}
-								/>
-							</div>
-							<div className="flex items-center gap-2">
-								<Checkbox
-									id="meal-child-option"
-									checked={newMealOption.isChildOption}
-									onCheckedChange={(checked) => 
-										setNewMealOption(prev => ({ ...prev, isChildOption: checked === true }))
-									}
-								/>
-								<Label htmlFor="meal-child-option">Child Option</Label>
-							</div>
-							<Button type="submit" disabled={!newMealOption.name.trim()}>
-								Add
-							</Button>
-						</div>
-					</form>
-					
-					<MealOptionsList
-						options={mealOptions}
-						onReorder={(result) => handleDragEnd(result, 'meal')}
-						onRemove={(id) => handleRemoveOption(id, 'meal')}
+		<div className="space-y-8">
+			<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+				<div className="bg-white p-6 rounded-lg shadow-sm">
+					<PreferenceStats
+						title="Meal"
+						options={statistics.mealChoices}
+						totalGuests={statistics.totalGuests}
+						colorClass="bg-gold"
 					/>
 				</div>
-
-				<div>
-					<h2 className="text-xl font-semibold mb-4">Dessert Options</h2>
-					<form onSubmit={handleAddDessertOption} className="mb-4">
-						<div className="flex gap-4 mb-4">
-							<div className="flex-1">
-								<Input
-									type="text"
-									placeholder="Add new dessert option"
-									value={newDessertOption.name}
-									onChange={(e) => setNewDessertOption(prev => ({ ...prev, name: e.target.value }))}
-								/>
-							</div>
-							<div className="flex items-center gap-2">
-								<Checkbox
-									id="dessert-child-option"
-									checked={newDessertOption.isChildOption}
-									onCheckedChange={(checked) => 
-										setNewDessertOption(prev => ({ ...prev, isChildOption: checked === true }))
-									}
-								/>
-								<Label htmlFor="dessert-child-option">Child Option</Label>
-							</div>
-							<Button type="submit" disabled={!newDessertOption.name.trim()}>
-								Add
-							</Button>
-						</div>
-					</form>
-					
-					<DessertOptionsList
-						options={dessertOptions}
-						onReorder={(result) => handleDragEnd(result, 'dessert')}
-						onRemove={(id) => handleRemoveOption(id, 'dessert')}
+				<div className="bg-white p-6 rounded-lg shadow-sm">
+					<PreferenceStats
+						title="Dessert"
+						options={statistics.dessertChoices}
+						totalGuests={statistics.totalGuests}
+						colorClass="bg-rose-400"
 					/>
 				</div>
 			</div>
 
-			<AlertDialog open={deleteConfirmation.isOpen}>
+			<AlertDialog 
+				open={deleteConfirmation.isOpen} 
+				onOpenChange={(isOpen) => setDeleteConfirmation(prev => ({ ...prev, isOpen }))}
+			>
 				<AlertDialogContent>
 					<AlertDialogHeader>
 						<AlertDialogTitle>Are you sure?</AlertDialogTitle>
 						<AlertDialogDescription>
-							This will permanently delete this menu option. This action cannot be undone.
+							This action cannot be undone. This will permanently remove this option.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
-						<AlertDialogCancel onClick={() => setDeleteConfirmation({ isOpen: false, optionId: '', optionType: 'meal' })}>
-							Cancel
-						</AlertDialogCancel>
-						<AlertDialogAction onClick={() => handleRemoveOption(deleteConfirmation.optionId, deleteConfirmation.optionType)}>
-							Delete
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction onClick={() => {
+							handleRemoveOption(deleteConfirmation.optionId, deleteConfirmation.optionType)
+							setDeleteConfirmation(prev => ({ ...prev, isOpen: false }))
+						}}>
+							Remove
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>
+			
+			<div className="space-y-6">
+				<div className="bg-white p-6 rounded-lg shadow-sm">
+					<h2 className="text-2xl font-bold text-gray-900 mb-4">Meal Options</h2>
+					<form onSubmit={handleAddMealOption} className="space-y-4 mb-6">
+						<div className="flex gap-2">
+							<Input
+								value={newMealOption}
+								onChange={(e) => setNewMealOption(e.target.value)}
+								placeholder="Add new meal option..."
+								className="max-w-xs bg-gray-50 border-gray-200 focus:border-gold focus:ring-gold"
+								disabled={isMealAdding}
+							/>
+							<Button type="submit" className="bg-gold hover:bg-[#c19b2f] text-white" disabled={isMealAdding}>
+								{isMealAdding ? (
+									<>Loading...</>
+								) : (
+									<>
+										<Plus className="h-4 w-4 mr-2" />
+										Add Option
+									</>
+								)}
+							</Button>
+						</div>
+						<div className="flex items-center space-x-2">
+							<Checkbox 
+								id="meal-for-children"
+								checked={isChildMealOption}
+								onCheckedChange={(checked) => setIsChildMealOption(checked === true)}
+								disabled={isMealAdding}
+							/>
+							<label
+								htmlFor="meal-for-children"
+								className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+							>
+								This is a children's meal option
+							</label>
+						</div>
+					</form>
+					<DndContext
+						sensors={sensors}
+						collisionDetection={closestCenter}
+						onDragEnd={(event) => handleDragEnd(event, 'meal')}
+					>
+						<SortableContext
+							items={mealOptions.map(option => option.id)}
+							strategy={verticalListSortingStrategy}
+						>
+							<div className="space-y-2">
+								{mealOptions.map((option, index) => (
+									<SortableItem key={option.id} id={option.id}>
+										<div 
+											className="flex items-center justify-between bg-card p-3 rounded-md border mb-2 cursor-grab"
+										>
+											<div className="flex-1 mr-4 flex items-center">
+											<span className="mr-1">{option.name}</span>
+											{option.isChildOption && (
+												<span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded ml-2 dark:bg-blue-900 dark:text-blue-300">
+												Child
+												</span>
+											)}
+											</div>
+											<Button
+												variant="ghost"
+												size="sm"
+												onClick={() => setDeleteConfirmation({ isOpen: true, optionId: option.id, optionType: 'meal' })}
+												className="text-destructive"
+											>
+												<Trash className="h-4 w-4" />
+											</Button>
+										</div>
+									</SortableItem>
+								))}
+							</div>
+						</SortableContext>
+					</DndContext>
+				</div>
+
+				<div className="bg-white p-6 rounded-lg shadow-sm mt-10">
+					<h2 className="text-2xl font-bold text-gray-900 mb-4">Dessert Options</h2>
+					<form onSubmit={handleAddDessertOption} className="space-y-4 mb-6">
+						<div className="flex gap-2">
+							<Input
+								value={newDessertOption}
+								onChange={(e) => setNewDessertOption(e.target.value)}
+								placeholder="Add new dessert option..."
+								className="max-w-xs bg-gray-50 border-gray-200 focus:border-gold focus:ring-gold"
+								disabled={isDessertAdding}
+							/>
+							<Button type="submit" className="bg-gold hover:bg-[#c19b2f] text-white" disabled={isDessertAdding}>
+								{isDessertAdding ? (
+									<>Loading...</>
+								) : (
+									<>
+										<Plus className="h-4 w-4 mr-2" />
+										Add Option
+									</>
+								)}
+							</Button>
+						</div>
+						<div className="flex items-center space-x-2">
+							<Checkbox 
+								id="dessert-for-children"
+								checked={isChildDessertOption}
+								onCheckedChange={(checked) => setIsChildDessertOption(checked === true)}
+								disabled={isDessertAdding}
+							/>
+							<label
+								htmlFor="dessert-for-children"
+								className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+							>
+								This is a children's dessert option
+							</label>
+						</div>
+					</form>
+					<DndContext
+						sensors={sensors}
+						collisionDetection={closestCenter}
+						onDragEnd={(event) => handleDragEnd(event, 'dessert')}
+					>
+						<SortableContext
+							items={dessertOptions.map(option => option.id)}
+							strategy={verticalListSortingStrategy}
+						>
+							<div className="space-y-2">
+								{dessertOptions.map((option, index) => (
+									<SortableItem key={option.id} id={option.id}>
+										<div 
+											className="flex items-center justify-between bg-card p-3 rounded-md border mb-2 cursor-grab"
+										>
+											<div className="flex-1 mr-4 flex items-center">
+											<span className="mr-1">{option.name}</span>
+											{option.isChildOption && (
+												<span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded ml-2 dark:bg-blue-900 dark:text-blue-300">
+												Child
+												</span>
+											)}
+											</div>
+											<Button
+												variant="ghost"
+												size="sm"
+												onClick={() => setDeleteConfirmation({ isOpen: true, optionId: option.id, optionType: 'dessert' })}
+												className="text-destructive"
+											>
+												<Trash className="h-4 w-4" />
+											</Button>
+										</div>
+									</SortableItem>
+								))}
+							</div>
+						</SortableContext>
+					</DndContext>
+				</div>
+			</div>
 		</div>
 	)
 }

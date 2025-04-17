@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
-import { StatisticsService } from "@/lib/services/statistics"
 
 export async function GET(
   request: NextRequest,
@@ -124,6 +123,7 @@ export async function POST(request: Request, { params }: { params: { code: strin
     // Process responses for each guest
     for (const guest of household.guests) {
       console.log(`Processing responses for guest: ${guest.name}`)
+      console.log(`Current isChild value: ${guest.isChild} (${typeof guest.isChild})`)
       
       const isAttending = responses[`attending-${guest.id}`]
       const mealOptionId = responses[`meal-${guest.id}`]
@@ -137,6 +137,7 @@ export async function POST(request: Request, { params }: { params: { code: strin
           isAttending,
           mealOptionId: isAttending ? mealOptionId : null,
           dessertOptionId: isAttending ? dessertOptionId : null,
+          // We're intentionally NOT updating isChild here to preserve it
         },
       })
 
@@ -163,7 +164,7 @@ export async function POST(request: Request, { params }: { params: { code: strin
         }
       }
 
-      // Process guest-specific responses
+      // Save guest-specific responses
       const guestResponses = Object.entries(responses)
         .filter(([key]) => key.endsWith(`-${guest.id}`))
         .filter(([key]) => !key.startsWith('meal-') && !key.startsWith('dessert-') && !key.startsWith('attending-'))
@@ -186,7 +187,7 @@ export async function POST(request: Request, { params }: { params: { code: strin
       }
     }
 
-    // Process household-level responses
+    // Save household-level responses
     const householdResponses = Object.entries(responses)
       .filter(([key]) => !key.includes("-"))
       .map(([questionId, value]) => ({
@@ -200,10 +201,6 @@ export async function POST(request: Request, { params }: { params: { code: strin
         data: householdResponses,
       })
     }
-
-    // Update statistics after all changes
-    const statisticsService = StatisticsService.getInstance()
-    await statisticsService.updateStatistics()
 
     return NextResponse.json({ success: true })
   } catch (error) {

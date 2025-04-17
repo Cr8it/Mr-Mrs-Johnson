@@ -130,17 +130,3 @@ model BridalPartyMember {
 
   @@index([type, order])
 }
-
-model StatisticsCache {
-  id                String   @id @default(cuid())
-  totalGuests      Int      @default(0)
-  respondedGuests  Int      @default(0)
-  attendingGuests  Int      @default(0)
-  notAttendingGuests Int    @default(0)
-  mealStats        Json     @default("{}")
-  dessertStats     Json     @default("{}")
-  lastUpdated      DateTime @default(now())
-  version          Int      @default(1)
-
-  @@index([lastUpdated])
-}
