@@ -47,6 +47,7 @@ interface Option {
 	isActive: boolean
 	isChildOption?: boolean
 	order: number
+	guestCount?: number
 }
 
 interface DeleteConfirmation {
@@ -88,7 +89,7 @@ function MealOptionsList({ options, onReorder, onRemove }: { options: Option[]; 
 		<DragDropContext onDragEnd={onReorder}>
 			<Droppable droppableId="meal-options">
 				{(provided) => (
-					<div {...provided.droppableProps} ref={provided.innerRef}>
+					<div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
 						{options.map((option, index) => (
 							<Draggable key={option.id} draggableId={option.id} index={index}>
 								{(provided) => (
@@ -96,28 +97,26 @@ function MealOptionsList({ options, onReorder, onRemove }: { options: Option[]; 
 										ref={provided.innerRef}
 										{...provided.draggableProps}
 										{...provided.dragHandleProps}
-										className="flex items-center justify-between p-4 mb-2 bg-white rounded-lg shadow"
+										className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center justify-between"
 									>
-										<div className="flex items-center space-x-4">
-											<GripVertical className="text-gray-400" />
+										<div className="flex items-center gap-4">
+											<GripVertical className="h-5 w-5 text-gray-400" />
 											<div>
-												<p className="font-medium">{option.name}</p>
+												<div className="font-medium">{option.name}</div>
 												{option.isChildOption && (
-													<span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-														Child Option
-													</span>
+													<span className="text-xs text-gray-500">Children's Option</span>
 												)}
 											</div>
 										</div>
 										<div className="flex items-center space-x-4">
-											{option.guestCount > 0 && (
+											{(option.guestCount ?? 0) > 0 && (
 												<span className="text-sm text-gray-500">
-													{option.guestCount} {option.guestCount === 1 ? 'guest' : 'guests'}
+													{option.guestCount} {(option.guestCount ?? 0) === 1 ? 'guest' : 'guests'}
 												</span>
 											)}
 											<button
 												onClick={() => onRemove(option.id)}
-												className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+												className="text-red-500 hover:text-red-700 transition-colors"
 											>
 												<Trash className="h-4 w-4" />
 											</button>
@@ -139,7 +138,7 @@ function DessertOptionsList({ options, onReorder, onRemove }: { options: Option[
 		<DragDropContext onDragEnd={onReorder}>
 			<Droppable droppableId="dessert-options">
 				{(provided) => (
-					<div {...provided.droppableProps} ref={provided.innerRef}>
+					<div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
 						{options.map((option, index) => (
 							<Draggable key={option.id} draggableId={option.id} index={index}>
 								{(provided) => (
@@ -147,28 +146,26 @@ function DessertOptionsList({ options, onReorder, onRemove }: { options: Option[
 										ref={provided.innerRef}
 										{...provided.draggableProps}
 										{...provided.dragHandleProps}
-										className="flex items-center justify-between p-4 mb-2 bg-white rounded-lg shadow"
+										className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center justify-between"
 									>
-										<div className="flex items-center space-x-4">
-											<GripVertical className="text-gray-400" />
+										<div className="flex items-center gap-4">
+											<GripVertical className="h-5 w-5 text-gray-400" />
 											<div>
-												<p className="font-medium">{option.name}</p>
+												<div className="font-medium">{option.name}</div>
 												{option.isChildOption && (
-													<span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-														Child Option
-													</span>
+													<span className="text-xs text-gray-500">Children's Option</span>
 												)}
 											</div>
 										</div>
 										<div className="flex items-center space-x-4">
-											{option.guestCount > 0 && (
+											{(option.guestCount ?? 0) > 0 && (
 												<span className="text-sm text-gray-500">
-													{option.guestCount} {option.guestCount === 1 ? 'guest' : 'guests'}
+													{option.guestCount} {(option.guestCount ?? 0) === 1 ? 'guest' : 'guests'}
 												</span>
 											)}
 											<button
 												onClick={() => onRemove(option.id)}
-												className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+												className="text-red-500 hover:text-red-700 transition-colors"
 											>
 												<Trash className="h-4 w-4" />
 											</button>
@@ -252,7 +249,11 @@ export default function MenuOptionsPage() {
 			setError(null)
 		} catch (err) {
 			setError('Failed to load menu options')
-			toast.error('Failed to load menu options')
+			toast({
+				variant: "destructive",
+				title: "Error",
+				description: "Failed to load menu options"
+			})
 		} finally {
 			setLoading(false)
 		}
