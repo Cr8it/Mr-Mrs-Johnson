@@ -720,11 +720,15 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                 </MotionDiv>
             )}
             </AnimatePresence>
-            </div>
+            </MotionDiv>
           ))}
 
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading ? 'Submitting...' : 'Submit RSVP'}
+          <Button 
+            type="submit" 
+            className="w-full bg-white text-black hover:bg-gray-200" 
+            disabled={loading}
+          >
+            {loading ? "Submitting..." : "Submit RSVP"}
           </Button>
         </form>
         </div>
