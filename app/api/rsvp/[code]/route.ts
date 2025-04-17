@@ -112,7 +112,12 @@ export async function POST(request: Request, { params }: { params: { code: strin
         code: params.code,
       },
       include: {
-        guests: true,
+        guests: {
+          include: {
+            mealChoice: true,
+            dessertChoice: true
+          }
+        },
       },
     })
 
@@ -120,16 +125,48 @@ export async function POST(request: Request, { params }: { params: { code: strin
       return NextResponse.json({ error: "Household not found" }, { status: 404 })
     }
 
+    // Fetch all meal and dessert options for validation
+    const [mealOptions, dessertOptions] = await Promise.all([
+      prisma.mealOption.findMany({
+        where: { isActive: true }
+      }),
+      prisma.dessertOption.findMany({
+        where: { isActive: true }
+      })
+    ])
+
     // Process responses for each guest
+    const results = []
     for (const guest of household.guests) {
       console.log(`Processing responses for guest: ${guest.name}`)
-      console.log(`Current isChild value: ${guest.isChild} (${typeof guest.isChild})`)
       
       const isAttending = responses[`attending-${guest.id}`]
       const mealOptionId = responses[`meal-${guest.id}`]
       const dessertOptionId = responses[`dessert-${guest.id}`]
+      const dietaryNotes = responses[`dietary-${guest.id}`]
 
-      await prisma.guest.update({
+      // Validate meal choice for child guests
+      if (isAttending && guest.isChild && mealOptionId) {
+        const selectedMeal = mealOptions.find(m => m.id === mealOptionId)
+        if (!selectedMeal?.isChildOption) {
+          return NextResponse.json({ 
+            error: `Invalid meal choice for child guest ${guest.name}. Must select a children's meal option.` 
+          }, { status: 400 })
+        }
+      }
+
+      // Validate dessert choice for child guests
+      if (isAttending && guest.isChild && dessertOptionId) {
+        const selectedDessert = dessertOptions.find(d => d.id === dessertOptionId)
+        if (!selectedDessert?.isChildOption) {
+          return NextResponse.json({ 
+            error: `Invalid dessert choice for child guest ${guest.name}. Must select a children's dessert option.` 
+          }, { status: 400 })
+        }
+      }
+
+      // Update guest preferences
+      const updatedGuest = await prisma.guest.update({
         where: {
           id: guest.id,
         },
@@ -137,75 +174,50 @@ export async function POST(request: Request, { params }: { params: { code: strin
           isAttending,
           mealOptionId: isAttending ? mealOptionId : null,
           dessertOptionId: isAttending ? dessertOptionId : null,
-          // We're intentionally NOT updating isChild here to preserve it
+          dietaryNotes: dietaryNotes || null,
+          // Preserve isChild status
+          isChild: guest.isChild
         },
       })
 
       // Log the meal and dessert choices in guest activity
       if (isAttending) {
         if (mealOptionId) {
+          const mealChoice = mealOptions.find(m => m.id === mealOptionId)
           await prisma.guestActivity.create({
             data: {
               guestId: guest.id,
               action: 'UPDATE_MEAL',
-              details: `Selected meal option: ${mealOptionId}`
+              details: `Selected meal option: ${mealChoice?.name || mealOptionId}`
             }
           })
         }
         
         if (dessertOptionId) {
+          const dessertChoice = dessertOptions.find(d => d.id === dessertOptionId)
           await prisma.guestActivity.create({
             data: {
               guestId: guest.id,
               action: 'UPDATE_DESSERT',
-              details: `Selected dessert option: ${dessertOptionId}`
+              details: `Selected dessert option: ${dessertChoice?.name || dessertOptionId}`
             }
           })
         }
       }
 
-      // Save guest-specific responses
-      const guestResponses = Object.entries(responses)
-        .filter(([key]) => key.endsWith(`-${guest.id}`))
-        .filter(([key]) => !key.startsWith('meal-') && !key.startsWith('dessert-') && !key.startsWith('attending-'))
-        .map(([key, value]) => ({
-          questionId: key.split("-")[0],
-          guestId: guest.id,
-          answer: String(value),
-        }))
-
-      if (guestResponses.length > 0) {
-        // Delete existing responses first
-        await prisma.questionResponse.deleteMany({
-          where: { guestId: guest.id }
-        })
-
-        // Create new responses
-        await prisma.questionResponse.createMany({
-          data: guestResponses,
-        })
-      }
+      results.push(updatedGuest)
     }
 
-    // Save household-level responses
-    const householdResponses = Object.entries(responses)
-      .filter(([key]) => !key.includes("-"))
-      .map(([questionId, value]) => ({
-        questionId,
-        guestId: household.guests[0].id,
-        answer: String(value),
-      }))
-
-    if (householdResponses.length > 0) {
-      await prisma.questionResponse.createMany({
-        data: householdResponses,
-      })
-    }
-
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ 
+      success: true,
+      results
+    })
   } catch (error) {
     console.error("Error processing RSVP:", error)
-    return NextResponse.json({ error: "Failed to process RSVP" }, { status: 500 })
+    return NextResponse.json({ 
+      error: "Failed to process RSVP",
+      details: error instanceof Error ? error.message : "Unknown error"
+    }, { status: 500 })
   }
 }
 

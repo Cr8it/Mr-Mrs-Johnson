@@ -46,82 +46,154 @@ export default function RSVPForm() {
   const [childMealOptions, setChildMealOptions] = useState<Option[]>([])
   const [dessertOptions, setDessertOptions] = useState<Option[]>([])
   const [childDessertOptions, setChildDessertOptions] = useState<Option[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setLoading(true)
+        setError(null)
+
         const [householdResponse, optionsResponse] = await Promise.all([
           fetch(`/api/rsvp/${params.code}`),
           fetch('/api/rsvp/options')
         ])
         
+        if (!householdResponse.ok) {
+          throw new Error('Failed to fetch household data')
+        }
+        if (!optionsResponse.ok) {
+          throw new Error('Failed to fetch menu options')
+        }
+        
         const householdData = await householdResponse.json()
         const optionsData = await optionsResponse.json()
         
+        // Validate child options
+        if (householdData.household.guests.some((g: Guest) => g.isChild) && 
+            (!optionsData.childMealOptions?.length || !optionsData.childDessertOptions?.length)) {
+          console.warn('Child guests present but child options missing')
+          toast({
+            title: "Warning",
+            description: "Some menu options may not be available. Please contact the hosts.",
+            variant: "destructive",
+          })
+        }
+
         setHousehold(householdData.household)
         setQuestions(householdData.questions)
-        setMealOptions(optionsData.mealOptions)
+        setMealOptions(optionsData.mealOptions || [])
         setChildMealOptions(optionsData.childMealOptions || [])
-        setDessertOptions(optionsData.dessertOptions)
+        setDessertOptions(optionsData.dessertOptions || [])
         setChildDessertOptions(optionsData.childDessertOptions || [])
+
       } catch (error) {
+        console.error('Error fetching RSVP data:', error)
+        setError('Failed to load RSVP form. Please try again later.')
         toast({
           title: "Error",
           description: "Failed to load RSVP form",
           variant: "destructive",
         })
+      } finally {
+        setLoading(false)
       }
     }
 
-    fetchData()
+    if (params.code) {
+      fetchData()
+    }
   }, [params.code, toast])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!household) return
 
-    // Validate required fields for attending guests
-    const hasInvalidResponses = household?.guests.some(guest => {
-      if (responses[`attending-${guest.id}`]) {
-        if (!responses[`meal-${guest.id}`] || !responses[`dessert-${guest.id}`]) {
-          return true
-        }
-      }
-      return false
-    })
-
-    if (hasInvalidResponses) {
-      toast({
-        title: "Error",
-        description: "Please select meal and dessert preferences for all attending guests",
-        variant: "destructive",
-      })
-      return
-    }
     try {
+      // Validate responses
+      const errors: string[] = []
+      
+      household.guests.forEach(guest => {
+        const isAttending = responses[`attending-${guest.id}`]
+        if (isAttending === undefined) {
+          errors.push(`Please indicate if ${guest.name} is attending`)
+        }
+        
+        if (isAttending) {
+          const mealChoice = responses[`meal-${guest.id}`]
+          const dessertChoice = responses[`dessert-${guest.id}`]
+          
+          if (!mealChoice) {
+            errors.push(`Please select a meal for ${guest.name}`)
+          }
+          if (!dessertChoice) {
+            errors.push(`Please select a dessert for ${guest.name}`)
+          }
+          
+          // Validate child options
+          if (guest.isChild) {
+            const selectedMeal = childMealOptions.find(o => o.id === mealChoice)
+            const selectedDessert = childDessertOptions.find(o => o.id === dessertChoice)
+            
+            if (mealChoice && !selectedMeal) {
+              errors.push(`Please select a children's meal for ${guest.name}`)
+            }
+            if (dessertChoice && !selectedDessert) {
+              errors.push(`Please select a children's dessert for ${guest.name}`)
+            }
+          }
+        }
+      })
+
+      if (errors.length > 0) {
+        toast({
+          title: "Validation Error",
+          description: errors.join('. '),
+          variant: "destructive",
+        })
+        return
+      }
+
       const response = await fetch(`/api/rsvp/${params.code}`, {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({ responses }),
       })
 
-      if (!response.ok) throw new Error("Failed to submit RSVP")
+      if (!response.ok) {
+        throw new Error('Failed to submit RSVP')
+      }
 
       toast({
         title: "Success",
         description: "Your RSVP has been submitted successfully",
       })
+
     } catch (error) {
+      console.error('Error submitting RSVP:', error)
       toast({
         title: "Error",
-        description: "Failed to submit RSVP",
+        description: "Failed to submit RSVP. Please try again.",
         variant: "destructive",
       })
     }
   }
 
-  if (!household) return null
+  if (loading) {
+    return <div>Loading...</div>
+  }
+
+  if (error) {
+    return <div className="text-red-500">{error}</div>
+  }
+
+  if (!household) {
+    return <div>No household found</div>
+  }
 
   return (
     <div className="min-h-screen bg-black text-white p-8">
@@ -143,7 +215,7 @@ export default function RSVPForm() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id={`attending-${guest.id}`}
-                      checked={responses[`attending-${guest.id}`]}
+                      checked={responses[`attending-${guest.id}`] === true}
                       onCheckedChange={(checked) =>
                         setResponses({
                           ...responses,
@@ -269,85 +341,4 @@ export default function RSVPForm() {
                                 onCheckedChange={(checked) =>
                                   setResponses({
                                     ...responses,
-                                    [`${question.id}-${guest.id}`]: checked,
-                                  })
-                                }
-                              />
-                              <label htmlFor={`${question.id}-${guest.id}`}>Yes</label>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                </div>
-              ))}
-              {questions
-                .filter((q) => !q.perGuest)
-                .map((question) => (
-                  <div key={question.id} className="space-y-2">
-                    <label>{question.question}</label>
-                    {question.type === "MULTIPLE_CHOICE" ? (
-                      <Select
-                        value={responses[question.id]}
-                        onValueChange={(value) =>
-                          setResponses({
-                            ...responses,
-                            [question.id]: value,
-                          })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select an option" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {(() => {
-                              try {
-                                const parsedOptions = JSON.parse(question.options);
-                                return parsedOptions.map((option: string) => (
-                                  <SelectItem key={option} value={option}>
-                                    {option}
-                                  </SelectItem>
-                                ));
-                              } catch {
-                                return null;
-                              }
-                            })()}
-                        </SelectContent>
-                      </Select>
-                    ) : question.type === "TEXT" ? (
-                      <Input
-                        value={responses[question.id] || ""}
-                        onChange={(e) =>
-                          setResponses({
-                            ...responses,
-                            [question.id]: e.target.value,
-                          })
-                        }
-                      />
-                    ) : (
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id={question.id}
-                          checked={responses[question.id]}
-                          onCheckedChange={(checked) =>
-                            setResponses({
-                              ...responses,
-                              [question.id]: checked,
-                            })
-                          }
-                        />
-                        <label htmlFor={question.id}>Yes</label>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              <Button type="submit" className="w-full">
-                Submit RSVP
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </motion.div>
-    </div>
-  )
-}
-
+                                    [`${question.id}-${guest.id}`
