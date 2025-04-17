@@ -53,6 +53,9 @@ export async function POST(request: Request) {
 			})
 		}
 
+		// Force boolean conversion for isChild
+		const isChildValue = isChild === true;
+
 		const guest = await prisma.guest.create({
 			data: {
 				name,
@@ -62,7 +65,7 @@ export async function POST(request: Request) {
 				mealOptionId: mealChoice?.id,
 				dessertOptionId: dessertChoice?.id,
 				householdId: household.id,
-				isChild: isChild === true,
+				isChild: isChildValue,
 			},
 			include: {
 				mealChoice: true,

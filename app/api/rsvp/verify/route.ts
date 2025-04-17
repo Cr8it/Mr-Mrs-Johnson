@@ -21,58 +21,58 @@ export async function POST(request: Request) {
 
     const [household, questions] = await Promise.all([
       prisma.household.findFirst({
-      where: {
-        code: normalizedCode
-      },
-      select: {
-        name: true,
-        code: true,
-        guests: {
+        where: {
+          code: normalizedCode
+        },
         select: {
-          id: true,
           name: true,
-          email: true,
-          isAttending: true,
-          isChild: true,
-          mealChoice: true, // Include full meal choice data
-          dessertChoice: true, // Include full dessert choice data
-          dietaryNotes: true,
-          responses: {
-          select: {
-            questionId: true,
-            answer: true,
-            question: {
+          code: true,
+          guests: {
             select: {
-              question: true,
-              type: true,
-              options: true,
-              isRequired: true
-            }
+              id: true,
+              name: true,
+              email: true,
+              isAttending: true,
+              isChild: true,
+              mealChoice: true,
+              dessertChoice: true,
+              dietaryNotes: true,
+              responses: {
+                select: {
+                  questionId: true,
+                  answer: true,
+                  question: {
+                    select: {
+                      question: true,
+                      type: true,
+                      options: true,
+                      isRequired: true
+                    }
+                  }
+                }
+              }
             }
           }
-          }
         }
-        }
-      }
       }),
       prisma.question.findMany({
-      where: { isActive: true },
-      orderBy: { createdAt: 'asc' },
-      select: {
-        id: true,
-        question: true,
-        type: true,
-        options: true,
-        isRequired: true
-      }
+        where: { isActive: true },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          question: true,
+          type: true,
+          options: true,
+          isRequired: true
+        }
       })
     ])
 
     if (!household) {
       console.log("No household found for code:", normalizedCode)
       return NextResponse.json(
-      { error: "Invalid code. Please check and try again." },
-      { status: 404 }
+        { error: "Invalid code. Please check and try again." },
+        { status: 404 }
       )
     }
 
@@ -82,39 +82,25 @@ export async function POST(request: Request) {
     const transformedQuestions = questions.map(question => ({
       ...question,
       options: question.type === "MULTIPLE_CHOICE" ? 
-      (() => {
-        try {
-        return JSON.parse(question.options)
-        } catch {
-        return []
-        }
-      })() : 
-      []
+        (() => {
+          try {
+            return JSON.parse(question.options)
+          } catch {
+            return []
+          }
+        })() : 
+        []
     }))
 
-    // Transform the household data to parse options in responses
+    // Transform the household data
     const transformedHousehold = {
       ...household,
-      guests: household?.guests.map(guest => {
-        // Log the raw data from the database
-        console.log(`Raw guest data for ${guest.name}:`, { 
-          isChild: guest.isChild, 
-          typeOf: typeof guest.isChild
-        });
-        
-        // Handle isChild value based on its actual type - without using string methods
-        const rawValue = guest.isChild;
-        // Use safe conversion that works regardless of type
-        const isChildValue = (() => {
-          if (typeof rawValue === 'string') {
-            return rawValue === 'true' || rawValue === 'TRUE';
-          }
-          return Boolean(rawValue);
-        })();
-          
+      guests: household.guests.map(guest => {
+        // Force boolean conversion for isChild
+        const isChildValue = guest.isChild === true;
+
         return {
           ...guest,
-          // Set isChild to the processed boolean value
           isChild: isChildValue,
           responses: guest.responses.map(response => ({
             ...response,
@@ -144,8 +130,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       household: {
-      ...transformedHousehold,
-      questions: transformedQuestions
+        ...transformedHousehold,
+        questions: transformedQuestions
       }
     })
   } catch (error) {
