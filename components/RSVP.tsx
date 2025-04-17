@@ -46,6 +46,7 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
   const [showSuccess, setShowSuccess] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [allNotAttending, setAllNotAttending] = useState(false)
+  const [error, setError] = useState("")
   const { toast } = useToast()
 
   useEffect(() => {
@@ -207,6 +208,49 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
     }
   }
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      // Normalize guest data before submission
+      const normalizedGuests = household.guests.map(guest => ({
+        ...guest,
+        // Force boolean conversion of isChild
+        isChild: guest.isChild === true
+      }));
+
+      const normalizedHousehold = {
+        ...household,
+        guests: normalizedGuests
+      };
+
+      const response = await fetch(`/api/rsvp/${household.code}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(normalizedHousehold),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        handleRsvpSuccess(data.household.guests);
+      } else {
+        throw new Error("Failed to submit RSVP");
+      }
+    } catch (error) {
+      console.error("RSVP Error:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to submit RSVP",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleModifyResponse = async () => {
     if (household?.code) {
@@ -215,11 +259,6 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
       await fetchHouseholdData(household.code);
     }
   };
-
-
-
-
-
 
   const handleRsvpSuccess = (guests: Guest[]) => {
     const notAttending = guests.every(guest => guest.isAttending === false);
@@ -237,8 +276,6 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
     // Only set success state, don't hide form
     setShowSuccess(true);
   };
-
-
 
   const handleBackToSearch = () => {
     setHousehold(null);

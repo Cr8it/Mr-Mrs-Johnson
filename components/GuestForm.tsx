@@ -179,7 +179,9 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
       mealChoice: guest.mealChoice || null,
       dessertChoice: guest.dessertChoice || null,
       responses: guest.responses || [],
-      isAttending: guest.isAttending ?? null
+      isAttending: guest.isAttending ?? null,
+      // Force boolean conversion of isChild
+      isChild: guest.isChild === true
     }));
     
     setGuests(newGuests);
@@ -471,12 +473,7 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
       const normalizedGuests = guests.map(guest => ({
         ...guest,
         // Force boolean conversion of isChild 
-        isChild: (() => {
-          if (typeof guest.isChild === 'string') {
-            return guest.isChild === 'true' || guest.isChild === 'TRUE';
-          }
-          return Boolean(guest.isChild);
-        })()
+        isChild: guest.isChild === true
       }));
       
       // Add detailed logging before submission

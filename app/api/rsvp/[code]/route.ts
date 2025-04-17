@@ -102,28 +102,18 @@ export async function GET(
   }
 }
 
-export async function POST(request: Request, { params }: { params: { code: string } }) {
+export async function POST(
+  request: Request,
+  { params }: { params: { code: string } }
+) {
   try {
-    const { responses } = await request.json()
-    console.log("RSVP responses received:", responses)
+    const household = await request.json();
     
-    const household = await prisma.household.findFirst({
-      where: {
-        code: params.code,
-      },
-      include: {
-        guests: {
-          include: {
-            mealChoice: true,
-            dessertChoice: true
-          }
-        },
-      },
-    })
-
-    if (!household) {
-      return NextResponse.json({ error: "Household not found" }, { status: 404 })
-    }
+    // Normalize guest data
+    const normalizedGuests = household.guests.map((guest: any) => ({
+      ...guest,
+      isChild: guest.isChild === true
+    }));
 
     // Fetch all meal and dessert options for validation
     const [mealOptions, dessertOptions] = await Promise.all([
@@ -133,85 +123,84 @@ export async function POST(request: Request, { params }: { params: { code: strin
       prisma.dessertOption.findMany({
         where: { isActive: true }
       })
-    ])
+    ]);
 
-    // Process responses for each guest
-    const results = []
-    for (const guest of household.guests) {
-      console.log(`Processing responses for guest: ${guest.name}`)
-      
-      const isAttending = responses[`attending-${guest.id}`]
-      const mealOptionId = responses[`meal-${guest.id}`]
-      const dessertOptionId = responses[`dessert-${guest.id}`]
-      const dietaryNotes = responses[`dietary-${guest.id}`]
+    // Validate child options
+    for (const guest of normalizedGuests) {
+      if (guest.isAttending && guest.isChild) {
+        if (guest.mealChoice) {
+          const selectedMeal = mealOptions.find(m => m.id === guest.mealChoice);
+          if (!selectedMeal?.isChildOption) {
+            return NextResponse.json({ 
+              error: `Invalid meal choice for child guest ${guest.name}. Must select a children's meal option.` 
+            }, { status: 400 });
+          }
+        }
 
-      // Validate meal choice for child guests
-      if (isAttending && guest.isChild && mealOptionId) {
-        const selectedMeal = mealOptions.find(m => m.id === mealOptionId)
-        if (!selectedMeal?.isChildOption) {
-          return NextResponse.json({ 
-            error: `Invalid meal choice for child guest ${guest.name}. Must select a children's meal option.` 
-          }, { status: 400 })
+        if (guest.dessertChoice) {
+          const selectedDessert = dessertOptions.find(d => d.id === guest.dessertChoice);
+          if (!selectedDessert?.isChildOption) {
+            return NextResponse.json({ 
+              error: `Invalid dessert choice for child guest ${guest.name}. Must select a children's dessert option.` 
+            }, { status: 400 });
+          }
         }
       }
+    }
 
-      // Validate dessert choice for child guests
-      if (isAttending && guest.isChild && dessertOptionId) {
-        const selectedDessert = dessertOptions.find(d => d.id === dessertOptionId)
-        if (!selectedDessert?.isChildOption) {
-          return NextResponse.json({ 
-            error: `Invalid dessert choice for child guest ${guest.name}. Must select a children's dessert option.` 
-          }, { status: 400 })
-        }
-      }
-
-      // Update guest preferences
-      const updatedGuest = await prisma.guest.update({
-        where: {
-          id: guest.id,
+    // Update household with normalized and validated guests
+    const updatedHousehold = await prisma.household.update({
+      where: {
+        code: params.code,
+      },
+      data: {
+        guests: {
+          update: normalizedGuests.map((guest: any) => ({
+            where: { id: guest.id },
+            data: {
+              isAttending: guest.isAttending,
+              mealChoice: guest.mealChoice,
+              dessertChoice: guest.dessertChoice,
+              dietaryNotes: guest.dietaryNotes,
+              isChild: guest.isChild,
+              responses: guest.responses
+            },
+          })),
         },
-        data: {
-          isAttending,
-          mealOptionId: isAttending ? mealOptionId : null,
-          dessertOptionId: isAttending ? dessertOptionId : null,
-          dietaryNotes: dietaryNotes || null,
-          // Preserve isChild status
-          isChild: guest.isChild
-        },
-      })
+      },
+      include: {
+        guests: true,
+      },
+    });
 
-      // Log the meal and dessert choices in guest activity
-      if (isAttending) {
-        if (mealOptionId) {
-          const mealChoice = mealOptions.find(m => m.id === mealOptionId)
+    // Log the meal and dessert choices in guest activity
+    for (const guest of normalizedGuests) {
+      if (guest.isAttending) {
+        if (guest.mealChoice) {
+          const mealChoice = mealOptions.find(m => m.id === guest.mealChoice);
           await prisma.guestActivity.create({
             data: {
               guestId: guest.id,
               action: 'UPDATE_MEAL',
-              details: `Selected meal option: ${mealChoice?.name || mealOptionId}`
+              details: `Selected meal option: ${mealChoice?.name || guest.mealChoice}`
             }
-          })
+          });
         }
         
-        if (dessertOptionId) {
-          const dessertChoice = dessertOptions.find(d => d.id === dessertOptionId)
+        if (guest.dessertChoice) {
+          const dessertChoice = dessertOptions.find(d => d.id === guest.dessertChoice);
           await prisma.guestActivity.create({
             data: {
               guestId: guest.id,
               action: 'UPDATE_DESSERT',
-              details: `Selected dessert option: ${dessertChoice?.name || dessertOptionId}`
+              details: `Selected dessert option: ${dessertChoice?.name || guest.dessertChoice}`
             }
-          })
+          });
         }
       }
-
-      results.push(updatedGuest)
     }
 
-    return NextResponse.json({ 
-      success: true,
-      results
-    })
+    return NextResponse.json({ household: updatedHousehold });
   } catch (error) {
     console.error("Error processing RSVP:", error)
     return NextResponse.json({ 
