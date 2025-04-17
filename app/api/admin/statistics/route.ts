@@ -1,96 +1,42 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/db"
+import { StatisticsService } from "@/lib/services/statistics"
 
 export async function GET() {
   try {
-    // Get basic statistics
-    const [
-      totalGuests,
-      respondedGuests,
-      attendingGuests,
-      notAttendingGuests,
-      totalHouseholds,
-      dietaryRequirements
-    ] = await Promise.all([
-      prisma.guest.count(),
-      prisma.guest.count({
-        where: { isAttending: { not: null } }
-      }),
-      prisma.guest.count({
-        where: { isAttending: true }
-      }),
-      prisma.guest.count({
-        where: { isAttending: false }
-      }),
-      prisma.household.count(),
-      prisma.guest.count({
-        where: {
-          NOT: { dietaryNotes: null }
-        }
-      })
-    ]);
+    const statisticsService = StatisticsService.getInstance()
+    const stats = await statisticsService.getStatistics()
 
-    // Get meal choices with counts
-    const mealChoices = await prisma.mealOption.findMany({
-      where: { isActive: true },
-      select: {
-        id: true,
-        name: true,
-        _count: {
-          select: {
-            guests: true
-          }
-        }
-      }
-    }).then(meals => 
-      meals.map(meal => ({
+    if (!stats) {
+      return NextResponse.json(
+        { error: "Failed to fetch statistics" },
+        { status: 500 }
+      )
+    }
+
+    // Transform the stats into the expected format
+    const mealChoices = Object.values(stats.mealStats as any).map(
+      (meal: any) => ({
         name: meal.name,
-        count: meal._count.guests
-      }))
-    );
+        count: meal.count
+      })
+    )
 
-    // Get dessert choices with counts
-    const dessertChoices = await prisma.dessertOption.findMany({
-      where: { isActive: true },
-      select: {
-        id: true,
-        name: true,
-        _count: {
-          select: {
-            guests: true
-          }
-        }
-      }
-    }).then(desserts => 
-      desserts.map(dessert => ({
+    const dessertChoices = Object.values(stats.dessertStats as any).map(
+      (dessert: any) => ({
         name: dessert.name,
-        count: dessert._count.guests
-      }))
-    );
+        count: dessert.count
+      })
+    )
 
-    const responseRate = totalGuests > 0 
-      ? Math.round((respondedGuests / totalGuests) * 100) 
-      : 0;
-
-    console.log("Statistics data:", {
-      totalGuests,
-      respondedGuests,
-      attendingGuests,
-      notAttendingGuests,
-      totalHouseholds,
-      dietaryRequirements,
-      responseRate,
-      mealChoices,
-      dessertChoices
-    });
+    const responseRate = stats.totalGuests > 0 
+      ? Math.round((stats.respondedGuests / stats.totalGuests) * 100) 
+      : 0
 
     return NextResponse.json({
-      totalGuests,
-      respondedGuests,
-      attendingGuests,
-      notAttendingGuests,
-      totalHouseholds,
-      dietaryRequirements,
+      totalGuests: stats.totalGuests,
+      respondedGuests: stats.respondedGuests,
+      attendingGuests: stats.attendingGuests,
+      notAttendingGuests: stats.notAttendingGuests,
       responseRate,
       mealChoices,
       dessertChoices
