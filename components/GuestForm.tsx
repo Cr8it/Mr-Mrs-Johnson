@@ -71,17 +71,33 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
   const [guests, setGuests] = useState<Guest[]>(() => {
     // Debug the raw values coming from the household object
     console.log('RAW GUEST DATA:', JSON.stringify(household.guests, null, 2));
-    console.log('RAW isChild values:', household.guests.map(g => ({ name: g.name, isChild: g.isChild, rawValue: g.isChild })));
     
-    return household.guests.map(guest => ({
-      ...guest,
-      // Force isChild to be a proper boolean with double negation
-      isChild: !!guest.isChild,
-      mealChoice: guest.mealChoice || null,
-      dessertChoice: guest.dessertChoice || null,
-      responses: guest.responses || [],
-      isAttending: guest.isAttending ?? null
-    }));
+    // Log exact values to debug isChild
+    household.guests.forEach(guest => {
+      console.log(`Guest ${guest.name} rawIsChild:`, {
+        value: guest.isChild,
+        type: typeof guest.isChild, 
+        stringified: JSON.stringify(guest.isChild),
+        booleanConversion: !!guest.isChild,
+      });
+    });
+    
+    return household.guests.map(guest => {
+      // Force proper boolean conversion regardless of string or boolean input
+      const isChildValue = typeof guest.isChild === 'string'
+        ? guest.isChild.toLowerCase() === 'true'
+        : Boolean(guest.isChild);
+      
+      return {
+        ...guest,
+        // Use the properly processed boolean value
+        isChild: isChildValue,
+        mealChoice: guest.mealChoice || null,
+        dessertChoice: guest.dessertChoice || null,
+        responses: guest.responses || [],
+        isAttending: guest.isAttending ?? null
+      };
+    });
   });
   
   console.log('GUEST DATA AFTER TRANSFORMATION:');

@@ -53,6 +53,11 @@ export async function POST(request: Request) {
           dietaryNotes: guest.dietaryNotes,
           // We explicitly don't update isChild, as it should already be set correctly in the database
         },
+        // Include relations to get full objects for the email
+        include: {
+          mealChoice: true,
+          dessertChoice: true
+        }
       });
       
       // Log what's being saved

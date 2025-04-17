@@ -102,10 +102,15 @@ export async function POST(request: Request) {
           typeOf: typeof guest.isChild
         });
         
+        // Handle isChild value based on its actual type
+        const isChildValue = typeof guest.isChild === 'string'
+          ? guest.isChild.toLowerCase() === 'true'
+          : Boolean(guest.isChild);
+          
         return {
           ...guest,
-          // Force isChild to be a boolean - might be coming as a string "TRUE" or "FALSE"
-          isChild: guest.isChild === true || guest.isChild === "TRUE" || guest.isChild === "true",
+          // Set isChild to the processed boolean value
+          isChild: isChildValue,
           responses: guest.responses.map(response => ({
             ...response,
             question: {
