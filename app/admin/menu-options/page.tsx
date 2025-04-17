@@ -292,9 +292,15 @@ export default function MenuOptionsPage() {
 			})
 
 			if (!response.ok) throw new Error('Failed to update order')
-			toast.success('Order updated successfully')
+			toast({
+				description: "Order updated successfully",
+				variant: "default"
+			})
 		} catch (err) {
-			toast.error('Failed to update order')
+			toast({
+				description: "Failed to update order",
+				variant: "destructive"
+			})
 			// Revert the changes
 			fetchOptions()
 		}
@@ -318,11 +324,17 @@ export default function MenuOptionsPage() {
 
 			if (!response.ok) throw new Error('Failed to add meal option')
 			
-			toast.success('Meal option added successfully')
+			toast({
+				description: "Meal option added successfully",
+				variant: "default"
+			})
 			setNewMealOption({ name: '', isChildOption: false })
 			fetchOptions()
 		} catch (err) {
-			toast.error('Failed to add meal option')
+			toast({
+				description: "Failed to add meal option",
+				variant: "destructive"
+			})
 		}
 	}
 
@@ -344,11 +356,17 @@ export default function MenuOptionsPage() {
 
 			if (!response.ok) throw new Error('Failed to add dessert option')
 			
-			toast.success('Dessert option added successfully')
+			toast({
+				description: "Dessert option added successfully",
+				variant: "default"
+			})
 			setNewDessertOption({ name: '', isChildOption: false })
 			fetchOptions()
 		} catch (err) {
-			toast.error('Failed to add dessert option')
+			toast({
+				description: "Failed to add dessert option",
+				variant: "destructive"
+			})
 		}
 	}
 
@@ -360,10 +378,16 @@ export default function MenuOptionsPage() {
 
 			if (!response.ok) throw new Error('Failed to remove option')
 			
-			toast.success(`${type === 'meal' ? 'Meal' : 'Dessert'} option removed successfully`)
+			toast({
+				description: `${type === 'meal' ? 'Meal' : 'Dessert'} option removed successfully`,
+				variant: "default"
+			})
 			fetchOptions()
 		} catch (err) {
-			toast.error('Failed to remove option')
+			toast({
+				description: "Failed to remove option",
+				variant: "destructive"
+			})
 		}
 		setDeleteConfirmation({ isOpen: false, optionId: '', optionType: 'meal' })
 	}
