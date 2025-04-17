@@ -320,62 +320,56 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
   };
 
   const handleMealChoice = (guestId: string, meal: string) => {
-    clearFieldError(guestId, 'Meal choice');
-    setGuests(prev => {
-      const updated = prev.map(guest => {
-        if (guest.id !== guestId) return guest;
-        
-        // Get the appropriate options based on whether guest is a child
-        const isChildGuest = (() => {
-          if (typeof guest.isChild === 'string') {
-            return guest.isChild === 'true' || guest.isChild === 'TRUE';
-          }
-          return Boolean(guest.isChild);
-        })();
-        
-        const relevantOptions = isChildGuest ? childMealOptions : mealOptions;
-        const selectedOption = relevantOptions.find(opt => opt.id === meal);
-        
-        return { 
-          ...guest, 
-          mealChoice: { 
-            id: meal,
-            name: selectedOption?.name || 'Unknown Option'
-          } 
-        };
+    setGuests(prevGuests => {
+      return prevGuests.map(g => {
+        if (g.id === guestId) {
+          // Find the meal option from the appropriate list based on isChild
+          const isChildGuest = Boolean(g.isChild);
+          const availableOptions = isChildGuest ? childMealOptions : mealOptions;
+          const selectedMeal = availableOptions.find(m => m.id === meal);
+          
+          console.log('Meal choice for guest:', {
+            guestId,
+            guestName: g.name,
+            isChild: isChildGuest,
+            selectedMeal,
+            availableOptions
+          });
+
+          return {
+            ...g,
+            mealChoice: selectedMeal || null
+          };
+        }
+        return g;
       });
-      saveToLocalStorage(updated);
-      return updated;
     });
   };
 
   const handleDessertChoice = (guestId: string, dessert: string) => {
-    clearFieldError(guestId, 'Dessert choice');
-    setGuests(prev => {
-      const updated = prev.map(guest => {
-        if (guest.id !== guestId) return guest;
-        
-        // Get the appropriate options based on whether guest is a child
-        const isChildGuest = (() => {
-          if (typeof guest.isChild === 'string') {
-            return guest.isChild === 'true' || guest.isChild === 'TRUE';
-          }
-          return Boolean(guest.isChild);
-        })();
-        
-        const relevantOptions = isChildGuest ? childDessertOptions : dessertOptions;
-        const selectedOption = relevantOptions.find(opt => opt.id === dessert);
-        
-        return { 
-          ...guest, 
-          dessertChoice: { 
-            id: dessert,
-            name: selectedOption?.name || 'Unknown Option'
-          } 
-        };
+    setGuests(prevGuests => {
+      return prevGuests.map(g => {
+        if (g.id === guestId) {
+          // Find the dessert option from the appropriate list based on isChild
+          const isChildGuest = Boolean(g.isChild);
+          const availableOptions = isChildGuest ? childDessertOptions : dessertOptions;
+          const selectedDessert = availableOptions.find(d => d.id === dessert);
+          
+          console.log('Dessert choice for guest:', {
+            guestId,
+            guestName: g.name,
+            isChild: isChildGuest,
+            selectedDessert,
+            availableOptions
+          });
+
+          return {
+            ...g,
+            dessertChoice: selectedDessert || null
+          };
+        }
+        return g;
       });
-      saveToLocalStorage(updated);
-      return updated;
     });
   };
 
@@ -559,177 +553,134 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
-          {guests.map((guest) => (
-            <MotionDiv
-              key={guest.id}
-                className="p-6 bg-black/30 rounded-lg border border-white/20 space-y-6"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
+          {guests.map((guest) => {
+            const isChildGuest = Boolean(guest.isChild);
+            const availableMealOptions = isChildGuest ? childMealOptions : mealOptions;
+            const availableDessertOptions = isChildGuest ? childDessertOptions : dessertOptions;
+
+            console.log('Rendering options for guest:', {
+              name: guest.name,
+              isChild: isChildGuest,
+              mealOptions: availableMealOptions.length,
+              dessertOptions: availableDessertOptions.length
+            });
+
+            return (
+              <MotionDiv
+                key={guest.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
+                className="bg-white/5 backdrop-blur-sm rounded-lg p-6 space-y-4"
+              >
+                <h3 className="text-xl font-semibold">{guest.name}</h3>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Will you be attending?</label>
+                    <div className="flex gap-4">
+                      <button
+                        type="button"
+                        onClick={() => handleAttendanceChange(guest.id, true)}
+                        className={`px-4 py-2 rounded-lg transition-colors ${
+                          guest.isAttending === true
+                            ? 'bg-gold text-black'
+                            : 'bg-white/10 hover:bg-white/20'
+                        }`}
+                      >
+                        Yes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAttendanceChange(guest.id, false)}
+                        className={`px-4 py-2 rounded-lg transition-colors ${
+                          guest.isAttending === false
+                            ? 'bg-gold text-black'
+                            : 'bg-white/10 hover:bg-white/20'
+                        }`}
+                      >
+                        No
+                      </button>
+                    </div>
+                  </div>
+
+                  {guest.isAttending && (
+                    <>
+                      {availableMealOptions.length > 0 && (
+                        <div>
+                          <label className="block text-sm font-medium mb-2">
+                            Meal Choice
+                          </label>
+                          <select
+                            value={guest.mealChoice?.id || ''}
+                            onChange={(e) => handleMealChoice(guest.id, e.target.value)}
+                            className="w-full bg-white/10 rounded-lg px-4 py-2 text-white"
+                          >
+                            <option value="">Select a meal</option>
+                            {availableMealOptions.map((option) => (
+                              <option key={option.id} value={option.id}>
+                                {option.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {availableDessertOptions.length > 0 && (
+                        <div>
+                          <label className="block text-sm font-medium mb-2">
+                            Dessert Choice
+                          </label>
+                          <select
+                            value={guest.dessertChoice?.id || ''}
+                            onChange={(e) => handleDessertChoice(guest.id, e.target.value)}
+                            className="w-full bg-white/10 rounded-lg px-4 py-2 text-white"
+                          >
+                            <option value="">Select a dessert</option>
+                            {availableDessertOptions.map((option) => (
+                              <option key={option.id} value={option.id}>
+                                {option.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Dietary Requirements
+                        </label>
+                        <textarea
+                          value={guest.dietaryNotes || ''}
+                          onChange={(e) => handleDietaryNotes(guest.id, e.target.value)}
+                          className="w-full bg-white/10 rounded-lg px-4 py-2 text-white"
+                          rows={3}
+                          placeholder="Any allergies or dietary requirements?"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              </MotionDiv>
+            );
+          })}
+
+          <div className="flex justify-between pt-6">
+            <button
+              type="button"
+              onClick={handleBack}
+              className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
             >
-            <div className="flex items-center justify-between space-x-8">
-              <h3 className="text-xl font-semibold text-white">{guest.name}</h3>
-              <div className="flex items-center space-x-8">
-              <span className={`text-sm transition-colors ${guest.isAttending === false ? 'text-white font-medium' : 'text-gray-400'}`}>
-                Not Attending
-              </span>
-              <div className="flex items-center">
-                <Switch
-                checked={guest.isAttending === true}
-                onCheckedChange={(checked) => handleAttendanceChange(guest.id, checked)}
-                />
-              </div>
-              <span className={`text-sm transition-colors ${guest.isAttending === true ? 'text-white font-medium' : 'text-gray-400'}`}>
-                Attending
-              </span>
-              </div>
-            </div>
-
-            <AnimatePresence>
-            {guest.isAttending && (
-                <MotionDiv
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="space-y-6"
-                >
-                <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Meal Preference <span className="text-red-500">*</span>
-                    </label>
-                    <Select
-                    value={guest.mealChoice?.id || ""}
-                    onValueChange={(value) => handleMealChoice(guest.id, value)}
-                    >
-                    <SelectTrigger 
-                      className={`bg-transparent border-white border-opacity-20 text-white h-12 ${
-                      validationErrors[guest.id]?.includes('Meal choice is required') 
-                        ? 'border-red-500' 
-                        : ''
-                      }`}
-                    >
-                      <SelectValue placeholder="Select your meal (Required)" />
-                    </SelectTrigger>
-                    {validationErrors[guest.id]?.includes('Meal choice is required') && (
-                      <p className="text-red-500 text-sm mt-1">Please select a meal option</p>
-                    )}
-                  <SelectContent className="bg-black border border-white border-opacity-20 text-white" sideOffset={5}>
-                    {(() => {
-                      // More detailed debugging
-                      const isChildGuest = (() => {
-                        if (typeof guest.isChild === 'string') {
-                          return guest.isChild === 'true' || guest.isChild === 'TRUE';
-                        }
-                        return Boolean(guest.isChild);
-                      })();
-                      
-                      console.log(`Rendering meal options for ${guest.name}:`);
-                      console.log(`  isChild=${isChildGuest} (${typeof guest.isChild})`);
-                      console.log(`  Regular meal options count: ${mealOptions.length}`);
-                      console.log(`  Child meal options count: ${childMealOptions.length}`);
-                      
-                      const optionsToShow = isChildGuest ? childMealOptions : mealOptions;
-                      console.log(`  Options being shown:`, optionsToShow.map(o => o.name));
-                      
-                      if (optionsToShow.length === 0) {
-                        console.warn(`  WARNING: No meal options available for ${isChildGuest ? 'child' : 'adult'} guest!`);
-                        return <div className="p-2 text-red-500">No options available</div>;
-                      }
-                      
-                      return optionsToShow.map((option) => (
-                        <SelectItem
-                          key={option.id}
-                          value={option.id}
-                          className="text-white hover:bg-white/10 cursor-pointer"
-                        >
-                          {option.name}
-                        </SelectItem>
-                      ));
-                    })()}
-                  </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Dessert Choice <span className="text-red-500">*</span>
-                    </label>
-                    <Select
-                    value={guest.dessertChoice?.id || ""}
-                    onValueChange={(value) => handleDessertChoice(guest.id, value)}
-                    >
-                    <SelectTrigger 
-                      className={`bg-transparent border-white border-opacity-20 text-white h-12 ${
-                      validationErrors[guest.id]?.includes('Dessert choice is required') 
-                        ? 'border-red-500' 
-                        : ''
-                      }`}
-                    >
-                      <SelectValue placeholder="Select your dessert (Required)" />
-                    </SelectTrigger>
-                    {validationErrors[guest.id]?.includes('Dessert choice is required') && (
-                      <p className="text-red-500 text-sm mt-1">Please select a dessert option</p>
-                    )}
-                  <SelectContent className="bg-black border border-white border-opacity-20 text-white" sideOffset={5}>
-                    {(() => {
-                      // More detailed debugging
-                      const isChildGuest = (() => {
-                        if (typeof guest.isChild === 'string') {
-                          return guest.isChild === 'true' || guest.isChild === 'TRUE';
-                        }
-                        return Boolean(guest.isChild);
-                      })();
-                      
-                      console.log(`Rendering dessert options for ${guest.name}:`);
-                      console.log(`  isChild=${isChildGuest} (${typeof guest.isChild})`);
-                      console.log(`  Regular dessert options count: ${dessertOptions.length}`);
-                      console.log(`  Child dessert options count: ${childDessertOptions.length}`);
-                      
-                      const optionsToShow = isChildGuest ? childDessertOptions : dessertOptions;
-                      console.log(`  Options being shown:`, optionsToShow.map(o => o.name));
-                      
-                      if (optionsToShow.length === 0) {
-                        console.warn(`  WARNING: No dessert options available for ${isChildGuest ? 'child' : 'adult'} guest!`);
-                        return <div className="p-2 text-red-500">No options available</div>;
-                      }
-                      
-                      return optionsToShow.map((option) => (
-                        <SelectItem
-                          key={option.id}
-                          value={option.id}
-                          className="text-white hover:bg-white/10 cursor-pointer"
-                        >
-                          {option.name}
-                        </SelectItem>
-                      ));
-                    })()}
-                  </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Dietary Notes
-                    </label>
-                    <Textarea
-                    value={guest.dietaryNotes || ''}
-                    onChange={(e) => handleDietaryNotes(guest.id, e.target.value)}
-                    />
-                </div>
-                </MotionDiv>
-            )}
-            </AnimatePresence>
-            </MotionDiv>
-          ))}
-
-          <Button 
-            type="submit" 
-            className="w-full bg-white text-black hover:bg-gray-200" 
-            disabled={loading}
-          >
-            {loading ? "Submitting..." : "Submit RSVP"}
-          </Button>
+              Back
+            </button>
+            <button
+              type="submit"
+              className="w-32 px-6 py-2 bg-white text-black hover:bg-gray-200 rounded-lg transition-colors"
+              disabled={loading}
+            >
+              {loading ? "Submitting..." : "Submit RSVP"}
+            </button>
+          </div>
         </form>
         </div>
     </MotionDiv>
