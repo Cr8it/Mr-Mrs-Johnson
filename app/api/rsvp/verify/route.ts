@@ -102,10 +102,15 @@ export async function POST(request: Request) {
           typeOf: typeof guest.isChild
         });
         
-        // Handle isChild value based on its actual type
-        const isChildValue = typeof guest.isChild === 'string'
-          ? guest.isChild.toLowerCase() === 'true'
-          : Boolean(guest.isChild);
+        // Handle isChild value based on its actual type - without using string methods
+        const rawValue = guest.isChild;
+        // Use safe conversion that works regardless of type
+        const isChildValue = (() => {
+          if (typeof rawValue === 'string') {
+            return rawValue === 'true' || rawValue === 'TRUE';
+          }
+          return Boolean(rawValue);
+        })();
           
         return {
           ...guest,

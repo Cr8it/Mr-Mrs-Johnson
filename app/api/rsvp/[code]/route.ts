@@ -47,12 +47,17 @@ export async function GET(
     const transformedHousehold = {
       ...household,
       guests: household.guests.map(guest => {
-        // Force isChild to be a proper boolean value - handle it based on its actual type
-        const isChildValue = typeof guest.isChild === 'string' 
-          ? guest.isChild.toLowerCase() === 'true'
-          : Boolean(guest.isChild);
-          
-        console.log(`Transforming guest ${guest.name}: raw isChild=${guest.isChild} → transformed=${isChildValue}`);
+        // Force isChild to be a proper boolean value without using string methods
+        const rawValue = guest.isChild;
+        // Use safe conversion that works regardless of type
+        const isChildValue = (() => {
+          if (typeof rawValue === 'string') {
+            return rawValue === 'true' || rawValue === 'TRUE';
+          }
+          return Boolean(rawValue);
+        })();
+        
+        console.log(`Transforming guest ${guest.name}: raw isChild=${rawValue} → transformed=${isChildValue}`);
         
         return {
           ...guest,

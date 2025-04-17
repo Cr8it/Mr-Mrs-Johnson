@@ -83,10 +83,13 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
     });
     
     return household.guests.map(guest => {
-      // Force proper boolean conversion regardless of string or boolean input
-      const isChildValue = typeof guest.isChild === 'string'
-        ? guest.isChild.toLowerCase() === 'true'
-        : Boolean(guest.isChild);
+      // Safely convert isChild to boolean regardless of input type
+      const isChildValue = (() => {
+        if (typeof guest.isChild === 'string') {
+          return guest.isChild === 'true' || guest.isChild === 'TRUE';
+        }
+        return Boolean(guest.isChild);
+      })();
       
       return {
         ...guest,
