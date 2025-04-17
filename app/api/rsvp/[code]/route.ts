@@ -109,11 +109,30 @@ export async function POST(
   try {
     const household = await request.json();
     
-    // Normalize guest data
-    const normalizedGuests = household.guests.map((guest: any) => ({
-      ...guest,
-      isChild: guest.isChild === true
-    }));
+    // Normalize guest data before saving
+    const normalizedGuests = household.guests.map((guest: any) => {
+      // More robust boolean conversion for isChild
+      const rawValue = guest.isChild;
+      const isChildValue = (() => {
+        if (typeof rawValue === 'string') {
+          // Assert rawValue as string to satisfy TypeScript
+          const strValue = rawValue as string; 
+          // Handle common string representations of true
+          return strValue.toLowerCase() === 'true' || strValue === '1' || strValue.toLowerCase() === 'yes' || strValue.toLowerCase() === 'y';
+        }
+        // Handle numeric representations (1 is true, 0 is false)
+        if (typeof rawValue === 'number') {
+          return rawValue === 1;
+        }
+        // Default to standard boolean conversion for other types (including actual booleans)
+        return Boolean(rawValue);
+      })();
+      
+      return {
+        ...guest,
+        isChild: isChildValue
+      };
+    });
 
     // Fetch all meal and dessert options for validation
     const [mealOptions, dessertOptions] = await Promise.all([
