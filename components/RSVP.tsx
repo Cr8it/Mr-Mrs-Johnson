@@ -112,19 +112,16 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
           // Store the code for later use
           localStorage.setItem('rsvp-code', data.household.code)
           
-          // Check for saved form data
+          // Clear any old saved form data to ensure we get fresh data
           const storageKey = `rsvp-${data.household.code}`;
-          const savedData = localStorage.getItem(storageKey);
-          if (savedData) {
-            const parsedData = JSON.parse(savedData);
-            setHousehold({
-            ...data.household,
-            guests: parsedData.guests || data.household.guests,
-            questions: parsedData.questions || data.household.questions
-            });
-          } else {
-            setHousehold(data.household);
-          }
+          localStorage.removeItem(storageKey);
+          
+          console.log("API search data for guests:", data.household.guests.map(g => 
+            ({ name: g.name, isChild: g.isChild, typeOfIsChild: typeof g.isChild }))
+          );
+          
+          // Use fresh data from the server
+          setHousehold(data.household);
           setShowForm(true); // Show the form
           toast({
             title: "Welcome back!",
@@ -181,22 +178,16 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
       if (verifyResponse.ok) {
         const verifyData = await verifyResponse.json();
         
-        // Check for saved form data
+        // Clear any previous saved data for this household to get fresh data
         const storageKey = `rsvp-${householdCode}`;
-        const savedData = localStorage.getItem(storageKey);
+        localStorage.removeItem(storageKey);
         
-        if (savedData) {
-          const parsedData = JSON.parse(savedData);
-          // Merge saved data with fetched data
-          setHousehold({
-            ...verifyData.household,
-            guests: parsedData.guests || verifyData.household.guests,
-            questions: parsedData.questions || verifyData.household.questions
-          });
-        } else {
-          setHousehold(verifyData.household);
-        }
+        console.log("API data for guests:", verifyData.household.guests.map(g => 
+          ({ name: g.name, isChild: g.isChild, typeOfIsChild: typeof g.isChild }))
+        );
         
+        // Use the server's data directly instead of potentially stale localStorage data
+        setHousehold(verifyData.household);
         setShowForm(true);
         setShowSuccess(false);
         return true;

@@ -329,13 +329,26 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
         
         // Get the appropriate options based on whether guest is a child
         const isChildGuest = (() => {
+          console.log(`DEBUG ${guest.name}: Raw isChild=${JSON.stringify(guest.isChild)}, type=${typeof guest.isChild}`);
           if (typeof guest.isChild === 'string') {
-            return guest.isChild === 'true' || guest.isChild === 'TRUE';
+            const result = guest.isChild === 'true' || guest.isChild === 'TRUE';
+            console.log(`  String check: ${guest.isChild} → ${result}`);
+            return result;
+          } else if (typeof guest.isChild === 'boolean') {
+            console.log(`  Boolean check: ${guest.isChild}`);
+            return guest.isChild;
+          } else if (typeof guest.isChild === 'number') {
+            const result = guest.isChild === 1;
+            console.log(`  Number check: ${guest.isChild} → ${result}`);
+            return result;
           }
-          return Boolean(guest.isChild);
+          const result = Boolean(guest.isChild);
+          console.log(`  Default check: ${guest.isChild} → ${result}`);
+          return result;
         })();
         
         const relevantOptions = isChildGuest ? childMealOptions : mealOptions;
+        console.log(`Using ${isChildGuest ? 'child' : 'adult'} meal options for ${guest.name}`);
         const selectedOption = relevantOptions.find(opt => opt.id === meal);
         
         return { 
@@ -359,13 +372,26 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
         
         // Get the appropriate options based on whether guest is a child
         const isChildGuest = (() => {
+          console.log(`DEBUG ${guest.name}: Raw isChild=${JSON.stringify(guest.isChild)}, type=${typeof guest.isChild}`);
           if (typeof guest.isChild === 'string') {
-            return guest.isChild === 'true' || guest.isChild === 'TRUE';
+            const result = guest.isChild === 'true' || guest.isChild === 'TRUE';
+            console.log(`  String check: ${guest.isChild} → ${result}`);
+            return result;
+          } else if (typeof guest.isChild === 'boolean') {
+            console.log(`  Boolean check: ${guest.isChild}`);
+            return guest.isChild;
+          } else if (typeof guest.isChild === 'number') {
+            const result = guest.isChild === 1;
+            console.log(`  Number check: ${guest.isChild} → ${result}`);
+            return result;
           }
-          return Boolean(guest.isChild);
+          const result = Boolean(guest.isChild);
+          console.log(`  Default check: ${guest.isChild} → ${result}`);
+          return result;
         })();
         
         const relevantOptions = isChildGuest ? childDessertOptions : dessertOptions;
+        console.log(`Using ${isChildGuest ? 'child' : 'adult'} dessert options for ${guest.name}`);
         const selectedOption = relevantOptions.find(opt => opt.id === dessert);
         
         return { 
@@ -615,14 +641,27 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                     {(() => {
                       // More detailed debugging
                       const isChildGuest = (() => {
+                        console.log(`DEBUG ${guest.name}: Raw isChild=${JSON.stringify(guest.isChild)}, type=${typeof guest.isChild}`);
                         if (typeof guest.isChild === 'string') {
-                          return guest.isChild === 'true' || guest.isChild === 'TRUE';
+                          const result = guest.isChild === 'true' || guest.isChild === 'TRUE';
+                          console.log(`  String check: ${guest.isChild} → ${result}`);
+                          return result;
+                        } else if (typeof guest.isChild === 'boolean') {
+                          console.log(`  Boolean check: ${guest.isChild}`);
+                          return guest.isChild;
+                        } else if (typeof guest.isChild === 'number') {
+                          const result = guest.isChild === 1;
+                          console.log(`  Number check: ${guest.isChild} → ${result}`);
+                          return result;
                         }
-                        return Boolean(guest.isChild);
+                        const result = Boolean(guest.isChild);
+                        console.log(`  Default check: ${guest.isChild} → ${result}`);
+                        return result;
                       })();
                       
                       console.log(`Rendering meal options for ${guest.name}:`);
                       console.log(`  isChild=${isChildGuest} (${typeof guest.isChild})`);
+                      console.log(`  Raw isChild value: ${JSON.stringify(guest.isChild)}`);
                       console.log(`  Regular meal options count: ${mealOptions.length}`);
                       console.log(`  Child meal options count: ${childMealOptions.length}`);
                       
@@ -672,14 +711,27 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                     {(() => {
                       // More detailed debugging
                       const isChildGuest = (() => {
+                        console.log(`DEBUG ${guest.name}: Raw isChild=${JSON.stringify(guest.isChild)}, type=${typeof guest.isChild}`);
                         if (typeof guest.isChild === 'string') {
-                          return guest.isChild === 'true' || guest.isChild === 'TRUE';
+                          const result = guest.isChild === 'true' || guest.isChild === 'TRUE';
+                          console.log(`  String check: ${guest.isChild} → ${result}`);
+                          return result;
+                        } else if (typeof guest.isChild === 'boolean') {
+                          console.log(`  Boolean check: ${guest.isChild}`);
+                          return guest.isChild;
+                        } else if (typeof guest.isChild === 'number') {
+                          const result = guest.isChild === 1;
+                          console.log(`  Number check: ${guest.isChild} → ${result}`);
+                          return result;
                         }
-                        return Boolean(guest.isChild);
+                        const result = Boolean(guest.isChild);
+                        console.log(`  Default check: ${guest.isChild} → ${result}`);
+                        return result;
                       })();
                       
                       console.log(`Rendering dessert options for ${guest.name}:`);
                       console.log(`  isChild=${isChildGuest} (${typeof guest.isChild})`);
+                      console.log(`  Raw isChild value: ${JSON.stringify(guest.isChild)}`);
                       console.log(`  Regular dessert options count: ${dessertOptions.length}`);
                       console.log(`  Child dessert options count: ${childDessertOptions.length}`);
                       
