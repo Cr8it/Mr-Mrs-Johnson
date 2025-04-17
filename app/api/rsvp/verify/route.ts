@@ -96,8 +96,20 @@ export async function POST(request: Request) {
     const transformedHousehold = {
       ...household,
       guests: household.guests.map(guest => {
-        // Force boolean conversion for isChild
-        const isChildValue = guest.isChild === true;
+        // More robust boolean conversion for isChild
+        const rawValue = guest.isChild;
+        const isChildValue = (() => {
+          if (typeof rawValue === 'string') {
+            // Handle common string representations of true
+            return rawValue.toLowerCase() === 'true' || rawValue === '1' || rawValue.toLowerCase() === 'yes' || rawValue.toLowerCase() === 'y';
+          }
+          // Handle numeric representations (1 is true, 0 is false)
+          if (typeof rawValue === 'number') {
+            return rawValue === 1;
+          }
+          // Default to standard boolean conversion for other types (including actual booleans)
+          return Boolean(rawValue);
+        })();
 
         return {
           ...guest,
