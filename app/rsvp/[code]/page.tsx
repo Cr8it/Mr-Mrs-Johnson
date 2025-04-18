@@ -59,8 +59,18 @@ export default function RSVPForm() {
         setError(null)
 
         const [householdResponse, optionsResponse] = await Promise.all([
-          fetch(`/api/rsvp/${params.code}`),
-          fetch('/api/rsvp/options')
+          fetch(`/api/rsvp/${params.code}`, {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate'
+            }
+          }),
+          fetch('/api/rsvp/options', {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate'
+            }
+          })
         ])
         
         if (!householdResponse.ok) {
@@ -163,7 +173,9 @@ export default function RSVPForm() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
         },
+        cache: 'no-store',
         body: JSON.stringify({ responses }),
       })
 

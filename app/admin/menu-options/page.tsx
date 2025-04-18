@@ -137,8 +137,18 @@ export default function MenuOptionsPage() {
 	const fetchOptions = async () => {
 		try {
 			const [mealResponse, dessertResponse] = await Promise.all([
-				fetch('/api/admin/meal-options'),
-				fetch('/api/admin/dessert-options')
+				fetch('/api/admin/meal-options', {
+					cache: 'no-store',
+					headers: {
+						'Cache-Control': 'no-cache, no-store, must-revalidate'
+					}
+				}),
+				fetch('/api/admin/dessert-options', {
+					cache: 'no-store',
+					headers: {
+						'Cache-Control': 'no-cache, no-store, must-revalidate'
+					}
+				})
 			])
 
 			if (mealResponse.ok) {
@@ -227,7 +237,9 @@ export default function MenuOptionsPage() {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
+					'Cache-Control': 'no-cache, no-store, must-revalidate'
 				},
+				cache: 'no-store',
 				body: JSON.stringify({
 					name: newMealOption.trim(),
 					isChildOption: isChildOption
@@ -284,7 +296,9 @@ export default function MenuOptionsPage() {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
+					'Cache-Control': 'no-cache, no-store, must-revalidate'
 				},
+				cache: 'no-store',
 				body: JSON.stringify({
 					name: newDessertOption.trim(),
 					isChildOption: isChildOption
@@ -321,6 +335,10 @@ export default function MenuOptionsPage() {
 		try {
 			const response = await fetch(`/api/admin/${type}-options/${id}`, {
 				method: 'DELETE',
+				cache: 'no-store',
+				headers: {
+					'Cache-Control': 'no-cache, no-store, must-revalidate'
+				}
 			})
 
 			if (response.ok) {

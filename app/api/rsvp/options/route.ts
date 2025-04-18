@@ -50,6 +50,10 @@ export async function GET() {
 			childMealOptions: childMealOptions,
 			dessertOptions: regularDessertOptions,
 			childDessertOptions: childDessertOptions
+		}, {
+			headers: {
+				'Cache-Control': 'no-store, max-age=0, must-revalidate'
+			}
 		})
 	} catch (error) {
 		console.error("GET options error:", error)

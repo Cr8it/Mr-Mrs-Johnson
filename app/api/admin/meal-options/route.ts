@@ -12,11 +12,19 @@ export async function GET() {
 		
 		if (!options || options.length === 0) {
 			console.log("No meal options found")
-			return NextResponse.json({ options: [] })
+			return NextResponse.json({ options: [] }, {
+				headers: {
+					'Cache-Control': 'no-store, max-age=0, must-revalidate'
+				}
+			})
 		}
 
 		console.log("Found meal options:", options)
-		return NextResponse.json({ options })
+		return NextResponse.json({ options }, {
+			headers: {
+				'Cache-Control': 'no-store, max-age=0, must-revalidate'
+			}
+		})
 	} catch (error) {
 		console.error("GET meal options error:", error)
 		return NextResponse.json(
@@ -33,7 +41,10 @@ export async function POST(request: Request) {
 		if (!data.name || typeof data.name !== 'string' || !data.name.trim()) {
 			return new Response(JSON.stringify({ error: 'Name is required' }), {
 				status: 400,
-				headers: { 'Content-Type': 'application/json' }
+				headers: { 
+					'Content-Type': 'application/json',
+					'Cache-Control': 'no-store, max-age=0, must-revalidate'
+				}
 			})
 		}
 
@@ -57,13 +68,18 @@ export async function POST(request: Request) {
 
 		return new Response(JSON.stringify({ option }), {
 			status: 201,
-			headers: { 'Content-Type': 'application/json' }
+			headers: { 
+				'Content-Type': 'application/json',
+				'Cache-Control': 'no-store, max-age=0, must-revalidate'
+			}
 		})
 	} catch (error) {
 		console.error('Error creating meal option:', error)
 		return new Response(JSON.stringify({ error: 'Failed to create meal option' }), {
 			status: 500,
-			headers: { 'Content-Type': 'application/json' }
+			headers: { 
+				'Content-Type': 'application/json'
+			}
 		})
 	}
 }

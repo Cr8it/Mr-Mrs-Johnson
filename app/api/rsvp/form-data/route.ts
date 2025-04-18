@@ -91,6 +91,10 @@ export async function GET() {
 			dessertOptions: regularDessertOptions,
 			childDessertOptions: childDessertOptions,
 			questions: transformedQuestions
+		}, {
+			headers: {
+				'Cache-Control': 'no-store, max-age=0, must-revalidate'
+			}
 		})
 	} catch (error) {
 		console.error("GET form data error:", error)
