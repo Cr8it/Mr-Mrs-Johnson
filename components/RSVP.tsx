@@ -178,6 +178,9 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
       if (verifyResponse.ok) {
         const verifyData = await verifyResponse.json();
         
+        // Examine the raw response data
+        console.log("RAW API RESPONSE:", JSON.stringify(verifyData, null, 2));
+        
         // Clear any previous saved data for this household to get fresh data
         const storageKey = `rsvp-${householdCode}`;
         localStorage.removeItem(storageKey);
@@ -188,6 +191,10 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
         
         // Use the server's data directly instead of potentially stale localStorage data
         setHousehold(verifyData.household);
+        
+        // Log the household after setting to state
+        console.log("HOUSEHOLD AFTER SETTING STATE:", verifyData.household);
+        
         setShowForm(true);
         setShowSuccess(false);
         return true;

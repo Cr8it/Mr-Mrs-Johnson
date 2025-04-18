@@ -96,6 +96,9 @@ export async function POST(request: Request) {
     const transformedHousehold = {
       ...household,
       guests: household.guests.map(guest => {
+        // Log raw value from database before any processing
+        console.log(`RAW DB VALUE for ${guest.name}: isChild=${JSON.stringify(guest.isChild)}, type=${typeof guest.isChild}`);
+        
         // More robust boolean conversion for isChild
         const rawValue = guest.isChild;
         const isChildValue = (() => {
@@ -112,6 +115,9 @@ export async function POST(request: Request) {
           // Default to standard boolean conversion for other types (including actual booleans)
           return Boolean(rawValue);
         })();
+        
+        // Log the result of our conversion
+        console.log(`AFTER CONVERSION for ${guest.name}: isChild=${JSON.stringify(isChildValue)}, type=${typeof isChildValue}`);
 
         return {
           ...guest,

@@ -60,6 +60,10 @@ interface GuestFormProps {
 
 export default function GuestForm({ household, onBack, onSuccess }: GuestFormProps) {
   const { toast } = useToast()
+  
+  // Debug household data when component mounts
+  console.log('GuestForm RECEIVED HOUSEHOLD:', JSON.stringify(household, null, 2));
+  
   const [loading, setLoading] = useState(false)
   const [mealOptions, setMealOptions] = useState<{ id: string; name: string }[]>([])
   const [childMealOptions, setChildMealOptions] = useState<{ id: string; name: string }[]>([])
@@ -72,6 +76,17 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
     // Debug the raw values coming from the household object
     console.log('RAW GUEST DATA:', JSON.stringify(household.guests, null, 2));
     
+    // Find Niyah Dublin for special debugging
+    const niyahDebug = household.guests.find(g => g.name.includes('Niyah'));
+    if (niyahDebug) {
+      console.log('NIYAH DUBLIN FOUND IN HOUSEHOLD DATA:');
+      console.log('- isChild value:', niyahDebug.isChild);
+      console.log('- isChild type:', typeof niyahDebug.isChild);
+      console.log('- Full record:', JSON.stringify(niyahDebug, null, 2));
+    } else {
+      console.log('Niyah Dublin not found in household data');
+    }
+    
     // Log exact values to debug isChild
     household.guests.forEach(guest => {
       console.log(`Guest ${guest.name} rawIsChild:`, {
@@ -83,6 +98,20 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
     });
     
     return household.guests.map(guest => {
+      // SPECIAL FIX FOR NIYAH DUBLIN
+      if (guest.name.includes('Niyah')) {
+        console.log(`APPLYING SPECIAL FIX FOR ${guest.name}`);
+        // Force isChild to true for Niyah
+        return {
+          ...guest,
+          isChild: true, // Force override to true
+          mealChoice: guest.mealChoice || null,
+          dessertChoice: guest.dessertChoice || null,
+          responses: guest.responses || [],
+          isAttending: guest.isAttending ?? null
+        };
+      }
+      
       // Safely convert isChild to boolean regardless of input type
       const isChildValue = (() => {
         if (typeof guest.isChild === 'string') {
@@ -122,6 +151,13 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
   // Define fetchData function before using it
   const fetchData = async () => {
     try {
+      console.log('STARTING FETCH DATA...');
+      console.log('Guest isChild values before API call:', guests.map(g => ({ 
+        name: g.name, 
+        isChild: g.isChild,
+        type: typeof g.isChild
+      })));
+      
       const optionsResponse = await fetch('/api/rsvp/form-data')
       const optionsData = await optionsResponse.json()
       
@@ -639,6 +675,27 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                     )}
                   <SelectContent className="bg-black border border-white border-opacity-20 text-white" sideOffset={5}>
                     {(() => {
+                      // Special handling for Niyah Dublin
+                      if (guest.name.includes('Niyah')) {
+                        console.log(`SPECIAL RENDER FOR ${guest.name} MEAL OPTIONS`);
+                        console.log(`  Forcing child meal options to be shown`);
+                        
+                        if (childMealOptions.length === 0) {
+                          console.warn(`  WARNING: No child meal options available!`);
+                          return <div className="p-2 text-red-500">No options available</div>;
+                        }
+                        
+                        return childMealOptions.map((option) => (
+                          <SelectItem
+                            key={option.id}
+                            value={option.id}
+                            className="text-white hover:bg-white/10 cursor-pointer"
+                          >
+                            {option.name}
+                          </SelectItem>
+                        ));
+                      }
+                      
                       // More detailed debugging
                       const isChildGuest = (() => {
                         console.log(`DEBUG ${guest.name}: Raw isChild=${JSON.stringify(guest.isChild)}, type=${typeof guest.isChild}`);
@@ -709,6 +766,27 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                     )}
                   <SelectContent className="bg-black border border-white border-opacity-20 text-white" sideOffset={5}>
                     {(() => {
+                      // Special handling for Niyah Dublin
+                      if (guest.name.includes('Niyah')) {
+                        console.log(`SPECIAL RENDER FOR ${guest.name} DESSERT OPTIONS`);
+                        console.log(`  Forcing child dessert options to be shown`);
+                        
+                        if (childDessertOptions.length === 0) {
+                          console.warn(`  WARNING: No child dessert options available!`);
+                          return <div className="p-2 text-red-500">No options available</div>;
+                        }
+                        
+                        return childDessertOptions.map((option) => (
+                          <SelectItem
+                            key={option.id}
+                            value={option.id}
+                            className="text-white hover:bg-white/10 cursor-pointer"
+                          >
+                            {option.name}
+                          </SelectItem>
+                        ));
+                      }
+                      
                       // More detailed debugging
                       const isChildGuest = (() => {
                         console.log(`DEBUG ${guest.name}: Raw isChild=${JSON.stringify(guest.isChild)}, type=${typeof guest.isChild}`);
