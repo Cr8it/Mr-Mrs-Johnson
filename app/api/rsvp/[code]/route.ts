@@ -47,17 +47,21 @@ export async function GET(
     const transformedHousehold = {
       ...household,
       guests: household.guests.map(guest => {
-        // Force isChild to be a proper boolean value without using string methods
-        const rawValue = guest.isChild;
-        // Use safe conversion that works regardless of type
-        const isChildValue = (() => {
-          if (typeof rawValue === 'string') {
-            return rawValue === 'true' || rawValue === 'TRUE';
-          }
-          return Boolean(rawValue);
-        })();
+        // Force isChild to be a proper boolean value consistently
+        let isChildValue;
         
-        console.log(`Transforming guest ${guest.name}: raw isChild=${rawValue} → transformed=${isChildValue}`);
+        if (typeof guest.isChild === 'string') {
+          // Convert string 'true'/'false' to boolean
+          isChildValue = guest.isChild.toLowerCase() === 'true';
+        } else if (typeof guest.isChild === 'number') {
+          // Convert numeric 1/0 to boolean
+          isChildValue = guest.isChild === 1;
+        } else {
+          // For other types, use standard Boolean conversion
+          isChildValue = Boolean(guest.isChild);
+        }
+        
+        console.log(`Transforming guest ${guest.name}: raw isChild=${guest.isChild} (${typeof guest.isChild}) → normalized=${isChildValue} (${typeof isChildValue})`);
         
         return {
           ...guest,
@@ -112,21 +116,20 @@ export async function POST(
     // Normalize guest data before saving
     const normalizedGuests = household.guests.map((guest: any) => {
       // More robust boolean conversion for isChild
-      const rawValue = guest.isChild;
-      const isChildValue = (() => {
-        if (typeof rawValue === 'string') {
-          // Assert rawValue as string to satisfy TypeScript
-          const strValue = rawValue as string; 
-          // Handle common string representations of true
-          return strValue.toLowerCase() === 'true' || strValue === '1' || strValue.toLowerCase() === 'yes' || strValue.toLowerCase() === 'y';
-        }
-        // Handle numeric representations (1 is true, 0 is false)
-        if (typeof rawValue === 'number') {
-          return rawValue === 1;
-        }
-        // Default to standard boolean conversion for other types (including actual booleans)
-        return Boolean(rawValue);
-      })();
+      let isChildValue;
+      
+      if (typeof guest.isChild === 'string') {
+        // Convert string 'true'/'false' to boolean
+        isChildValue = guest.isChild.toLowerCase() === 'true';
+      } else if (typeof guest.isChild === 'number') {
+        // Convert numeric 1/0 to boolean
+        isChildValue = guest.isChild === 1;
+      } else {
+        // For other types, use standard Boolean conversion
+        isChildValue = Boolean(guest.isChild);
+      }
+      
+      console.log(`Normalizing guest ${guest.name}: raw isChild=${guest.isChild} (${typeof guest.isChild}) → normalized=${isChildValue} (${typeof isChildValue})`);
       
       return {
         ...guest,
@@ -146,7 +149,12 @@ export async function POST(
 
     // Validate child options
     for (const guest of normalizedGuests) {
-      if (guest.isAttending && guest.isChild) {
+      const isAttending = guest.isAttending === true;
+      const isChild = guest.isChild === true; // Ensure it's truly boolean true
+      
+      if (isAttending && isChild) {
+        console.log(`Validating child options for ${guest.name} (isChild=${isChild}, type: ${typeof isChild})`);
+        
         if (guest.mealChoice) {
           const selectedMeal = mealOptions.find(m => m.id === guest.mealChoice);
           if (!selectedMeal?.isChildOption) {

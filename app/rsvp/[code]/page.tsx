@@ -94,7 +94,28 @@ export default function RSVPForm() {
           })
         }
 
-        setHousehold(householdData.household)
+        // Normalize isChild property explicitly to ensure it's a true boolean
+        const normalizedGuests = householdData.household.guests.map((guest: Guest) => {
+          // Explicitly normalize isChild as boolean
+          const isChildValue = 
+            typeof guest.isChild === 'string' 
+              ? guest.isChild.toLowerCase() === 'true' 
+              : Boolean(guest.isChild);
+          
+          console.log(`Normalizing guest ${guest.name}: isChild=${guest.isChild} (${typeof guest.isChild}) → ${isChildValue} (${typeof isChildValue})`);
+          
+          return {
+            ...guest,
+            isChild: isChildValue
+          };
+        });
+
+        const normalizedHousehold = {
+          ...householdData.household,
+          guests: normalizedGuests
+        };
+
+        setHousehold(normalizedHousehold)
         setQuestions(householdData.questions)
         setMealOptions(optionsData.mealOptions || [])
         setChildMealOptions(optionsData.childMealOptions || [])
@@ -145,8 +166,10 @@ export default function RSVPForm() {
             errors.push(`Please select a dessert for ${guest.name}`)
           }
           
-          // Validate child options
-          if (guest.isChild) {
+          // Validate child options - normalize isChild to Boolean for consistency
+          const isChild = Boolean(guest.isChild);
+          if (isChild) {
+            console.log(`Validating child options for ${guest.name} (isChild=${isChild})`);
             const selectedMeal = childMealOptions.find(o => o.id === mealChoice)
             const selectedDessert = childDessertOptions.find(o => o.id === dessertChoice)
             
@@ -212,6 +235,21 @@ export default function RSVPForm() {
     router.push('/')
   }
 
+  // Debug logging for guest isChild status
+  const showMealOptions = (guest) => {
+    // Convert to boolean explicitly to ensure consistent behavior
+    const isChild = Boolean(guest.isChild);
+    console.log(`MEAL: Guest ${guest.name} has isChild=${isChild} (${typeof isChild})`);
+    return isChild ? childMealOptions : mealOptions;
+  };
+
+  const showDessertOptions = (guest) => {
+    // Convert to boolean explicitly to ensure consistent behavior
+    const isChild = Boolean(guest.isChild);
+    console.log(`DESSERT: Guest ${guest.name} has isChild=${isChild} (${typeof isChild})`);
+    return isChild ? childDessertOptions : dessertOptions;
+  };
+
   if (loading) {
     return <div>Loading...</div>
   }
@@ -272,7 +310,7 @@ export default function RSVPForm() {
                             <SelectValue placeholder="Select a meal" />
                           </SelectTrigger>
                           <SelectContent>
-                            {guest.isChild
+                            {guest.isChild === true
                               ? childMealOptions.map((option) => (
                                   <SelectItem key={option.id} value={option.id}>
                                     {option.name}
@@ -302,7 +340,7 @@ export default function RSVPForm() {
                             <SelectValue placeholder="Select a dessert" />
                           </SelectTrigger>
                           <SelectContent>
-                            {guest.isChild
+                            {guest.isChild === true
                               ? childDessertOptions.map((option) => (
                                   <SelectItem key={option.id} value={option.id}>
                                     {option.name}
