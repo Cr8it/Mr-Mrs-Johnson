@@ -17,6 +17,19 @@ interface Guest {
   mealOptionId?: string
   dessertOptionId?: string
   isChild?: boolean
+  mealChoice?: {
+    id: string
+    name: string
+  } | null
+  dessertChoice?: {
+    id: string
+    name: string
+  } | null
+  dietaryNotes?: string | null
+  responses?: Array<{
+    questionId: string
+    answer: string
+  }>
 }
 
 interface Option {
@@ -29,7 +42,7 @@ interface Question {
   id: string
   type: "TEXT" | "MULTIPLE_CHOICE" | "BOOLEAN" | "DATE"
   question: string
-  options: string // This is a JSON string that needs to be parsed
+  options: string | string[] // This can be a JSON string or an array
   isRequired: boolean
   perGuest: boolean
   isActive: boolean
@@ -136,17 +149,17 @@ export default function RSVPForm() {
           }
           
           // Pre-fill meal choice
-          if (guest.mealChoice) {
+          if ('mealChoice' in guest && guest.mealChoice) {
             initialResponses[`meal-${guest.id}`] = guest.mealChoice;
           }
           
           // Pre-fill dessert choice
-          if (guest.dessertChoice) {
+          if ('dessertChoice' in guest && guest.dessertChoice) {
             initialResponses[`dessert-${guest.id}`] = guest.dessertChoice;
           }
           
           // Pre-fill dietary notes
-          if (guest.dietaryNotes) {
+          if ('dietaryNotes' in guest && guest.dietaryNotes) {
             initialResponses[`dietary-${guest.id}`] = guest.dietaryNotes;
           }
           
@@ -346,7 +359,7 @@ export default function RSVPForm() {
         }
       } else if (Array.isArray(question.options)) {
         // Already an array
-        return question.options.map((o: any) => String(o));
+        return (question.options as string[]).map((o: string) => String(o));
       } else {
         console.warn(`Unexpected options format for question ${question.id}: ${typeof question.options}`);
         return [];
