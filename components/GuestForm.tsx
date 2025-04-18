@@ -9,45 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Guest, Question, Response } from "@/components/types"
 // Motion components
 const MotionDiv = motion.div
 
-interface Question {
-  id: string
-  question: string
-  type: "TEXT" | "MULTIPLE_CHOICE" | "MULTIPLE_SELECT" | "BOOLEAN" | "DATE"
-  options: string
-  isRequired: boolean
-  perGuest: boolean
-  isActive: boolean
-  order: number
-}
-
-
-interface Response {
-  questionId: string
-  answer: string
-}
-
-interface Guest {
-  id: string
-  name: string
-  isAttending: boolean | null
-  mealChoice: {
-    id: string
-    name: string
-  } | null
-  dessertChoice: {
-    id: string
-    name: string
-  } | null
-  dietaryNotes: string | null
-  responses: Response[]
-  isChild: boolean
-}
-
 interface GuestFormProps {
-
   household: {
     name: string
     code: string

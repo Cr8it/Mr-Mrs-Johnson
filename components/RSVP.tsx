@@ -6,36 +6,12 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import GuestForm from "./GuestForm"
-import { Response, Question } from "@/components/types"
+import { Response, Question, Guest, Household } from "@/components/types"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Label } from '@/components/ui/label'
 import Image from 'next/image'
 import { LoaderCircle } from 'lucide-react'
-
-interface Guest {
-  id: string
-  name: string
-  email?: string
-  isAttending: boolean | null
-  mealChoice: {
-    id: string
-    name: string
-  } | null
-  dessertChoice: {
-    id: string
-    name: string
-  } | null
-  dietaryNotes: string | null
-  responses: Response[]
-}
-
-interface Household {
-  name: string
-  code: string
-  guests: Guest[]
-  questions?: Question[]
-}
 
 interface RSVPProps {
   onClose?: () => void;

@@ -9,8 +9,10 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
+import { Question, Option } from "@/components/types"
 
-interface Guest {
+// Local interface since this file uses different property names
+interface LocalGuest {
   id: string
   name: string
   isAttending?: boolean
@@ -19,27 +21,10 @@ interface Guest {
   isChild?: boolean
 }
 
-interface Option {
-  id: string
-  name: string
-  isChildOption?: boolean
-}
-
-interface Question {
-  id: string
-  type: "TEXT" | "MULTIPLE_CHOICE" | "BOOLEAN" | "DATE"
-  question: string
-  options: string
-  isRequired: boolean
-  perGuest: boolean
-  isActive: boolean
-  order: number
-}
-
 export default function RSVPForm() {
   const params = useParams()
   const { toast } = useToast()
-  const [household, setHousehold] = useState<{ name: string; guests: Guest[] } | null>(null)
+  const [household, setHousehold] = useState<{ name: string; guests: LocalGuest[] } | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
   const [responses, setResponses] = useState<Record<string, any>>({})
   const [mealOptions, setMealOptions] = useState<Option[]>([])
