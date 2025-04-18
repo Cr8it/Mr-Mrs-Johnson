@@ -116,7 +116,7 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
           const storageKey = `rsvp-${data.household.code}`;
           localStorage.removeItem(storageKey);
           
-          console.log("API search data for guests:", data.household.guests.map(g => 
+          console.log("API search data for guests:", data.household.guests.map((g: Guest) => 
             ({ name: g.name, isChild: g.isChild, typeOfIsChild: typeof g.isChild }))
           );
           
@@ -182,7 +182,7 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
         const storageKey = `rsvp-${householdCode}`;
         localStorage.removeItem(storageKey);
         
-        console.log("API data for guests:", verifyData.household.guests.map(g => 
+        console.log("API data for guests:", verifyData.household.guests.map((g: Guest) => 
           ({ name: g.name, isChild: g.isChild, typeOfIsChild: typeof g.isChild }))
         );
         
