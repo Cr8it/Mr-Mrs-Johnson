@@ -172,11 +172,13 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
       // Regular options handling
       if (optionsData.mealOptions?.length > 0) {
         setMealOptions(optionsData.mealOptions)
+        console.log('Set regular meal options:', optionsData.mealOptions);
       }
       
       // Child options handling with fallback
       if (optionsData.childMealOptions?.length > 0) {
         setChildMealOptions(optionsData.childMealOptions)
+        console.log('Set child meal options:', optionsData.childMealOptions);
       } else {
         // If no child options, use regular options as fallback
         console.warn('No child meal options found, using regular options as fallback')
@@ -186,11 +188,13 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
       // Regular dessert options
       if (optionsData.dessertOptions?.length > 0) {
         setDessertOptions(optionsData.dessertOptions)
+        console.log('Set regular dessert options:', optionsData.dessertOptions);
       }
       
       // Child dessert options with fallback
       if (optionsData.childDessertOptions?.length > 0) {
         setChildDessertOptions(optionsData.childDessertOptions)
+        console.log('Set child dessert options:', optionsData.childDessertOptions);
       } else {
         // If no child options, use regular options as fallback
         console.warn('No child dessert options found, using regular options as fallback')

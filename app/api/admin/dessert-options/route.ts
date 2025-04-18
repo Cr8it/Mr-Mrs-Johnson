@@ -38,12 +38,23 @@ export async function POST(request: Request) {
 			})
 		}
 
+		// Log the incoming data
+		console.log('Creating dessert option with data:', {
+			name: data.name.trim(),
+			isChildOption: data.isChildOption,
+			isChildOptionType: typeof data.isChildOption,
+			booleanValue: Boolean(data.isChildOption)
+		});
+
 		const option = await prisma.dessertOption.create({
 			data: {
 				name: data.name.trim(),
 				isChildOption: Boolean(data.isChildOption)
-			} as any
+			}
 		})
+
+		// Log the created option
+		console.log('Created dessert option:', option);
 
 		return new Response(JSON.stringify({ option }), {
 			status: 201,

@@ -81,12 +81,16 @@ export default function MenuOptionsPage() {
 	const [mealOptions, setMealOptions] = useState<Option[]>([])
 	const [dessertOptions, setDessertOptions] = useState<Option[]>([])
 	const [newMealOption, setNewMealOption] = useState("")
-	const [isChildMealOption, setIsChildMealOption] = useState(false)
 	const [newDessertOption, setNewDessertOption] = useState("")
-	const [isChildDessertOption, setIsChildDessertOption] = useState(false)
 	const [isMealAdding, setIsMealAdding] = useState(false)
 	const [isDessertAdding, setIsDessertAdding] = useState(false)
-	const { toast } = useToast()
+	const [isChildMealOption, setIsChildMealOption] = useState(false)
+	const [isChildDessertOption, setIsChildDessertOption] = useState(false)
+	const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation>({
+		isOpen: false,
+		optionId: "",
+		optionType: "meal"
+	})
 	const [statistics, setStatistics] = useState<{
 		mealChoices: { name: string; count: number }[];
 		dessertChoices: { name: string; count: number }[];
@@ -96,11 +100,7 @@ export default function MenuOptionsPage() {
 		dessertChoices: [],
 		totalGuests: 0
 	})
-	const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation>({
-		isOpen: false,
-		optionId: '',
-		optionType: 'meal'
-	})
+	const { toast } = useToast()
 
 	const sensors = useSensors(
 		useSensor(PointerSensor),

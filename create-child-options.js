@@ -5,6 +5,13 @@ async function main() {
   try {
     console.log('Starting to create child options...');
 
+    // Get all existing options for debugging
+    const existingMeals = await prisma.mealOption.findMany();
+    console.log('Existing meal options:', existingMeals);
+    
+    const existingDesserts = await prisma.dessertOption.findMany();
+    console.log('Existing dessert options:', existingDesserts);
+
     // First, ensure any existing child options are marked as inactive
     await prisma.mealOption.updateMany({
       where: { isChildOption: true },
@@ -59,12 +66,36 @@ async function main() {
       skipDuplicates: true
     });
 
-    console.log('Successfully created child options!');
+    // Verify the options after creation
+    const finalMeals = await prisma.mealOption.findMany();
+    console.log('Final meal options:', finalMeals);
+    
+    const finalDesserts = await prisma.dessertOption.findMany();
+    console.log('Final dessert options:', finalDesserts);
+    
+    // Get filtered child options to verify filtering works
+    const childMeals = await prisma.mealOption.findMany({
+      where: {
+        isChildOption: true,
+        isActive: true
+      }
+    });
+    console.log('Child meal options:', childMeals);
+    
+    const childDesserts = await prisma.dessertOption.findMany({
+      where: {
+        isChildOption: true,
+        isActive: true
+      }
+    });
+    console.log('Child dessert options:', childDesserts);
+
+    console.log('Successfully updated menu options!');
     console.log('Meal options created:', mealOptions);
     console.log('Dessert options created:', dessertOptions);
 
   } catch (error) {
-    console.error('Error creating child options:', error);
+    console.error('Error updating menu options:', error);
     throw error;
   } finally {
     await prisma.$disconnect();
