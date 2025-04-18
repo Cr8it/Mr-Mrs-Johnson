@@ -43,7 +43,25 @@ export default function RSVPForm() {
         const householdData = await householdResponse.json()
         const optionsData = await optionsResponse.json()
         
-        setHousehold(householdData.household)
+        // Log the raw household data to debug isChild values
+        console.log("Raw household data received:", JSON.stringify(householdData.household.guests.map(g => ({
+          id: g.id,
+          name: g.name,
+          isChild: g.isChild,
+          isChildType: typeof g.isChild
+        })), null, 2));
+        
+        // Ensure isChild is properly converted to boolean before setting state
+        const processedGuests = householdData.household.guests.map(guest => ({
+          ...guest,
+          isChild: Boolean(guest.isChild) // Force conversion to boolean
+        }));
+        
+        setHousehold({
+          ...householdData.household,
+          guests: processedGuests
+        });
+        
         setQuestions(householdData.questions)
         setMealOptions(optionsData.mealOptions)
         setChildMealOptions(optionsData.childMealOptions || [])
@@ -61,14 +79,15 @@ export default function RSVPForm() {
     fetchData()
   }, [params.code, toast])
 
-  // Debug effect to log fetched data
+  // Debug effect to log state after it's been set
   useEffect(() => {
-    console.log("Debug - Household data:", household);
-    console.log("Debug - Regular meal options:", mealOptions);
-    console.log("Debug - Child meal options:", childMealOptions);
-    console.log("Debug - Regular dessert options:", dessertOptions);
-    console.log("Debug - Child dessert options:", childDessertOptions);
-  }, [household, mealOptions, childMealOptions, dessertOptions, childDessertOptions]);
+    if (household) {
+      console.log("RSVP Component State - Guests with isChild status:");
+      household.guests.forEach(guest => {
+        console.log(`${guest.name}: isChild=${guest.isChild} (${typeof guest.isChild})`);
+      });
+    }
+  }, [household]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -137,9 +156,12 @@ export default function RSVPForm() {
                   {/* Debug info - visible on page */}
                   <div className="bg-yellow-100 text-black p-2 text-xs rounded mb-2">
                     <p><strong>Debug info:</strong></p>
-                    <p>isChild flag: {String(guest.isChild)}</p>
-                    <p>Will see: {guest.isChild ? "Child options" : "Adult options"}</p>
-                    <p>Available meal options: {guest.isChild ? childMealOptions.length : mealOptions.length}</p>
+                    <p>isChild raw value: {String(guest.isChild)}</p>
+                    <p>isChild type: {typeof guest.isChild}</p>
+                    <p>isChild === true: {String(guest.isChild === true)}</p>
+                    <p>Boolean(isChild): {String(Boolean(guest.isChild))}</p>
+                    <p>Will use: {Boolean(guest.isChild) ? "Child options" : "Adult options"}</p>
+                    <p>Available meal options: {Boolean(guest.isChild) ? childMealOptions.length : mealOptions.length}</p>
                     <p>Child meal options available: {childMealOptions.length}</p>
                     <p>Regular meal options available: {mealOptions.length}</p>
                   </div>
@@ -178,7 +200,7 @@ export default function RSVPForm() {
                         <SelectValue placeholder="Select a meal" />
                         </SelectTrigger>
                         <SelectContent>
-                        {(guest.isChild ? childMealOptions : mealOptions).map((option) => (
+                        {(Boolean(guest.isChild) ? childMealOptions : mealOptions).map((option) => (
                           <SelectItem key={option.id} value={option.id}>
                           {option.name}
                           </SelectItem>
@@ -206,7 +228,7 @@ export default function RSVPForm() {
                         <SelectValue placeholder="Select a dessert" />
                         </SelectTrigger>
                         <SelectContent>
-                        {(guest.isChild ? childDessertOptions : dessertOptions).map((option) => (
+                        {(Boolean(guest.isChild) ? childDessertOptions : dessertOptions).map((option) => (
                           <SelectItem key={option.id} value={option.id}>
                           {option.name}
                           </SelectItem>

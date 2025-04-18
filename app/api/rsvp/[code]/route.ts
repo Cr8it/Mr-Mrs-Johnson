@@ -6,6 +6,26 @@ export async function GET(
   { params }: { params: { code: string } }
 ) {
   try {
+    // First let's get the raw database values for debugging
+    const rawGuests = await prisma.guest.findMany({
+      where: {
+        household: {
+          code: params.code
+        }
+      },
+      select: {
+        id: true,
+        name: true,
+        isChild: true
+      }
+    });
+    
+    console.log("RAW DATABASE VALUES:");
+    rawGuests.forEach(g => {
+      console.log(`DB RAW: Guest ${g.name} (${g.id}): isChild raw value = ${g.isChild}, type = ${typeof g.isChild}`);
+    });
+
+    // Now get full household data
     const household = await prisma.household.findFirst({
       where: {
         code: params.code,
@@ -34,19 +54,23 @@ export async function GET(
       orderBy: { order: 'asc' }
     })
 
-    // Transform the data to include existing choices
+    // Transform the data to include existing choices - paying special attention to isChild
     const transformedHousehold = {
       ...household,
       guests: household.guests.map(guest => {
-        // Debug output for isChild flag - also log raw value for debugging
-        const isChildValue = guest.isChild === true;
-        console.log(`Guest ${guest.name}: isChild=${guest.isChild}, type=${typeof guest.isChild}, transformedValue=${isChildValue}`);
+        // IMPORTANT: Force isChild to be a proper boolean by directly reading from database
+        const rawDbValue = rawGuests.find(g => g.id === guest.id)?.isChild;
+        const isChildValue = Boolean(rawDbValue);
+        
+        console.log(`Processing guest ${guest.name}:`);
+        console.log(`- Database isChild value: ${rawDbValue} (type: ${typeof rawDbValue})`);
+        console.log(`- Processed isChild value: ${isChildValue} (type: ${typeof isChildValue})`);
         
         return {
           ...guest,
           mealChoice: guest.mealChoice?.id || null,
           dessertChoice: guest.dessertChoice?.id || null,
-          // Use explicit comparison to ensure boolean value is preserved
+          // Use the forced boolean value from our raw database check
           isChild: isChildValue,
           responses: guest.responses.map(response => ({
             questionId: response.questionId,
@@ -69,6 +93,12 @@ export async function GET(
         })() : 
         []
     }))
+
+    // Log the final guest data being sent to client for debugging
+    console.log("FINAL DATA BEING SENT TO CLIENT:");
+    transformedHousehold.guests.forEach(guest => {
+      console.log(`FINAL: Guest ${guest.name}: isChild=${guest.isChild}, type=${typeof guest.isChild}`);
+    });
 
     return NextResponse.json({ 
       household: transformedHousehold, 

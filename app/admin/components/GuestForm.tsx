@@ -81,10 +81,13 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
 
   useEffect(() => {
     if (initialData) {
-      console.log('Initializing form with data:', initialData);
+      // Force isChild to be a boolean by using strict comparison
+      const isChildValue = initialData.isChild === true;
+      console.log(`Initializing form for ${initialData.name} with isChild=${initialData.isChild} (${typeof initialData.isChild}), processed to: ${isChildValue}`);
+      
       setFormData({
         ...initialData,
-        isChild: initialData.isChild === true
+        isChild: isChildValue
       });
     }
   }, [initialData])
@@ -170,6 +173,50 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
     }
   }
 
+  // Direct fix for Niyah Dublin or any other child guest showing wrong options
+  const fixIsChildStatus = async (guestId: string, correctValue: boolean) => {
+    try {
+      setLoading(true);
+      console.log(`Fixing isChild status for guest ID ${guestId} to ${correctValue}`);
+      
+      // Direct database update to fix the issue
+      const response = await fetch(`/api/admin/guests/${guestId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          isChild: correctValue
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update child status');
+      }
+      
+      const updatedGuest = await response.json();
+      console.log('Updated guest data:', updatedGuest);
+      
+      // Update the form data
+      setFormData({
+        ...formData,
+        isChild: correctValue
+      });
+      
+      toast({
+        title: "Success",
+        description: `Updated child status for ${formData.name}`,
+      });
+    } catch (error) {
+      console.error('Error fixing child status:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update child status",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -232,21 +279,51 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
               <Label htmlFor="isChild" className="text-sm font-medium">
                 Child
               </Label>
-              <Select
-                value={formData.isChild ? "true" : "false"}
-                onValueChange={(value) => {
-                  console.log('Child status changed to:', value);
-                  setFormData({ ...formData, isChild: value === "true" });
-                }}
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Is this a child?" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="true">Yes</SelectItem>
-                  <SelectItem value="false">No</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex flex-col gap-2">
+                <Select
+                  value={formData.isChild ? "true" : "false"}
+                  onValueChange={(value) => {
+                    const newValue = value === "true";
+                    console.log('Child status changed to:', newValue);
+                    setFormData({ ...formData, isChild: newValue });
+                  }}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Is this a child?" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">Yes</SelectItem>
+                    <SelectItem value="false">No</SelectItem>
+                  </SelectContent>
+                </Select>
+                
+                {initialData?.id && (
+                  <div className="text-xs text-gray-500">
+                    <p>Raw isChild value: {String(initialData.isChild)}</p>
+                    <p>Current form value: {String(formData.isChild)}</p>
+                    <div className="flex gap-2 mt-1">
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => fixIsChildStatus(initialData.id!, true)}
+                        disabled={loading}
+                      >
+                        Force Set Child: Yes
+                      </Button>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => fixIsChildStatus(initialData.id!, false)}
+                        disabled={loading}
+                      >
+                        Force Set Child: No
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
             {mode === 'edit' && (
               <>
