@@ -99,7 +99,7 @@ export default function RSVPForm() {
           // Explicitly normalize isChild as boolean
           const isChildValue = 
             typeof guest.isChild === 'string' 
-              ? guest.isChild.toLowerCase() === 'true' 
+              ? (guest.isChild as string).toLowerCase() === 'true' 
               : Boolean(guest.isChild);
           
           console.log(`Normalizing guest ${guest.name}: isChild=${guest.isChild} (${typeof guest.isChild}) → ${isChildValue} (${typeof isChildValue})`);
@@ -234,21 +234,6 @@ export default function RSVPForm() {
   const onBack = () => {
     router.push('/')
   }
-
-  // Debug logging for guest isChild status
-  const showMealOptions = (guest) => {
-    // Convert to boolean explicitly to ensure consistent behavior
-    const isChild = Boolean(guest.isChild);
-    console.log(`MEAL: Guest ${guest.name} has isChild=${isChild} (${typeof isChild})`);
-    return isChild ? childMealOptions : mealOptions;
-  };
-
-  const showDessertOptions = (guest) => {
-    // Convert to boolean explicitly to ensure consistent behavior
-    const isChild = Boolean(guest.isChild);
-    console.log(`DESSERT: Guest ${guest.name} has isChild=${isChild} (${typeof isChild})`);
-    return isChild ? childDessertOptions : dessertOptions;
-  };
 
   if (loading) {
     return <div>Loading...</div>

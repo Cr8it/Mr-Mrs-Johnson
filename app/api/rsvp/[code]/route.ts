@@ -48,14 +48,14 @@ export async function GET(
       ...household,
       guests: household.guests.map(guest => {
         // Force isChild to be a proper boolean value consistently
-        let isChildValue;
+        let isChildValue: boolean;
         
         if (typeof guest.isChild === 'string') {
           // Convert string 'true'/'false' to boolean
-          isChildValue = guest.isChild.toLowerCase() === 'true';
+          isChildValue = (guest.isChild as string).toLowerCase() === 'true';
         } else if (typeof guest.isChild === 'number') {
           // Convert numeric 1/0 to boolean
-          isChildValue = guest.isChild === 1;
+          isChildValue = (guest.isChild as number) === 1;
         } else {
           // For other types, use standard Boolean conversion
           isChildValue = Boolean(guest.isChild);
@@ -116,14 +116,14 @@ export async function POST(
     // Normalize guest data before saving
     const normalizedGuests = household.guests.map((guest: any) => {
       // More robust boolean conversion for isChild
-      let isChildValue;
+      let isChildValue: boolean;
       
       if (typeof guest.isChild === 'string') {
         // Convert string 'true'/'false' to boolean
-        isChildValue = guest.isChild.toLowerCase() === 'true';
+        isChildValue = (guest.isChild as string).toLowerCase() === 'true';
       } else if (typeof guest.isChild === 'number') {
         // Convert numeric 1/0 to boolean
-        isChildValue = guest.isChild === 1;
+        isChildValue = (guest.isChild as number) === 1;
       } else {
         // For other types, use standard Boolean conversion
         isChildValue = Boolean(guest.isChild);
