@@ -157,8 +157,11 @@ export default function RSVPForm() {
                     <>
                       <div className="space-y-2">
                       <label>Meal Preference</label>
-                      {console.log(`Rendering meal options for ${guest.name}: isChild=${guest.isChild}`)}
-                      {console.log(guest.isChild ? `Using child options: ${childMealOptions.length} options` : `Using adult options: ${mealOptions.length} options`)}
+                      {(() => {
+                        console.log(`Rendering meal options for ${guest.name}: isChild=${guest.isChild}`);
+                        console.log(guest.isChild ? `Using child options: ${childMealOptions.length} options` : `Using adult options: ${mealOptions.length} options`);
+                        return null;
+                      })()}
                       <Select
                         value={responses[`meal-${guest.id}`]}
                         onValueChange={(value) =>
@@ -182,8 +185,11 @@ export default function RSVPForm() {
                       </div>
                       <div className="space-y-2">
                       <label>Dessert Choice</label>
-                      {console.log(`Rendering dessert options for ${guest.name}: isChild=${guest.isChild}`)}
-                      {console.log(guest.isChild ? `Using child desserts: ${childDessertOptions.length} options` : `Using adult desserts: ${dessertOptions.length} options`)}
+                      {(() => {
+                        console.log(`Rendering dessert options for ${guest.name}: isChild=${guest.isChild}`);
+                        console.log(guest.isChild ? `Using child desserts: ${childDessertOptions.length} options` : `Using adult desserts: ${dessertOptions.length} options`);
+                        return null;
+                      })()}
                       <Select
                         value={responses[`dessert-${guest.id}`]}
                         onValueChange={(value) =>
