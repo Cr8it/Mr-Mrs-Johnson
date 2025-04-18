@@ -3,17 +3,50 @@ import { prisma } from "@/lib/db"
 
 export async function GET() {
 	try {
-		const [mealOptions, dessertOptions, questions] = await Promise.all([
+		const [
+			regularMealOptions, 
+			childMealOptions, 
+			regularDessertOptions, 
+			childDessertOptions, 
+			questions
+		] = await Promise.all([
+			// Regular meal options
 			prisma.mealOption.findMany({
-				where: { isActive: true },
+				where: { 
+					isActive: true,
+					isChildOption: false 
+				},
 				orderBy: { createdAt: 'asc' },
-				select: { id: true, name: true }
+				select: { id: true, name: true, isChildOption: true }
 			}),
+			// Child meal options
+			prisma.mealOption.findMany({
+				where: { 
+					isActive: true,
+					isChildOption: true 
+				},
+				orderBy: { createdAt: 'asc' },
+				select: { id: true, name: true, isChildOption: true }
+			}),
+			// Regular dessert options
 			prisma.dessertOption.findMany({
-				where: { isActive: true },
+				where: { 
+					isActive: true,
+					isChildOption: false 
+				},
 				orderBy: { createdAt: 'asc' },
-				select: { id: true, name: true }
+				select: { id: true, name: true, isChildOption: true }
 			}),
+			// Child dessert options
+			prisma.dessertOption.findMany({
+				where: { 
+					isActive: true,
+					isChildOption: true 
+				},
+				orderBy: { createdAt: 'asc' },
+				select: { id: true, name: true, isChildOption: true }
+			}),
+			// Questions
 			prisma.question.findMany({
 				where: { isActive: true },
 				orderBy: { createdAt: 'asc' },
@@ -26,6 +59,10 @@ export async function GET() {
 				}
 			})
 		])
+
+		// Debug logs to verify options
+		console.log(`Found ${regularMealOptions.length} regular meal options, ${childMealOptions.length} child meal options`);
+		console.log(`Found ${regularDessertOptions.length} regular dessert options, ${childDessertOptions.length} child dessert options`);
 
 		// Transform questions to parse options for multiple choice questions
 		const transformedQuestions = questions.map(question => ({
@@ -42,8 +79,10 @@ export async function GET() {
 		}))
 
 		return NextResponse.json({ 
-			mealOptions, 
-			dessertOptions,
+			mealOptions: regularMealOptions, 
+			childMealOptions: childMealOptions,
+			dessertOptions: regularDessertOptions,
+			childDessertOptions: childDessertOptions,
 			questions: transformedQuestions
 		})
 	} catch (error) {

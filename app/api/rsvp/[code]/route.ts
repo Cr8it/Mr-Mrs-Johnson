@@ -80,26 +80,42 @@ export async function GET(
 
 export async function POST(request: Request, { params }: { params: { code: string } }) {
   try {
+    console.log(`Processing RSVP submission for household code: ${params.code}`)
     const { responses } = await request.json()
     const household = await prisma.household.findFirst({
       where: {
         code: params.code,
       },
       include: {
-        guests: true,
+        guests: {
+          include: {
+            mealChoice: true,
+            dessertChoice: true
+          }
+        },
       },
     })
 
     if (!household) {
+      console.error(`Household not found for code: ${params.code}`)
       return NextResponse.json({ error: "Household not found" }, { status: 404 })
     }
 
+    console.log(`Processing RSVP for household: ${household.name} (${household.guests.length} guests)`)
+    
     // Process responses for each guest
     for (const guest of household.guests) {
       const isAttending = responses[`attending-${guest.id}`]
       const mealOptionId = responses[`meal-${guest.id}`]
       const dessertOptionId = responses[`dessert-${guest.id}`]
+      
+      console.log(`Guest ${guest.name}: Attending=${isAttending}, Meal=${mealOptionId}, Dessert=${dessertOptionId}`)
 
+      // Track changes for logging
+      const mealChanged = guest.mealOptionId !== mealOptionId
+      const dessertChanged = guest.dessertOptionId !== dessertOptionId
+      
+      // Update the guest record
       await prisma.guest.update({
         where: {
           id: guest.id,
@@ -111,27 +127,61 @@ export async function POST(request: Request, { params }: { params: { code: strin
         },
       })
 
-      // Log the meal and dessert choices in guest activity
+      // Log guest activities for significant changes
       if (isAttending) {
-        if (mealOptionId) {
+        // Log attendance status change if it changed
+        if (guest.isAttending !== isAttending) {
           await prisma.guestActivity.create({
             data: {
               guestId: guest.id,
-              action: 'UPDATE_MEAL',
-              details: `Selected meal option: ${mealOptionId}`
+              action: 'RSVP_YES',
+              details: 'Confirmed attendance through RSVP form'
             }
           })
         }
         
-        if (dessertOptionId) {
+        // Log meal choice change
+        if (mealChanged && mealOptionId) {
+          const mealOption = await prisma.mealOption.findUnique({
+            where: { id: mealOptionId }
+          })
+          
+          await prisma.guestActivity.create({
+            data: {
+              guestId: guest.id,
+              action: 'UPDATE_MEAL',
+              details: `Selected meal option: ${mealOption?.name || mealOptionId}`
+            }
+          })
+          
+          console.log(`Updated meal choice for ${guest.name}: ${mealOption?.name || mealOptionId}`)
+        }
+        
+        // Log dessert choice change
+        if (dessertChanged && dessertOptionId) {
+          const dessertOption = await prisma.dessertOption.findUnique({
+            where: { id: dessertOptionId }
+          })
+          
           await prisma.guestActivity.create({
             data: {
               guestId: guest.id,
               action: 'UPDATE_DESSERT',
-              details: `Selected dessert option: ${dessertOptionId}`
+              details: `Selected dessert option: ${dessertOption?.name || dessertOptionId}`
             }
           })
+          
+          console.log(`Updated dessert choice for ${guest.name}: ${dessertOption?.name || dessertOptionId}`)
         }
+      } else if (guest.isAttending !== isAttending) {
+        // Log declined attendance
+        await prisma.guestActivity.create({
+          data: {
+            guestId: guest.id,
+            action: 'RSVP_NO',
+            details: 'Declined attendance through RSVP form'
+          }
+        })
       }
 
       // Save guest-specific responses
@@ -154,6 +204,8 @@ export async function POST(request: Request, { params }: { params: { code: strin
         await prisma.questionResponse.createMany({
           data: guestResponses,
         })
+        
+        console.log(`Saved ${guestResponses.length} question responses for ${guest.name}`)
       }
     }
 
@@ -170,9 +222,15 @@ export async function POST(request: Request, { params }: { params: { code: strin
       await prisma.questionResponse.createMany({
         data: householdResponses,
       })
+      
+      console.log(`Saved ${householdResponses.length} household-level responses`)
     }
 
-    return NextResponse.json({ success: true })
+    console.log(`RSVP submission completed successfully for household: ${household.name}`)
+    return NextResponse.json({ 
+      success: true,
+      message: "Thank you for your RSVP!" 
+    })
   } catch (error) {
     console.error("Error processing RSVP:", error)
     return NextResponse.json({ error: "Failed to process RSVP" }, { status: 500 })

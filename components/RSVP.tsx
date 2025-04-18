@@ -7,6 +7,11 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import GuestForm from "./GuestForm"
 import { Response, Question } from "@/components/types"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Label } from '@/components/ui/label'
+import Image from 'next/image'
+import { LoaderCircle } from 'lucide-react'
 
 interface Guest {
   id: string
@@ -38,6 +43,26 @@ interface RSVPProps {
   onRSVPStatus?: (notAttending: boolean) => void;
 }
 
+// Add debugging component
+const DebugInfo = ({ data, title }: { data: any, title: string }) => {
+  const [showDebug, setShowDebug] = useState(false);
+  return (
+    <div className="mt-2 p-2 border border-dashed border-gray-500 rounded">
+      <button 
+        className="text-sm text-gray-400 underline"
+        onClick={() => setShowDebug(!showDebug)}
+      >
+        {showDebug ? 'Hide' : 'Show'} {title}
+      </button>
+      {showDebug && (
+        <pre className="mt-2 p-2 bg-gray-800 text-xs text-gray-300 overflow-auto max-h-40">
+          {JSON.stringify(data, null, 2)}
+        </pre>
+      )}
+    </div>
+  );
+};
+
 export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
   const [code, setCode] = useState("")
   const [loading, setLoading] = useState(false)
@@ -46,6 +71,7 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
   const [showForm, setShowForm] = useState(false)
   const [allNotAttending, setAllNotAttending] = useState(false)
   const { toast } = useToast()
+  const [tab, setTab] = useState('search')
 
   useEffect(() => {
     const storedCode = localStorage.getItem('rsvp-code')
@@ -278,6 +304,21 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
 
   const MotionDiv = motion.div
 
+  const handleCodeSuccess = (data: any) => {
+    console.log('Household data received:', data);
+    setHousehold(data)
+    setTab('guestForm')
+    setLoading(false)
+    
+    // Log child status for debugging
+    if (data?.guests) {
+      console.log('Guest child status:', data.guests.map((g: any) => ({ 
+        name: g.name, 
+        isChild: g.isChild 
+      })));
+    }
+  }
+
   return (
     <section id="rsvp" className="py-12">
         <MotionDiv
@@ -354,11 +395,64 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
             </div>
           </div>
         ) : (
-            <GuestForm
-            household={household}
-            onBack={handleBackToSearch}
-            onSuccess={handleRsvpSuccess}
-            />
+            <div className="relative">
+              {showSuccess ? (
+                <MotionDiv
+                  className="max-w-md mx-auto text-center space-y-6"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  <div className="bg-black/30 p-8 rounded-lg border border-white/20">
+                    <h3 className="text-2xl font-semibold text-white mb-4">Thank You for Your Response!</h3>
+                    {allNotAttending ? (
+                    <p className="text-white mb-6">We're sorry you won't be able to join us, but thank you for letting us know.</p>
+                    ) : (
+                    <p className="text-white mb-6">We're excited to celebrate with you! We'll be in touch with more details as the day approaches.</p>
+                    )}
+                    <p className="text-sm text-gray-300 mb-6">
+                    You can modify your response anytime before the deadline using your household code:
+                    <br />
+                    <span className="font-mono font-bold text-white">{household?.code}</span>
+                    </p>
+                    <div className="space-y-4">
+                      <Button 
+                        onClick={handleModifyResponse}
+                        className="bg-white text-black hover:bg-gray-200"
+                      >
+                        Modify Response
+                      </Button>
+                      {!allNotAttending && (
+                        <Button 
+                          onClick={handleModalClose}
+                          className="w-full bg-green-600 text-white hover:bg-green-700"
+                        >
+                          Close and View Wedding Details
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </MotionDiv>
+              ) : (
+                <>
+                  <GuestForm
+                    household={household}
+                    onBack={handleBackToSearch}
+                    onSuccess={handleRsvpSuccess}
+                  />
+                  
+                  {/* Add debugging info */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <DebugInfo 
+                      title="Household Child Status" 
+                      data={household.guests.map((g: any) => ({ 
+                        name: g.name, 
+                        isChild: g.isChild 
+                      }))} 
+                    />
+                  )}
+                </>
+              )}
+            </div>
         )}
         </MotionDiv>
     </section>

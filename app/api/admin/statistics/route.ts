@@ -3,6 +3,9 @@ import { prisma } from "@/lib/db"
 
 export async function GET() {
   try {
+    console.log("Fetching admin statistics...")
+    const startTime = Date.now()
+    
     // Get basic statistics
     const [
       totalGuests,
@@ -30,7 +33,9 @@ export async function GET() {
       })
     ]);
 
-    // Get meal choices with counts
+    console.log(`Basic statistics: ${attendingGuests} attending, ${notAttendingGuests} not attending, ${respondedGuests}/${totalGuests} responded`)
+
+    // Get meal choices with counts - ensure we're getting fresh data
     const mealChoices = await prisma.mealOption.findMany({
       where: { isActive: true },
       select: {
@@ -38,7 +43,11 @@ export async function GET() {
         name: true,
         _count: {
           select: {
-            guests: true
+            guests: {
+              where: {
+                isAttending: true  // Only count guests who are attending
+              }
+            }
           }
         }
       }
@@ -49,7 +58,9 @@ export async function GET() {
       }))
     );
 
-    // Get dessert choices with counts
+    console.log("Meal choices statistics:", mealChoices)
+
+    // Get dessert choices with counts - ensure we're getting fresh data
     const dessertChoices = await prisma.dessertOption.findMany({
       where: { isActive: true },
       select: {
@@ -57,7 +68,11 @@ export async function GET() {
         name: true,
         _count: {
           select: {
-            guests: true
+            guests: {
+              where: {
+                isAttending: true  // Only count guests who are attending
+              }
+            }
           }
         }
       }
@@ -68,21 +83,14 @@ export async function GET() {
       }))
     );
 
+    console.log("Dessert choices statistics:", dessertChoices)
+
     const responseRate = totalGuests > 0 
       ? Math.round((respondedGuests / totalGuests) * 100) 
       : 0;
 
-    console.log("Statistics data:", {
-      totalGuests,
-      respondedGuests,
-      attendingGuests,
-      notAttendingGuests,
-      totalHouseholds,
-      dietaryRequirements,
-      responseRate,
-      mealChoices,
-      dessertChoices
-    });
+    const processingTime = Date.now() - startTime
+    console.log(`Statistics fetched in ${processingTime}ms`)
 
     return NextResponse.json({
       totalGuests,
@@ -94,6 +102,13 @@ export async function GET() {
       responseRate,
       mealChoices,
       dessertChoices
+    }, {
+      headers: {
+        // Add cache control headers to prevent caching
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
     })
   } catch (error) {
     console.error("Statistics error:", error)

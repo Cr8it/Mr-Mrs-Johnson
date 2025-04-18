@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
@@ -99,6 +99,8 @@ export default function MenuOptionsPage() {
 		optionId: '',
 		optionType: 'meal'
 	})
+	const mountedRef = useRef(true)
+	const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
 	const sensors = useSensors(
 		useSensor(PointerSensor),
@@ -107,12 +109,9 @@ export default function MenuOptionsPage() {
 		})
 	)
 
-	useEffect(() => {
-		fetchOptions()
-		fetchStatistics()
-	}, [])
-
-	const fetchStatistics = async () => {
+	const fetchStatistics = useCallback(async () => {
+		if (!mountedRef.current) return;
+		
 		try {
 			const response = await fetch('/api/admin/statistics')
 			if (response.ok) {
@@ -124,13 +123,46 @@ export default function MenuOptionsPage() {
 				})
 			}
 		} catch (error) {
-			toast({
-				variant: "destructive",
-				title: "Error",
-				description: "Failed to fetch statistics"
-			})
+			console.error("Failed to fetch statistics:", error);
+			if (mountedRef.current) {
+				toast({
+					variant: "destructive",
+					title: "Error",
+					description: "Failed to fetch statistics"
+				})
+			}
 		}
-	}
+	}, [toast])
+
+	useEffect(() => {
+		fetchOptions()
+		fetchStatistics()
+        
+		pollIntervalRef.current = setInterval(() => {
+			fetchStatistics()
+		}, 30000)
+        
+		return () => {
+			mountedRef.current = false
+			if (pollIntervalRef.current) {
+				clearInterval(pollIntervalRef.current)
+			}
+		}
+	}, [fetchStatistics])
+
+	useEffect(() => {
+		const handleVisibilityChange = () => {
+			if (document.visibilityState === 'visible') {
+				fetchStatistics()
+			}
+		}
+
+		document.addEventListener('visibilitychange', handleVisibilityChange)
+		
+		return () => {
+			document.removeEventListener('visibilitychange', handleVisibilityChange)
+		}
+	}, [fetchStatistics])
 
 	const fetchOptions = async () => {
 		try {
@@ -149,7 +181,6 @@ export default function MenuOptionsPage() {
 				setDessertOptions(dessertData.options)
 			}
 
-			// Refresh statistics after fetching options
 			await fetchStatistics()
 		} catch (error) {
 			toast({
@@ -190,7 +221,6 @@ export default function MenuOptionsPage() {
 
 			if (!response.ok) throw new Error(`Failed to reorder ${type} options`)
 
-			// Refresh statistics after reordering
 			await fetchStatistics()
 		} catch (error) {
 			toast({
@@ -236,7 +266,6 @@ export default function MenuOptionsPage() {
 					title: "Success",
 					description: "Meal option added successfully"
 				})
-				// Refresh statistics after adding option
 				await fetchStatistics()
 			}
 		} catch (error) {
@@ -284,7 +313,6 @@ export default function MenuOptionsPage() {
 					title: "Success",
 					description: "Dessert option added successfully"
 				})
-				// Refresh statistics after adding option
 				await fetchStatistics()
 			}
 		} catch (error) {
@@ -309,7 +337,6 @@ export default function MenuOptionsPage() {
 					title: "Success",
 					description: `${type.charAt(0).toUpperCase() + type.slice(1)} option removed successfully`
 				})
-				// Refresh statistics after removing option
 				await fetchStatistics()
 			}
 		} catch (error) {

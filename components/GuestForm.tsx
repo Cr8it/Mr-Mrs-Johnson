@@ -43,6 +43,7 @@ interface Guest {
   } | null
   dietaryNotes: string | null
   responses: Response[]
+  isChild: boolean
 }
 
 interface GuestFormProps {
@@ -60,8 +61,10 @@ interface GuestFormProps {
 export default function GuestForm({ household, onBack, onSuccess }: GuestFormProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
-  const [mealOptions, setMealOptions] = useState<{ id: string; name: string }[]>([])
-  const [dessertOptions, setDessertOptions] = useState<{ id: string; name: string }[]>([])
+  const [regularMealOptions, setRegularMealOptions] = useState<{ id: string; name: string }[]>([])
+  const [childMealOptions, setChildMealOptions] = useState<{ id: string; name: string }[]>([])
+  const [regularDessertOptions, setRegularDessertOptions] = useState<{ id: string; name: string }[]>([])
+  const [childDessertOptions, setChildDessertOptions] = useState<{ id: string; name: string }[]>([])
   const [validationErrors, setValidationErrors] = useState<Record<string, string[]>>({})
   const [guests, setGuests] = useState<Guest[]>(() => {
     return household.guests.map(guest => ({
@@ -96,10 +99,16 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
       }
       
       if (optionsData.mealOptions?.length > 0) {
-        setMealOptions(optionsData.mealOptions)
+        setRegularMealOptions(optionsData.mealOptions)
+      }
+      if (optionsData.childMealOptions?.length > 0) {
+        setChildMealOptions(optionsData.childMealOptions)
       }
       if (optionsData.dessertOptions?.length > 0) {
-        setDessertOptions(optionsData.dessertOptions)
+        setRegularDessertOptions(optionsData.dessertOptions)
+      }
+      if (optionsData.childDessertOptions?.length > 0) {
+        setChildDessertOptions(optionsData.childDessertOptions)
       }
     } catch (error) {
       console.error('Failed to fetch data:', error)
@@ -200,8 +209,10 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
 
   // Add debug logging to the render section
   console.log('Rendering GuestForm with:', {
-    mealOptions,
-    dessertOptions,
+    regularMealOptions,
+    childMealOptions,
+    regularDessertOptions,
+    childDessertOptions,
     questions,
     guests
   })
@@ -259,7 +270,7 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
           ...guest, 
           mealChoice: { 
             id: meal,
-            name: mealOptions.find(opt => opt.id === meal)?.name || ''
+            name: regularMealOptions.find(opt => opt.id === meal)?.name || ''
           } 
         } : guest
       );
@@ -276,7 +287,7 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
           ...guest, 
           dessertChoice: { 
             id: dessert,
-            name: dessertOptions.find(opt => opt.id === dessert)?.name || ''
+            name: regularDessertOptions.find(opt => opt.id === dessert)?.name || ''
           } 
         } : guest
       );
@@ -409,10 +420,11 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
 
   // Add debug logging before render
   console.log('Rendering select options:', {
-    mealOptions,
-    dessertOptions,
-    guestMealChoices: guests.map(g => ({ id: g.id, mealChoice: g.mealChoice })),
-    guestDessertChoices: guests.map(g => ({ id: g.id, dessertChoice: g.dessertChoice }))
+    regularMealOptions,
+    childMealOptions,
+    regularDessertOptions,
+    childDessertOptions,
+    guests: guests.map(g => ({ id: g.id, name: g.name, isChild: g.isChild }))
   })
 
   return (
@@ -496,14 +508,14 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                       <p className="text-red-500 text-sm mt-1">Please select a meal option</p>
                     )}
                   <SelectContent className="bg-black border border-white border-opacity-20 text-white" sideOffset={5}>
-                    {mealOptions.map((option) => (
-                    <SelectItem
-                      key={option.id}
-                      value={option.id}
-                      className="text-white hover:bg-white/10 cursor-pointer"
-                    >
-                      {option.name}
-                    </SelectItem>
+                    {guest.isChild ? childMealOptions.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.name}
+                      </SelectItem>
+                    )) : regularMealOptions.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                   </Select>
@@ -519,9 +531,9 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                     >
                     <SelectTrigger 
                       className={`bg-transparent border-white border-opacity-20 text-white h-12 ${
-                      validationErrors[guest.id]?.includes('Dessert choice is required') 
-                        ? 'border-red-500' 
-                        : ''
+                        validationErrors[guest.id]?.includes('Dessert choice is required') 
+                          ? 'border-red-500' 
+                          : ''
                       }`}
                     >
                       <SelectValue placeholder="Select your dessert (Required)" />
@@ -529,17 +541,17 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                     {validationErrors[guest.id]?.includes('Dessert choice is required') && (
                       <p className="text-red-500 text-sm mt-1">Please select a dessert option</p>
                     )}
-                  <SelectContent className="bg-black border border-white border-opacity-20 text-white" sideOffset={5}>
-                    {dessertOptions.map((option) => (
-                    <SelectItem
-                      key={option.id}
-                      value={option.id}
-                      className="text-white hover:bg-white/10 cursor-pointer"
-                    >
-                      {option.name}
-                    </SelectItem>
-                    ))}
-                  </SelectContent>
+                    <SelectContent className="bg-black border border-white border-opacity-20 text-white" sideOffset={5}>
+                      {guest.isChild ? childDessertOptions.map((option) => (
+                        <SelectItem key={option.id} value={option.id}>
+                          {option.name}
+                        </SelectItem>
+                      )) : regularDessertOptions.map((option) => (
+                        <SelectItem key={option.id} value={option.id}>
+                          {option.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
                   </Select>
                 </div>
 
