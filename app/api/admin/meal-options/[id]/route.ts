@@ -11,11 +11,7 @@ export async function PATCH(
 			where: { id: params.id },
 			data: { isActive }
 		})
-		return NextResponse.json({ option }, {
-			headers: {
-				'Cache-Control': 'no-store, max-age=0, must-revalidate'
-			}
-		})
+		return NextResponse.json({ option })
 	} catch (error) {
 		return NextResponse.json(
 			{ error: "Failed to update meal option" },
@@ -32,11 +28,7 @@ export async function DELETE(
 		await prisma.mealOption.delete({
 			where: { id: params.id }
 		})
-		return NextResponse.json({ success: true }, {
-			headers: {
-				'Cache-Control': 'no-store, max-age=0, must-revalidate'
-			}
-		})
+		return NextResponse.json({ success: true })
 	} catch (error) {
 		return NextResponse.json(
 			{ error: "Failed to delete meal option" },

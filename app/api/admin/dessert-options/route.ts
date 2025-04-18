@@ -12,19 +12,11 @@ export async function GET() {
 		
 		if (!options || options.length === 0) {
 			console.log("No dessert options found")
-			return NextResponse.json({ options: [] }, {
-				headers: {
-					'Cache-Control': 'no-store, max-age=0, must-revalidate'
-				}
-			})
+			return NextResponse.json({ options: [] })
 		}
 
 		console.log("Found dessert options:", options)
-		return NextResponse.json({ options }, {
-			headers: {
-				'Cache-Control': 'no-store, max-age=0, must-revalidate'
-			}
-		})
+		return NextResponse.json({ options })
 	} catch (error) {
 		console.error("GET dessert options error:", error)
 		return NextResponse.json(
@@ -42,46 +34,26 @@ export async function POST(request: Request) {
 		if (!data.name || typeof data.name !== 'string' || !data.name.trim()) {
 			return new Response(JSON.stringify({ error: 'Name is required' }), {
 				status: 400,
-				headers: { 
-					'Content-Type': 'application/json',
-					'Cache-Control': 'no-store, max-age=0, must-revalidate'
-				}
+				headers: { 'Content-Type': 'application/json' }
 			})
 		}
-
-		// Log the incoming data
-		console.log('Creating dessert option with data:', {
-			name: data.name.trim(),
-			isChildOption: data.isChildOption,
-			isChildOptionType: typeof data.isChildOption,
-			booleanValue: Boolean(data.isChildOption)
-		});
 
 		const option = await prisma.dessertOption.create({
 			data: {
 				name: data.name.trim(),
-				isChildOption: Boolean(data.isChildOption)
+				isChildOption: data.isChildOption === true
 			}
 		})
 
-		// Log the created option
-		console.log('Created dessert option:', option);
-
 		return new Response(JSON.stringify({ option }), {
 			status: 201,
-			headers: { 
-				'Content-Type': 'application/json',
-				'Cache-Control': 'no-store, max-age=0, must-revalidate'
-			}
+			headers: { 'Content-Type': 'application/json' }
 		})
 	} catch (error) {
 		console.error('Error creating dessert option:', error)
 		return new Response(JSON.stringify({ error: 'Failed to create dessert option' }), {
 			status: 500,
-			headers: { 
-				'Content-Type': 'application/json',
-				'Cache-Control': 'no-store, max-age=0, must-revalidate'
-			}
+			headers: { 'Content-Type': 'application/json' }
 		})
 	}
 }

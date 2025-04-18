@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -17,19 +17,6 @@ interface Guest {
   mealOptionId?: string
   dessertOptionId?: string
   isChild?: boolean
-  mealChoice?: {
-    id: string
-    name: string
-  } | null
-  dessertChoice?: {
-    id: string
-    name: string
-  } | null
-  dietaryNotes?: string | null
-  responses?: Array<{
-    questionId: string
-    answer: string
-  }>
 }
 
 interface Option {
@@ -42,18 +29,15 @@ interface Question {
   id: string
   type: "TEXT" | "MULTIPLE_CHOICE" | "BOOLEAN" | "DATE"
   question: string
-  options: string | string[] // This can be a JSON string or an array
+  options: string
   isRequired: boolean
   perGuest: boolean
   isActive: boolean
   order: number
 }
 
-const MotionDiv = motion.div
-
 export default function RSVPForm() {
   const params = useParams()
-  const router = useRouter()
   const { toast } = useToast()
   const [household, setHousehold] = useState<{ name: string; guests: Guest[] } | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
@@ -62,358 +46,86 @@ export default function RSVPForm() {
   const [childMealOptions, setChildMealOptions] = useState<Option[]>([])
   const [dessertOptions, setDessertOptions] = useState<Option[]>([])
   const [childDessertOptions, setChildDessertOptions] = useState<Option[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true)
-        setError(null)
-
         const [householdResponse, optionsResponse] = await Promise.all([
-          fetch(`/api/rsvp/${params.code}`, {
-            cache: 'no-store',
-            headers: {
-              'Cache-Control': 'no-cache, no-store, must-revalidate'
-            }
-          }),
-          fetch('/api/rsvp/options', {
-            cache: 'no-store',
-            headers: {
-              'Cache-Control': 'no-cache, no-store, must-revalidate'
-            }
-          })
+          fetch(`/api/rsvp/${params.code}`),
+          fetch('/api/rsvp/options')
         ])
-        
-        if (!householdResponse.ok) {
-          throw new Error('Failed to fetch household data')
-        }
-        if (!optionsResponse.ok) {
-          throw new Error('Failed to fetch menu options')
-        }
         
         const householdData = await householdResponse.json()
         const optionsData = await optionsResponse.json()
         
-        // Debug output to verify questions
-        console.log('Fetched questions data:', householdData.questions)
-        console.log('Questions with perGuest=true:', 
-                    householdData.questions?.filter((q: Question) => q.perGuest)?.length || 0)
-        console.log('Questions with perGuest=false:', 
-                    householdData.questions?.filter((q: Question) => !q.perGuest)?.length || 0)
-        
-        // Validate child options
-        if (householdData.household.guests.some((g: Guest) => g.isChild) && 
-            (!optionsData.childMealOptions?.length || !optionsData.childDessertOptions?.length)) {
-          console.warn('Child guests present but child options missing')
-          toast({
-            title: "Warning",
-            description: "Some menu options may not be available. Please contact the hosts.",
-            variant: "destructive",
-          })
-        }
-
-        // Normalize isChild property explicitly to ensure it's a true boolean
-        const normalizedGuests = householdData.household.guests.map((guest: Guest) => {
-          // Explicitly normalize isChild as boolean
-          const isChildValue = 
-            typeof guest.isChild === 'string' 
-              ? (guest.isChild as string).toLowerCase() === 'true' 
-              : Boolean(guest.isChild);
-          
-          console.log(`Normalizing guest ${guest.name}: isChild=${guest.isChild} (${typeof guest.isChild}) → ${isChildValue} (${typeof isChildValue})`);
-          
-          return {
-            ...guest,
-            isChild: isChildValue
-          };
-        });
-
-        const normalizedHousehold = {
-          ...householdData.household,
-          guests: normalizedGuests
-        };
-
-        setHousehold(normalizedHousehold)
+        setHousehold(householdData.household)
         setQuestions(householdData.questions)
-        setMealOptions(optionsData.mealOptions || [])
+        setMealOptions(optionsData.mealOptions)
         setChildMealOptions(optionsData.childMealOptions || [])
-        setDessertOptions(optionsData.dessertOptions || [])
+        setDessertOptions(optionsData.dessertOptions)
         setChildDessertOptions(optionsData.childDessertOptions || [])
-
-        // Debug questions
-        console.log('Loaded questions:', householdData.questions);
-
-        // Set up initial responses based on existing data
-        const initialResponses: Record<string, any> = {};
-        
-        // Initialize attendance, meal, and dessert choices
-        normalizedGuests.forEach((guest: Guest) => {
-          // Pre-fill attendance status
-          if (guest.isAttending !== undefined) {
-            initialResponses[`attending-${guest.id}`] = guest.isAttending;
-          }
-          
-          // Pre-fill meal choice
-          if ('mealChoice' in guest && guest.mealChoice) {
-            initialResponses[`meal-${guest.id}`] = guest.mealChoice;
-          }
-          
-          // Pre-fill dessert choice
-          if ('dessertChoice' in guest && guest.dessertChoice) {
-            initialResponses[`dessert-${guest.id}`] = guest.dessertChoice;
-          }
-          
-          // Pre-fill dietary notes
-          if ('dietaryNotes' in guest && guest.dietaryNotes) {
-            initialResponses[`dietary-${guest.id}`] = guest.dietaryNotes;
-          }
-          
-          // Pre-fill guest-specific question responses
-          if (guest.responses && Array.isArray(guest.responses)) {
-            guest.responses.forEach((response: { questionId: string; answer: string }) => {
-              initialResponses[`${response.questionId}-${guest.id}`] = response.answer;
-            });
-          }
-        });
-        
-        // Set initial responses
-        setResponses(initialResponses);
-        console.log('Initial responses set:', initialResponses);
-
       } catch (error) {
-        console.error('Error fetching RSVP data:', error)
-        setError('Failed to load RSVP form. Please try again later.')
         toast({
           title: "Error",
           description: "Failed to load RSVP form",
           variant: "destructive",
         })
-      } finally {
-        setLoading(false)
       }
     }
 
-    if (params.code) {
-      fetchData()
-    }
+    fetchData()
   }, [params.code, toast])
 
-  // Validate all responses and return errors if any
-  const validateResponses = () => {
-    if (!household) return ['No household data found'];
-    
-    const errors: string[] = [];
-    
-    household.guests.forEach((guest: Guest) => {
-      const isAttending = responses[`attending-${guest.id}`];
-      if (isAttending === undefined) {
-        errors.push(`Please indicate if ${guest.name} is attending`);
-      }
-      
-      if (isAttending) {
-        const mealChoice = responses[`meal-${guest.id}`];
-        const dessertChoice = responses[`dessert-${guest.id}`];
-        
-        if (!mealChoice) {
-          errors.push(`Please select a meal for ${guest.name}`);
-        }
-        if (!dessertChoice) {
-          errors.push(`Please select a dessert for ${guest.name}`);
-        }
-        
-        // Validate child options - normalize isChild to Boolean for consistency
-        const isChild = Boolean(guest.isChild);
-        if (isChild) {
-          console.log(`Validating child options for ${guest.name} (isChild=${isChild})`);
-          const selectedMeal = childMealOptions.find(o => o.id === mealChoice);
-          const selectedDessert = childDessertOptions.find(o => o.id === dessertChoice);
-          
-          if (mealChoice && !selectedMeal) {
-            errors.push(`Please select a children's meal for ${guest.name}`);
-          }
-          if (dessertChoice && !selectedDessert) {
-            errors.push(`Please select a children's dessert for ${guest.name}`);
-          }
-        }
-      }
-    });
-    
-    return errors;
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!household) return;
+    e.preventDefault()
 
+    // Validate required fields for attending guests
+    const hasInvalidResponses = household?.guests.some(guest => {
+      if (responses[`attending-${guest.id}`]) {
+        if (!responses[`meal-${guest.id}`] || !responses[`dessert-${guest.id}`]) {
+          return true
+        }
+      }
+      return false
+    })
+
+    if (hasInvalidResponses) {
+      toast({
+        title: "Error",
+        description: "Please select meal and dessert preferences for all attending guests",
+        variant: "destructive",
+      })
+      return
+    }
     try {
-      console.log('Starting RSVP submission...');
-      
-      // Validate responses
-      const errors = validateResponses();
-      
-      if (errors.length > 0) {
-        toast({
-          title: "Validation Error",
-          description: errors.join('. '),
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Format the data for the API
-      const formattedGuests = household.guests.map(guest => {
-        const isAttending = responses[`attending-${guest.id}`] === true;
-        const mealChoiceId = isAttending ? responses[`meal-${guest.id}`] : null;
-        const dessertChoiceId = isAttending ? responses[`dessert-${guest.id}`] : null;
-        const dietaryNotes = responses[`dietary-${guest.id}`] || null;
-        
-        // Collect question responses for this guest
-        const guestResponses = questions
-          .filter(q => q.perGuest)
-          .map(question => ({
-            questionId: question.id,
-            answer: String(responses[`${question.id}-${guest.id}`] || '')
-          }))
-          .filter(r => r.answer.trim() !== ''); // Only include non-empty responses
-        
-        return {
-          id: guest.id,
-          name: guest.name,
-          isAttending,
-          mealChoice: isAttending ? mealChoiceId : null,
-          dessertChoice: isAttending ? dessertChoiceId : null,
-          dietaryNotes,
-          isChild: guest.isChild,
-          responses: guestResponses
-        };
-      });
-      
-      // Add household-level questions
-      const householdResponses = questions
-        .filter(q => !q.perGuest)
-        .map(question => ({
-          questionId: question.id,
-          answer: String(responses[question.id] || '')
-        }))
-        .filter(r => r.answer.trim() !== '');
-      
-      const apiData = {
-        guests: formattedGuests,
-        householdResponses
-      };
-      
-      console.log('Submitting RSVP data:', JSON.stringify(apiData, null, 2));
-
-      // Add a loading state for submit button
-      setLoading(true);
-      
       const response = await fetch(`/api/rsvp/${params.code}`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate'
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify(apiData),
-      });
+        body: JSON.stringify({ responses }),
+      })
 
-      const responseData = await response.json();
-      console.log('Server response:', responseData);
-
-      if (!response.ok) {
-        throw new Error(responseData.error || responseData.details || 'Failed to submit RSVP');
-      }
+      if (!response.ok) throw new Error("Failed to submit RSVP")
 
       toast({
         title: "Success",
         description: "Your RSVP has been submitted successfully",
-      });
-      
-      // Redirect to success page or close modal
-      setTimeout(() => {
-        router.push('/');
-      }, 2000);
-
+      })
     } catch (error) {
-      console.error('Error submitting RSVP:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to submit RSVP. Please try again.",
+        description: "Failed to submit RSVP",
         variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+      })
     }
   }
 
-  const getQuestionOptions = (question: Question): string[] => {
-    if (question.type !== "MULTIPLE_CHOICE") return [];
-    
-    try {
-      // Handle different potential formats for options
-      if (!question.options) {
-        console.warn(`Question ${question.id} has no options string`);
-        return [];
-      }
-      
-      if (typeof question.options === 'string') {
-        // Try to parse as JSON string
-        if (question.options.trim() === '') {
-          console.warn(`Question ${question.id} has empty options string`);
-          return [];
-        }
-        
-        try {
-          const parsed = JSON.parse(question.options);
-          if (Array.isArray(parsed)) {
-            return parsed;
-          } else if (typeof parsed === 'object') {
-            // Handle case where it might be an object with options
-            return Object.values(parsed).map(v => String(v));
-          } else {
-            // Single option case
-            return [String(parsed)];
-          }
-        } catch (e) {
-          // If not valid JSON, treat as comma-separated list
-          console.warn(`Failed to parse JSON for question ${question.id}, treating as comma-separated: ${e}`);
-          return question.options.split(',').map(o => o.trim()).filter(o => o.length > 0);
-        }
-      } else if (Array.isArray(question.options)) {
-        // Already an array
-        return (question.options as string[]).map((o: string) => String(o));
-      } else {
-        console.warn(`Unexpected options format for question ${question.id}: ${typeof question.options}`);
-        return [];
-      }
-    } catch (error) {
-      console.error(`Error processing options for question ${question.id}:`, error);
-      console.error(`Raw options data:`, question.options);
-      return [];
-    }
-  }
-
-  const onBack = () => {
-    router.push('/')
-  }
-
-  if (loading) {
-    return <div>Loading...</div>
-  }
-
-  if (error) {
-    return <div className="text-red-500">{error}</div>
-  }
-
-  if (!household) {
-    return <div>No household found</div>
-  }
+  if (!household) return null
 
   return (
     <div className="min-h-screen bg-black text-white p-8">
-      <MotionDiv
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
@@ -432,151 +144,128 @@ export default function RSVPForm() {
                     <Checkbox
                       id={`attending-${guest.id}`}
                       checked={responses[`attending-${guest.id}`]}
-                      onCheckedChange={(checked) => {
+                      onCheckedChange={(checked) =>
                         setResponses({
                           ...responses,
-                          [`attending-${guest.id}`]: checked
+                          [`attending-${guest.id}`]: checked,
                         })
-                      }}
+                      }
                     />
-                    <label htmlFor={`attending-${guest.id}`}>Will you be attending?</label>
+                    <label htmlFor={`attending-${guest.id}`}>Attending</label>
                   </div>
-
-                  {responses[`attending-${guest.id}`] && (
+                    {responses[`attending-${guest.id}`] && (
                     <>
                       <div className="space-y-2">
-                        <label>Meal Choice</label>
-                        <Select
-                          value={responses[`meal-${guest.id}`]}
-                          onValueChange={(value) => {
-                            setResponses({
-                              ...responses,
-                              [`meal-${guest.id}`]: value
-                            })
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a meal" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {guest.isChild === true
-                              ? childMealOptions.map((option) => (
-                                  <SelectItem key={option.id} value={option.id}>
-                                    {option.name}
-                                  </SelectItem>
-                                ))
-                              : mealOptions.map((option) => (
-                                  <SelectItem key={option.id} value={option.id}>
-                                    {option.name}
-                                  </SelectItem>
-                                ))}
-                          </SelectContent>
-                        </Select>
+                      <label>Meal Preference</label>
+                      <Select
+                        value={responses[`meal-${guest.id}`]}
+                        onValueChange={(value) =>
+                        setResponses({
+                          ...responses,
+                          [`meal-${guest.id}`]: value,
+                        })
+                        }
+                      >
+                        <SelectTrigger>
+                        <SelectValue placeholder="Select a meal" />
+                        </SelectTrigger>
+                        <SelectContent>
+                        {(guest.isChild ? childMealOptions : mealOptions).map((option) => (
+                          <SelectItem key={option.id} value={option.id}>
+                          {option.name}
+                          </SelectItem>
+                        ))}
+                        </SelectContent>
+                      </Select>
                       </div>
-
                       <div className="space-y-2">
-                        <label>Dessert Choice</label>
-                        <Select
-                          value={responses[`dessert-${guest.id}`]}
-                          onValueChange={(value) => {
-                            setResponses({
-                              ...responses,
-                              [`dessert-${guest.id}`]: value
-                            })
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a dessert" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {guest.isChild === true
-                              ? childDessertOptions.map((option) => (
-                                  <SelectItem key={option.id} value={option.id}>
-                                    {option.name}
-                                  </SelectItem>
-                                ))
-                              : dessertOptions.map((option) => (
-                                  <SelectItem key={option.id} value={option.id}>
-                                    {option.name}
-                                  </SelectItem>
-                                ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label>Dietary Requirements</label>
-                        <Input
-                          value={responses[`dietary-${guest.id}`] || ""}
-                          onChange={(e) => {
-                            setResponses({
-                              ...responses,
-                              [`dietary-${guest.id}`]: e.target.value
-                            })
-                          }}
-                          placeholder="Any dietary requirements or allergies?"
-                        />
+                      <label>Dessert Choice</label>
+                      <Select
+                        value={responses[`dessert-${guest.id}`]}
+                        onValueChange={(value) =>
+                        setResponses({
+                          ...responses,
+                          [`dessert-${guest.id}`]: value,
+                        })
+                        }
+                      >
+                        <SelectTrigger>
+                        <SelectValue placeholder="Select a dessert" />
+                        </SelectTrigger>
+                        <SelectContent>
+                        {(guest.isChild ? childDessertOptions : dessertOptions).map((option) => (
+                          <SelectItem key={option.id} value={option.id}>
+                          {option.name}
+                          </SelectItem>
+                        ))}
+                        </SelectContent>
+                      </Select>
                       </div>
                     </>
-                  )}
-
-                  {questions
-                    .filter((q) => q.perGuest)
-                    .map((question) => (
-                      <div key={question.id} className="space-y-2">
-                        <label>{question.question}</label>
-                        {question.type === "MULTIPLE_CHOICE" ? (
-                          <Select
-                            value={responses[`${question.id}-${guest.id}`]}
-                            onValueChange={(value) => {
-                              setResponses({
-                                ...responses,
-                                [`${question.id}-${guest.id}`]: value
-                              })
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select an option" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {getQuestionOptions(question).map((option) => (
-                                <SelectItem key={option} value={option}>
-                                  {option}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : question.type === "BOOLEAN" ? (
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`${question.id}-${guest.id}`}
-                              checked={responses[`${question.id}-${guest.id}`]}
-                              onCheckedChange={(checked) => {
+                    )}
+                    {responses[`attending-${guest.id}`] &&
+                    questions
+                      .filter((q) => q.perGuest)
+                      .map((question) => (
+                        <div key={question.id} className="space-y-2">
+                          <label>{question.question}</label>
+                          {question.type === "MULTIPLE_CHOICE" ? (
+                            <Select
+                              value={responses[`${question.id}-${guest.id}`]}
+                              onValueChange={(value) =>
                                 setResponses({
                                   ...responses,
-                                  [`${question.id}-${guest.id}`]: checked
+                                  [`${question.id}-${guest.id}`]: value,
                                 })
-                              }}
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select an option" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {(() => {
+                                  try {
+                                    const parsedOptions = JSON.parse(question.options);
+                                    return parsedOptions.map((option: string) => (
+                                      <SelectItem key={option} value={option}>
+                                        {option}
+                                      </SelectItem>
+                                    ));
+                                  } catch {
+                                    return null;
+                                  }
+                                })()}
+                              </SelectContent>
+                            </Select>
+                          ) : question.type === "TEXT" ? (
+                            <Input
+                              value={responses[`${question.id}-${guest.id}`] || ""}
+                              onChange={(e) =>
+                                setResponses({
+                                  ...responses,
+                                  [`${question.id}-${guest.id}`]: e.target.value,
+                                })
+                              }
                             />
-                            <label htmlFor={`${question.id}-${guest.id}`}>Yes</label>
-                          </div>
-                        ) : (
-                          <Input
-                            value={responses[`${question.id}-${guest.id}`] || ""}
-                            onChange={(e) => {
-                              setResponses({
-                                ...responses,
-                                [`${question.id}-${guest.id}`]: e.target.value
-                              })
-                            }}
-                            placeholder="Your answer"
-                          />
-                        )}
-                      </div>
-                    ))}
+                          ) : (
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`${question.id}-${guest.id}`}
+                                checked={responses[`${question.id}-${guest.id}`]}
+                                onCheckedChange={(checked) =>
+                                  setResponses({
+                                    ...responses,
+                                    [`${question.id}-${guest.id}`]: checked,
+                                  })
+                                }
+                              />
+                              <label htmlFor={`${question.id}-${guest.id}`}>Yes</label>
+                            </div>
+                          )}
+                        </div>
+                      ))}
                 </div>
               ))}
-
               {questions
                 .filter((q) => !q.perGuest)
                 .map((question) => (
@@ -585,65 +274,66 @@ export default function RSVPForm() {
                     {question.type === "MULTIPLE_CHOICE" ? (
                       <Select
                         value={responses[question.id]}
-                        onValueChange={(value) => {
+                        onValueChange={(value) =>
                           setResponses({
                             ...responses,
-                            [question.id]: value
+                            [question.id]: value,
                           })
-                        }}
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select an option" />
                         </SelectTrigger>
                         <SelectContent>
-                          {getQuestionOptions(question).map((option) => (
-                            <SelectItem key={option} value={option}>
-                              {option}
-                            </SelectItem>
-                          ))}
+                            {(() => {
+                              try {
+                                const parsedOptions = JSON.parse(question.options);
+                                return parsedOptions.map((option: string) => (
+                                  <SelectItem key={option} value={option}>
+                                    {option}
+                                  </SelectItem>
+                                ));
+                              } catch {
+                                return null;
+                              }
+                            })()}
                         </SelectContent>
                       </Select>
-                    ) : question.type === "BOOLEAN" ? (
+                    ) : question.type === "TEXT" ? (
+                      <Input
+                        value={responses[question.id] || ""}
+                        onChange={(e) =>
+                          setResponses({
+                            ...responses,
+                            [question.id]: e.target.value,
+                          })
+                        }
+                      />
+                    ) : (
                       <div className="flex items-center space-x-2">
                         <Checkbox
                           id={question.id}
                           checked={responses[question.id]}
-                          onCheckedChange={(checked) => {
+                          onCheckedChange={(checked) =>
                             setResponses({
                               ...responses,
-                              [question.id]: checked
+                              [question.id]: checked,
                             })
-                          }}
+                          }
                         />
                         <label htmlFor={question.id}>Yes</label>
                       </div>
-                    ) : (
-                      <Input
-                        value={responses[question.id] || ""}
-                        onChange={(e) => {
-                          setResponses({
-                            ...responses,
-                            [question.id]: e.target.value
-                          })
-                        }}
-                        placeholder="Your answer"
-                      />
                     )}
                   </div>
                 ))}
-
-              <div className="flex justify-end space-x-4">
-                <Button variant="outline" type="button" onClick={onBack} disabled={loading}>
-                  Back
-                </Button>
-                <Button type="submit" disabled={loading}>
-                  {loading ? 'Submitting...' : 'Submit RSVP'}
-                </Button>
-              </div>
+              <Button type="submit" className="w-full">
+                Submit RSVP
+              </Button>
             </form>
           </CardContent>
         </Card>
-      </MotionDiv>
+      </motion.div>
     </div>
   )
 }
+

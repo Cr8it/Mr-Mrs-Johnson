@@ -18,91 +18,129 @@ interface GuestSubmission {
     questionId: string
     answer: string
   }>
-  isChild?: boolean
 }
 
 export async function POST(request: Request) {
   try {
     const { guests } = await request.json()
-    console.log("Received RSVP submission:", JSON.stringify(guests, null, 2))
-    
-    if (!guests || !Array.isArray(guests)) {
-      return NextResponse.json({ error: "Invalid guest data" }, { status: 400 })
-    }
-    
-    const results = [];
-    
-    // Process each guest
-    for (const guest of guests) {
+    console.log("Submitting RSVP for guests:", guests)
+
+    // Update each guest's RSVP details
+    const updates = guests.map(async (guest: GuestSubmission) => {
       try {
-        // First, get the current guest data
+        // Get the guest's current state to compare changes
         const currentGuest = await prisma.guest.findUnique({
           where: { id: guest.id },
-          select: { isChild: true }
-        });
-
-        if (!currentGuest) {
-          console.error(`Guest not found: ${guest.id}`);
-          continue;
-        }
-
-        // Force boolean conversion of isChild
-        const isChildValue = currentGuest.isChild === true;
-        
-        // Update the guest with forced boolean value
-        const updatedGuest = await prisma.guest.update({
-          where: { id: guest.id },
-          data: {
-            isAttending: guest.isAttending,
-            mealOptionId: guest.isAttending ? guest.mealChoice?.id : null,
-            dessertOptionId: guest.isAttending ? guest.dessertChoice?.id : null,
-            dietaryNotes: guest.dietaryNotes,
-            isChild: isChildValue
-          },
           include: {
             mealChoice: true,
             dessertChoice: true
           }
-        });
-        
-        console.log(`Updated guest ${updatedGuest.name}:`, {
-          id: updatedGuest.id,
-          isChild: updatedGuest.isChild,
-          typeOfIsChild: typeof updatedGuest.isChild
-        });
-        
-        results.push(updatedGuest);
-      } catch (error) {
-        console.error(`Error processing guest ${guest.id}:`, error);
+        })
+
+        // Update guest basic info
+        const updatedGuest = await prisma.guest.update({
+          where: { id: guest.id },
+          data: {
+            isAttending: guest.isAttending,
+            mealOptionId: guest.mealChoice?.id || null,
+            dessertOptionId: guest.dessertChoice?.id || null,
+            dietaryNotes: guest.dietaryNotes,
+          },
+          include: {
+            household: true,
+            mealChoice: true,
+            dessertChoice: true
+          }
+        })
+
+        // Try to log activities
+        try {
+          // Log RSVP status change
+          if (currentGuest?.isAttending !== guest.isAttending) {
+            await prisma.guestActivity.create({
+              data: {
+                guestId: guest.id,
+                action: guest.isAttending ? 'RSVP_YES' : 'RSVP_NO',
+                details: guest.isAttending ? 'Confirmed attendance' : 'Declined attendance'
+              }
+            })
+          }
+
+          // Log meal choice change
+          if (currentGuest?.mealChoice?.id !== guest.mealChoice?.id && guest.mealChoice) {
+            await prisma.guestActivity.create({
+              data: {
+                guestId: guest.id,
+                action: 'UPDATE_MEAL',
+                details: `Selected meal: ${guest.mealChoice.name}`
+              }
+            })
+          }
+
+          // Log dessert choice change
+          if (currentGuest?.dessertChoice?.id !== guest.dessertChoice?.id && guest.dessertChoice) {
+            await prisma.guestActivity.create({
+              data: {
+                guestId: guest.id,
+                action: 'UPDATE_DESSERT',
+                details: `Selected dessert: ${guest.dessertChoice.name}`
+              }
+            })
+          }
+        } catch (activityError) {
+          console.error("Failed to log activities:", activityError)
+          // Continue with the update even if activity logging fails
+        }
+
+        // Handle responses
+        if (guest.responses && guest.responses.length > 0) {
+          await prisma.questionResponse.deleteMany({
+            where: { guestId: guest.id }
+          })
+
+          await prisma.questionResponse.createMany({
+            data: guest.responses.map(response => ({
+              guestId: guest.id,
+              questionId: response.questionId,
+              answer: response.answer
+            }))
+          })
+        }
+
+        return updatedGuest
+      } catch (guestError) {
+        console.error(`Error updating guest ${guest.id}:`, guestError)
+        throw guestError
       }
-    }
-    
-    // Send confirmation email if we have results
-    if (results.length > 0) {
-      try {
-        await sendRsvpConfirmation(results.map(guest => ({
-          id: guest.id,
-          name: guest.name,
-          isAttending: guest.isAttending,
-          mealChoice: guest.mealChoice,
-          dessertChoice: guest.dessertChoice,
-          dietaryNotes: guest.dietaryNotes,
-          email: guest.email
-        })));
-      } catch (emailError) {
-        console.error("Failed to send RSVP confirmation email:", emailError);
-      }
+    })
+
+    const updatedGuests = await Promise.all(updates)
+    console.log("Updated guests:", updatedGuests)
+
+    // Send confirmation email
+    try {
+      await sendRsvpConfirmation(updatedGuests.map(guest => ({
+        id: guest.id,
+        name: guest.name,
+        isAttending: guest.isAttending,
+        mealChoice: guest.mealChoice,
+        dessertChoice: guest.dessertChoice,
+        dietaryNotes: guest.dietaryNotes,
+        email: guest.email
+      })))
+    } catch (emailError) {
+      console.error("Failed to send RSVP confirmation email:", emailError)
     }
 
     return NextResponse.json({ 
-      success: true, 
-      results: results
-    });
+      success: true,
+      message: "RSVP submitted successfully"
+    })
   } catch (error) {
-    console.error("Error processing RSVP submission:", error);
-    return NextResponse.json({ 
-      error: "Failed to process RSVP submission",
-      details: error instanceof Error ? error.message : "Unknown error"
-    }, { status: 500 });
+    console.error("RSVP submit error:", error)
+    return NextResponse.json(
+      { error: "Failed to submit RSVP" },
+      { status: 500 }
+    )
   }
 }

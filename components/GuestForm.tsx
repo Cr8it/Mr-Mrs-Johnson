@@ -43,7 +43,6 @@ interface Guest {
   } | null
   dietaryNotes: string | null
   responses: Response[]
-  isChild: boolean
 }
 
 interface GuestFormProps {
@@ -60,81 +59,19 @@ interface GuestFormProps {
 
 export default function GuestForm({ household, onBack, onSuccess }: GuestFormProps) {
   const { toast } = useToast()
-  
-  // Debug household data when component mounts
-  console.log('GuestForm RECEIVED HOUSEHOLD:', JSON.stringify(household, null, 2));
-  
   const [loading, setLoading] = useState(false)
   const [mealOptions, setMealOptions] = useState<{ id: string; name: string }[]>([])
-  const [childMealOptions, setChildMealOptions] = useState<{ id: string; name: string }[]>([])
   const [dessertOptions, setDessertOptions] = useState<{ id: string; name: string }[]>([])
-  const [childDessertOptions, setChildDessertOptions] = useState<{ id: string; name: string }[]>([])
   const [validationErrors, setValidationErrors] = useState<Record<string, string[]>>({})
-  
-  // Add explicit boolean conversion for all guests' isChild property
   const [guests, setGuests] = useState<Guest[]>(() => {
-    // Debug the raw values coming from the household object
-    console.log('RAW GUEST DATA:', JSON.stringify(household.guests, null, 2));
-    
-    // Find Niyah Dublin for special debugging
-    const niyahDebug = household.guests.find(g => g.name.includes('Niyah'));
-    if (niyahDebug) {
-      console.log('NIYAH DUBLIN FOUND IN HOUSEHOLD DATA:');
-      console.log('- isChild value:', niyahDebug.isChild);
-      console.log('- isChild type:', typeof niyahDebug.isChild);
-      console.log('- Full record:', JSON.stringify(niyahDebug, null, 2));
-    } else {
-      console.log('Niyah Dublin not found in household data');
-    }
-    
-    // Log exact values to debug isChild
-    household.guests.forEach(guest => {
-      console.log(`Guest ${guest.name} rawIsChild:`, {
-        value: guest.isChild,
-        type: typeof guest.isChild, 
-        stringified: JSON.stringify(guest.isChild),
-        booleanConversion: !!guest.isChild,
-      });
-    });
-    
-    return household.guests.map(guest => {
-      // SPECIAL FIX FOR NIYAH DUBLIN
-      if (guest.name.includes('Niyah')) {
-        console.log(`APPLYING SPECIAL FIX FOR ${guest.name}`);
-        // Force isChild to true for Niyah
-        return {
-          ...guest,
-          isChild: true, // Force override to true
-          mealChoice: guest.mealChoice || null,
-          dessertChoice: guest.dessertChoice || null,
-          responses: guest.responses || [],
-          isAttending: guest.isAttending ?? null
-        };
-      }
-      
-      // Safely convert isChild to boolean regardless of input type
-      const isChildValue = (() => {
-        if (typeof guest.isChild === 'string') {
-          return guest.isChild === 'true' || guest.isChild === 'TRUE';
-        }
-        return Boolean(guest.isChild);
-      })();
-      
-      return {
-        ...guest,
-        // Use the properly processed boolean value
-        isChild: isChildValue,
-        mealChoice: guest.mealChoice || null,
-        dessertChoice: guest.dessertChoice || null,
-        responses: guest.responses || [],
-        isAttending: guest.isAttending ?? null
-      };
-    });
+    return household.guests.map(guest => ({
+      ...guest,
+      mealChoice: guest.mealChoice || null,
+      dessertChoice: guest.dessertChoice || null,
+      responses: guest.responses || [],
+      isAttending: guest.isAttending ?? null
+    }));
   });
-  
-  console.log('GUEST DATA AFTER TRANSFORMATION:');
-  console.log('isChild after conversion:', guests.map(g => ({ name: g.name, isChild: g.isChild })));
-  console.log(`Found ${guests.filter(g => g.isChild).length} child guests in household`);
 
   // Add handleBack function
   const handleBack = () => {
@@ -151,56 +88,19 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
   // Define fetchData function before using it
   const fetchData = async () => {
     try {
-      console.log('STARTING FETCH DATA...');
-      console.log('Guest isChild values before API call:', guests.map(g => ({ 
-        name: g.name, 
-        isChild: g.isChild,
-        type: typeof g.isChild
-      })));
-      
       const optionsResponse = await fetch('/api/rsvp/form-data')
       const optionsData = await optionsResponse.json()
-      
-      console.log('API Response data:', optionsData);
-      console.log('Child meal options from API:', optionsData.childMealOptions);
-      console.log('Child dessert options from API:', optionsData.childDessertOptions);
       
       if (!optionsResponse.ok) {
         throw new Error(optionsData.error || 'Failed to fetch options')
       }
       
-      // Regular options handling
       if (optionsData.mealOptions?.length > 0) {
         setMealOptions(optionsData.mealOptions)
-        console.log('Set regular meal options:', optionsData.mealOptions);
       }
-      
-      // Child options handling with fallback
-      if (optionsData.childMealOptions?.length > 0) {
-        setChildMealOptions(optionsData.childMealOptions)
-        console.log('Set child meal options:', optionsData.childMealOptions);
-      } else {
-        // If no child options, use regular options as fallback
-        console.warn('No child meal options found, using regular options as fallback')
-        setChildMealOptions(optionsData.mealOptions || [])
-      }
-      
-      // Regular dessert options
       if (optionsData.dessertOptions?.length > 0) {
         setDessertOptions(optionsData.dessertOptions)
-        console.log('Set regular dessert options:', optionsData.dessertOptions);
       }
-      
-      // Child dessert options with fallback
-      if (optionsData.childDessertOptions?.length > 0) {
-        setChildDessertOptions(optionsData.childDessertOptions)
-        console.log('Set child dessert options:', optionsData.childDessertOptions);
-      } else {
-        // If no child options, use regular options as fallback
-        console.warn('No child dessert options found, using regular options as fallback')
-        setChildDessertOptions(optionsData.dessertOptions || [])
-      }
-      
     } catch (error) {
       console.error('Failed to fetch data:', error)
       toast({
@@ -219,9 +119,7 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
       mealChoice: guest.mealChoice || null,
       dessertChoice: guest.dessertChoice || null,
       responses: guest.responses || [],
-      isAttending: guest.isAttending ?? null,
-      // Force boolean conversion of isChild
-      isChild: guest.isChild === true
+      isAttending: guest.isAttending ?? null
     }));
     
     setGuests(newGuests);
@@ -265,12 +163,6 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
 
   useEffect(() => {
     fetchData()
-    
-    // Log children when component mounts
-    console.log('Guest isChild values on component mount:', guests.map(g => ({ 
-      name: g.name, 
-      isChild: g.isChild 
-    })))
   }, [])
 
 
@@ -309,9 +201,7 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
   // Add debug logging to the render section
   console.log('Rendering GuestForm with:', {
     mealOptions,
-    childMealOptions,
     dessertOptions,
-    childDessertOptions,
     questions,
     guests
   })
@@ -364,41 +254,15 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
   const handleMealChoice = (guestId: string, meal: string) => {
     clearFieldError(guestId, 'Meal choice');
     setGuests(prev => {
-      const updated = prev.map(guest => {
-        if (guest.id !== guestId) return guest;
-        
-        // Get the appropriate options based on whether guest is a child
-        const isChildGuest = (() => {
-          console.log(`DEBUG ${guest.name}: Raw isChild=${JSON.stringify(guest.isChild)}, type=${typeof guest.isChild}`);
-          if (typeof guest.isChild === 'string') {
-            const result = guest.isChild === 'true' || guest.isChild === 'TRUE';
-            console.log(`  String check: ${guest.isChild} → ${result}`);
-            return result;
-          } else if (typeof guest.isChild === 'boolean') {
-            console.log(`  Boolean check: ${guest.isChild}`);
-            return guest.isChild;
-          } else if (typeof guest.isChild === 'number') {
-            const result = guest.isChild === 1;
-            console.log(`  Number check: ${guest.isChild} → ${result}`);
-            return result;
-          }
-          const result = Boolean(guest.isChild);
-          console.log(`  Default check: ${guest.isChild} → ${result}`);
-          return result;
-        })();
-        
-        const relevantOptions = isChildGuest ? childMealOptions : mealOptions;
-        console.log(`Using ${isChildGuest ? 'child' : 'adult'} meal options for ${guest.name}`);
-        const selectedOption = relevantOptions.find(opt => opt.id === meal);
-        
-        return { 
+      const updated = prev.map(guest =>
+        guest.id === guestId ? { 
           ...guest, 
           mealChoice: { 
             id: meal,
-            name: selectedOption?.name || 'Unknown Option'
+            name: mealOptions.find(opt => opt.id === meal)?.name || ''
           } 
-        };
-      });
+        } : guest
+      );
       saveToLocalStorage(updated);
       return updated;
     });
@@ -407,41 +271,15 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
   const handleDessertChoice = (guestId: string, dessert: string) => {
     clearFieldError(guestId, 'Dessert choice');
     setGuests(prev => {
-      const updated = prev.map(guest => {
-        if (guest.id !== guestId) return guest;
-        
-        // Get the appropriate options based on whether guest is a child
-        const isChildGuest = (() => {
-          console.log(`DEBUG ${guest.name}: Raw isChild=${JSON.stringify(guest.isChild)}, type=${typeof guest.isChild}`);
-          if (typeof guest.isChild === 'string') {
-            const result = guest.isChild === 'true' || guest.isChild === 'TRUE';
-            console.log(`  String check: ${guest.isChild} → ${result}`);
-            return result;
-          } else if (typeof guest.isChild === 'boolean') {
-            console.log(`  Boolean check: ${guest.isChild}`);
-            return guest.isChild;
-          } else if (typeof guest.isChild === 'number') {
-            const result = guest.isChild === 1;
-            console.log(`  Number check: ${guest.isChild} → ${result}`);
-            return result;
-          }
-          const result = Boolean(guest.isChild);
-          console.log(`  Default check: ${guest.isChild} → ${result}`);
-          return result;
-        })();
-        
-        const relevantOptions = isChildGuest ? childDessertOptions : dessertOptions;
-        console.log(`Using ${isChildGuest ? 'child' : 'adult'} dessert options for ${guest.name}`);
-        const selectedOption = relevantOptions.find(opt => opt.id === dessert);
-        
-        return { 
+      const updated = prev.map(guest =>
+        guest.id === guestId ? { 
           ...guest, 
           dessertChoice: { 
             id: dessert,
-            name: selectedOption?.name || 'Unknown Option'
+            name: dessertOptions.find(opt => opt.id === dessert)?.name || ''
           } 
-        };
-      });
+        } : guest
+      );
       saveToLocalStorage(updated);
       return updated;
     });
@@ -535,28 +373,10 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
     }
 
     try {
-      // Ensure all guests have a properly normalized isChild property before submission
-      const normalizedGuests = guests.map(guest => ({
-        ...guest,
-        // Force boolean conversion of isChild 
-        isChild: guest.isChild === true
-      }));
-      
-      // Add detailed logging before submission
-      console.log("About to submit RSVP with normalized guests:", JSON.stringify(normalizedGuests.map(g => ({
-        id: g.id,
-        name: g.name,
-        isAttending: g.isAttending,
-        mealChoice: g.mealChoice,
-        dessertChoice: g.dessertChoice,
-        isChild: g.isChild,
-        typeOfIsChild: typeof g.isChild
-      })), null, 2));
-      
       const response = await fetch("/api/rsvp/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ guests: normalizedGuests }),
+        body: JSON.stringify({ guests }),
       });
 
       const data = await response.json();
@@ -590,9 +410,7 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
   // Add debug logging before render
   console.log('Rendering select options:', {
     mealOptions,
-    childMealOptions,
     dessertOptions,
-    childDessertOptions,
     guestMealChoices: guests.map(g => ({ id: g.id, mealChoice: g.mealChoice })),
     guestDessertChoices: guests.map(g => ({ id: g.id, dessertChoice: g.dessertChoice }))
   })
@@ -678,72 +496,15 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                       <p className="text-red-500 text-sm mt-1">Please select a meal option</p>
                     )}
                   <SelectContent className="bg-black border border-white border-opacity-20 text-white" sideOffset={5}>
-                    {(() => {
-                      // Special handling for Niyah Dublin
-                      if (guest.name.includes('Niyah')) {
-                        console.log(`SPECIAL RENDER FOR ${guest.name} MEAL OPTIONS`);
-                        console.log(`  Forcing child meal options to be shown`);
-                        
-                        if (childMealOptions.length === 0) {
-                          console.warn(`  WARNING: No child meal options available!`);
-                          return <div className="p-2 text-red-500">No options available</div>;
-                        }
-                        
-                        return childMealOptions.map((option) => (
-                          <SelectItem
-                            key={option.id}
-                            value={option.id}
-                            className="text-white hover:bg-white/10 cursor-pointer"
-                          >
-                            {option.name}
-                          </SelectItem>
-                        ));
-                      }
-                      
-                      // More detailed debugging
-                      const isChildGuest = (() => {
-                        console.log(`DEBUG ${guest.name}: Raw isChild=${JSON.stringify(guest.isChild)}, type=${typeof guest.isChild}`);
-                        if (typeof guest.isChild === 'string') {
-                          const result = guest.isChild === 'true' || guest.isChild === 'TRUE';
-                          console.log(`  String check: ${guest.isChild} → ${result}`);
-                          return result;
-                        } else if (typeof guest.isChild === 'boolean') {
-                          console.log(`  Boolean check: ${guest.isChild}`);
-                          return guest.isChild;
-                        } else if (typeof guest.isChild === 'number') {
-                          const result = guest.isChild === 1;
-                          console.log(`  Number check: ${guest.isChild} → ${result}`);
-                          return result;
-                        }
-                        const result = Boolean(guest.isChild);
-                        console.log(`  Default check: ${guest.isChild} → ${result}`);
-                        return result;
-                      })();
-                      
-                      console.log(`Rendering meal options for ${guest.name}:`);
-                      console.log(`  isChild=${isChildGuest} (${typeof guest.isChild})`);
-                      console.log(`  Raw isChild value: ${JSON.stringify(guest.isChild)}`);
-                      console.log(`  Regular meal options count: ${mealOptions.length}`);
-                      console.log(`  Child meal options count: ${childMealOptions.length}`);
-                      
-                      const optionsToShow = isChildGuest ? childMealOptions : mealOptions;
-                      console.log(`  Options being shown:`, optionsToShow.map(o => o.name));
-                      
-                      if (optionsToShow.length === 0) {
-                        console.warn(`  WARNING: No meal options available for ${isChildGuest ? 'child' : 'adult'} guest!`);
-                        return <div className="p-2 text-red-500">No options available</div>;
-                      }
-                      
-                      return optionsToShow.map((option) => (
-                        <SelectItem
-                          key={option.id}
-                          value={option.id}
-                          className="text-white hover:bg-white/10 cursor-pointer"
-                        >
-                          {option.name}
-                        </SelectItem>
-                      ));
-                    })()}
+                    {mealOptions.map((option) => (
+                    <SelectItem
+                      key={option.id}
+                      value={option.id}
+                      className="text-white hover:bg-white/10 cursor-pointer"
+                    >
+                      {option.name}
+                    </SelectItem>
+                    ))}
                   </SelectContent>
                   </Select>
                 </div>
@@ -769,91 +530,138 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                       <p className="text-red-500 text-sm mt-1">Please select a dessert option</p>
                     )}
                   <SelectContent className="bg-black border border-white border-opacity-20 text-white" sideOffset={5}>
-                    {(() => {
-                      // Special handling for Niyah Dublin
-                      if (guest.name.includes('Niyah')) {
-                        console.log(`SPECIAL RENDER FOR ${guest.name} DESSERT OPTIONS`);
-                        console.log(`  Forcing child dessert options to be shown`);
-                        
-                        if (childDessertOptions.length === 0) {
-                          console.warn(`  WARNING: No child dessert options available!`);
-                          return <div className="p-2 text-red-500">No options available</div>;
-                        }
-                        
-                        return childDessertOptions.map((option) => (
-                          <SelectItem
-                            key={option.id}
-                            value={option.id}
-                            className="text-white hover:bg-white/10 cursor-pointer"
-                          >
-                            {option.name}
-                          </SelectItem>
-                        ));
-                      }
-                      
-                      // More detailed debugging
-                      const isChildGuest = (() => {
-                        console.log(`DEBUG ${guest.name}: Raw isChild=${JSON.stringify(guest.isChild)}, type=${typeof guest.isChild}`);
-                        if (typeof guest.isChild === 'string') {
-                          const result = guest.isChild === 'true' || guest.isChild === 'TRUE';
-                          console.log(`  String check: ${guest.isChild} → ${result}`);
-                          return result;
-                        } else if (typeof guest.isChild === 'boolean') {
-                          console.log(`  Boolean check: ${guest.isChild}`);
-                          return guest.isChild;
-                        } else if (typeof guest.isChild === 'number') {
-                          const result = guest.isChild === 1;
-                          console.log(`  Number check: ${guest.isChild} → ${result}`);
-                          return result;
-                        }
-                        const result = Boolean(guest.isChild);
-                        console.log(`  Default check: ${guest.isChild} → ${result}`);
-                        return result;
-                      })();
-                      
-                      console.log(`Rendering dessert options for ${guest.name}:`);
-                      console.log(`  isChild=${isChildGuest} (${typeof guest.isChild})`);
-                      console.log(`  Raw isChild value: ${JSON.stringify(guest.isChild)}`);
-                      console.log(`  Regular dessert options count: ${dessertOptions.length}`);
-                      console.log(`  Child dessert options count: ${childDessertOptions.length}`);
-                      
-                      const optionsToShow = isChildGuest ? childDessertOptions : dessertOptions;
-                      console.log(`  Options being shown:`, optionsToShow.map(o => o.name));
-                      
-                      if (optionsToShow.length === 0) {
-                        console.warn(`  WARNING: No dessert options available for ${isChildGuest ? 'child' : 'adult'} guest!`);
-                        return <div className="p-2 text-red-500">No options available</div>;
-                      }
-                      
-                      return optionsToShow.map((option) => (
-                        <SelectItem
-                          key={option.id}
-                          value={option.id}
-                          className="text-white hover:bg-white/10 cursor-pointer"
-                        >
-                          {option.name}
-                        </SelectItem>
-                      ));
-                    })()}
+                    {dessertOptions.map((option) => (
+                    <SelectItem
+                      key={option.id}
+                      value={option.id}
+                      className="text-white hover:bg-white/10 cursor-pointer"
+                    >
+                      {option.name}
+                    </SelectItem>
+                    ))}
                   </SelectContent>
                   </Select>
                 </div>
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Dietary Notes
-                    </label>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                Dietary Requirements
+                </label>
+                <Textarea
+                value={guest.dietaryNotes || ""}
+                onChange={(e) => handleDietaryNotes(guest.id, e.target.value)}
+                placeholder="Any allergies or dietary requirements?"
+                className="bg-transparent border-white border-opacity-20 text-white placeholder-gray-400"
+                />
+              </div>
+
+                {questions.map((question) => (
+                  <div key={question.id} className="space-y-2">
+                  <label className="text-sm font-medium text-gray-300">
+                    {question.question}
+                    {question.isRequired && <span className="text-red-500 ml-1">*</span>}
+                  </label>
+                    {question.type === "MULTIPLE_SELECT" ? (
+                      <div className="space-y-3">
+                        {(() => {
+                          try {
+                            const options = typeof question.options === 'string' ? 
+                              JSON.parse(question.options) : 
+                              question.options;
+                            const selectedOptions = guest.responses?.find(r => r.questionId === question.id)?.answer || "[]";
+                            const selectedValues = JSON.parse(selectedOptions);
+                            
+                            return Array.isArray(options) ? options.map((option: string) => (
+                              <div key={option} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`${guest.id}-${question.id}-${option}`}
+                                  checked={selectedValues.includes(option)}
+                                  onCheckedChange={(checked) => {
+                                    const currentValues = [...selectedValues];
+                                    if (checked) {
+                                      currentValues.push(option);
+                                    } else {
+                                      const index = currentValues.indexOf(option);
+                                      if (index > -1) {
+                                        currentValues.splice(index, 1);
+                                      }
+                                    }
+                                    handleQuestionResponse(guest.id, question.id, JSON.stringify(currentValues));
+                                  }}
+                                  className="data-[state=checked]:bg-gold data-[state=checked]:border-gold"
+                                />
+                                <label
+                                  htmlFor={`${guest.id}-${question.id}-${option}`}
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-white"
+                                >
+                                  {option}
+                                </label>
+                              </div>
+                            )) : [];
+                          } catch {
+                            return [];
+                          }
+                        })()}
+                        {validationErrors[guest.id]?.includes(question.question) && (
+                          <p className="text-red-500 text-sm mt-1">Please select at least one option</p>
+                        )}
+                      </div>
+                    ) : question.type === "MULTIPLE_CHOICE" ? (
+                      <>
+                        <Select
+                          value={guest.responses?.find(r => r.questionId === question.id)?.answer || ""}
+                          onValueChange={(value) => handleQuestionResponse(guest.id, question.id, value)}
+                        >
+                          <SelectTrigger 
+                            className={`bg-transparent border-white border-opacity-20 text-white h-12 ${
+                              validationErrors[guest.id]?.includes(question.question) ? 'border-red-500' : ''
+                            }`}
+                          >
+                            <SelectValue placeholder="Select an option" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-black border-white border-opacity-20">
+                            {(() => {
+                              try {
+                                const options = typeof question.options === 'string' ? 
+                                  JSON.parse(question.options) : 
+                                  question.options;
+                                return Array.isArray(options) ? options.map((option: string) => (
+                                  <SelectItem key={option} value={option}>{option}</SelectItem>
+                                )) : [];
+                              } catch {
+                                return [];
+                              }
+                            })()}
+                          </SelectContent>
+                        </Select>
+                        {validationErrors[guest.id]?.includes(question.question) && (
+                          <p className="text-red-500 text-sm mt-1">Please select an option</p>
+                        )}
+                      </>
+                    ) : (
+                    <>
                     <Textarea
-                    value={guest.dietaryNotes || ''}
-                    onChange={(e) => handleDietaryNotes(guest.id, e.target.value)}
+                      value={guest.responses?.find(r => r.questionId === question.id)?.answer || ""}
+                      onChange={(e) => handleQuestionResponse(guest.id, question.id, e.target.value)}
+                      placeholder="Your answer"
+                      className={`min-h-[80px] resize-none ${
+                      validationErrors[guest.id]?.includes(`${question.question} is required`)
+                        ? 'border-red-500'
+                        : ''
+                      }`}
                     />
-                </div>
+                    {validationErrors[guest.id]?.includes(`${question.question} is required`) && (
+                      <p className="text-red-500 text-sm mt-1">This field is required</p>
+                    )}
+                    </>
+                  )}
+                  </div>
+                ))}
                 </MotionDiv>
-            )}
+              )}
             </AnimatePresence>
             </MotionDiv>
           ))}
-
           <Button 
             type="submit" 
             className="w-full bg-white text-black hover:bg-gray-200" 
@@ -861,8 +669,10 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
           >
             {loading ? "Submitting..." : "Submit RSVP"}
           </Button>
-        </form>
+          </form>
         </div>
-    </MotionDiv>
-  )
-}
+        </MotionDiv>
+        );
+    }
+
+

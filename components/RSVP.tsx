@@ -23,7 +23,6 @@ interface Guest {
   } | null
   dietaryNotes: string | null
   responses: Response[]
-  isChild: boolean
 }
 
 interface Household {
@@ -41,12 +40,11 @@ interface RSVPProps {
 
 export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
   const [code, setCode] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [household, setHousehold] = useState<Household | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [allNotAttending, setAllNotAttending] = useState(false)
-  const [error, setError] = useState("")
   const { toast } = useToast()
 
   useEffect(() => {
@@ -96,7 +94,7 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsSubmitting(true)
+    setLoading(true)
     setShowSuccess(false)
 
     try {
@@ -112,16 +110,19 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
           // Store the code for later use
           localStorage.setItem('rsvp-code', data.household.code)
           
-          // Clear any old saved form data to ensure we get fresh data
+          // Check for saved form data
           const storageKey = `rsvp-${data.household.code}`;
-          localStorage.removeItem(storageKey);
-          
-          console.log("API search data for guests:", data.household.guests.map((g: Guest) => 
-            ({ name: g.name, isChild: g.isChild, typeOfIsChild: typeof g.isChild }))
-          );
-          
-          // Use fresh data from the server
-          setHousehold(data.household);
+          const savedData = localStorage.getItem(storageKey);
+          if (savedData) {
+            const parsedData = JSON.parse(savedData);
+            setHousehold({
+            ...data.household,
+            guests: parsedData.guests || data.household.guests,
+            questions: parsedData.questions || data.household.questions
+            });
+          } else {
+            setHousehold(data.household);
+          }
           setShowForm(true); // Show the form
           toast({
             title: "Welcome back!",
@@ -163,7 +164,7 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
       })
       setHousehold(null)
     } finally {
-      setIsSubmitting(false)
+      setLoading(false)
     }
   }
 
@@ -178,22 +179,21 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
       if (verifyResponse.ok) {
         const verifyData = await verifyResponse.json();
         
-        // Examine the raw response data
-        console.log("RAW API RESPONSE:", JSON.stringify(verifyData, null, 2));
-        
-        // Clear any previous saved data for this household to get fresh data
+        // Check for saved form data
         const storageKey = `rsvp-${householdCode}`;
-        localStorage.removeItem(storageKey);
+        const savedData = localStorage.getItem(storageKey);
         
-        console.log("API data for guests:", verifyData.household.guests.map((g: Guest) => 
-          ({ name: g.name, isChild: g.isChild, typeOfIsChild: typeof g.isChild }))
-        );
-        
-        // Use the server's data directly instead of potentially stale localStorage data
-        setHousehold(verifyData.household);
-        
-        // Log the household after setting to state
-        console.log("HOUSEHOLD AFTER SETTING STATE:", verifyData.household);
+        if (savedData) {
+          const parsedData = JSON.parse(savedData);
+          // Merge saved data with fetched data
+          setHousehold({
+            ...verifyData.household,
+            guests: parsedData.guests || verifyData.household.guests,
+            questions: parsedData.questions || verifyData.household.questions
+          });
+        } else {
+          setHousehold(verifyData.household);
+        }
         
         setShowForm(true);
         setShowSuccess(false);
@@ -206,74 +206,6 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setIsSubmitting(true);
-
-    try {
-      // Add null check for household
-      if (!household) {
-        setError("No household data found. Please try again.");
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Normalize guest data before submission
-      const normalizedGuests = household.guests.map(guest => {
-        // More robust boolean conversion for isChild
-        const rawValue = guest.isChild;
-        const isChildValue = (() => {
-          if (typeof rawValue === 'string') {
-            // Assert rawValue as string to satisfy TypeScript
-            const strValue = rawValue as string; 
-            // Handle common string representations of true
-            return strValue.toLowerCase() === 'true' || strValue === '1' || strValue.toLowerCase() === 'yes' || strValue.toLowerCase() === 'y';
-          }
-          // Handle numeric representations (1 is true, 0 is false)
-          if (typeof rawValue === 'number') {
-            return rawValue === 1;
-          }
-          // Default to standard boolean conversion for other types (including actual booleans)
-          return Boolean(rawValue);
-        })();
-        
-        return {
-          ...guest,
-          isChild: isChildValue
-        };
-      });
-
-      const requestBody = {
-        ...household,
-        guests: normalizedGuests
-      };
-
-      const response = await fetch(`/api/rsvp/${household.code}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        handleRsvpSuccess(data.household.guests);
-      } else {
-        throw new Error("Failed to submit RSVP");
-      }
-    } catch (error) {
-      console.error("RSVP Error:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to submit RSVP",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handleModifyResponse = async () => {
     if (household?.code) {
@@ -282,6 +214,11 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
       await fetchHouseholdData(household.code);
     }
   };
+
+
+
+
+
 
   const handleRsvpSuccess = (guests: Guest[]) => {
     const notAttending = guests.every(guest => guest.isAttending === false);
@@ -299,6 +236,8 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
     // Only set success state, don't hide form
     setShowSuccess(true);
   };
+
+
 
   const handleBackToSearch = () => {
     setHousehold(null);
@@ -407,9 +346,9 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
                 <Button 
                   type="submit" 
                   className="w-full bg-white text-black hover:bg-gray-200" 
-                  disabled={isSubmitting}
+                  disabled={loading}
                 >
-                  {isSubmitting ? "Searching..." : "Find My Invitation"}
+                  {loading ? "Searching..." : "Find My Invitation"}
                 </Button>
               </form>
             </div>

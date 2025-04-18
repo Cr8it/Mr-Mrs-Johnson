@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
-import { Plus, X, GripVertical, Trash } from "lucide-react"
+import { Plus, X, GripVertical } from "lucide-react"
 import { PreferenceStats } from "@/components/PreferenceStats"
 import {
 	AlertDialog,
@@ -81,16 +81,10 @@ export default function MenuOptionsPage() {
 	const [mealOptions, setMealOptions] = useState<Option[]>([])
 	const [dessertOptions, setDessertOptions] = useState<Option[]>([])
 	const [newMealOption, setNewMealOption] = useState("")
-	const [newDessertOption, setNewDessertOption] = useState("")
-	const [isMealAdding, setIsMealAdding] = useState(false)
-	const [isDessertAdding, setIsDessertAdding] = useState(false)
 	const [isChildMealOption, setIsChildMealOption] = useState(false)
+	const [newDessertOption, setNewDessertOption] = useState("")
 	const [isChildDessertOption, setIsChildDessertOption] = useState(false)
-	const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation>({
-		isOpen: false,
-		optionId: "",
-		optionType: "meal"
-	})
+	const { toast } = useToast()
 	const [statistics, setStatistics] = useState<{
 		mealChoices: { name: string; count: number }[];
 		dessertChoices: { name: string; count: number }[];
@@ -100,7 +94,11 @@ export default function MenuOptionsPage() {
 		dessertChoices: [],
 		totalGuests: 0
 	})
-	const { toast } = useToast()
+	const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation>({
+		isOpen: false,
+		optionId: '',
+		optionType: 'meal'
+	})
 
 	const sensors = useSensors(
 		useSensor(PointerSensor),
@@ -137,18 +135,8 @@ export default function MenuOptionsPage() {
 	const fetchOptions = async () => {
 		try {
 			const [mealResponse, dessertResponse] = await Promise.all([
-				fetch('/api/admin/meal-options', {
-					cache: 'no-store',
-					headers: {
-						'Cache-Control': 'no-cache, no-store, must-revalidate'
-					}
-				}),
-				fetch('/api/admin/dessert-options', {
-					cache: 'no-store',
-					headers: {
-						'Cache-Control': 'no-cache, no-store, must-revalidate'
-					}
-				})
+				fetch('/api/admin/meal-options'),
+				fetch('/api/admin/dessert-options')
 			])
 
 			if (mealResponse.ok) {
@@ -215,119 +203,97 @@ export default function MenuOptionsPage() {
 
 	const handleAddMealOption = async (e: React.FormEvent) => {
 		e.preventDefault()
-		
 		if (!newMealOption.trim()) {
 			toast({
-				title: "Error",
-				description: "Please enter a meal option name.",
 				variant: "destructive",
+				title: "Error",
+				description: "Please enter a meal option name"
 			})
 			return
 		}
-		
-		setIsMealAdding(true)
-		
+
 		try {
-			// Extract isChildOption from the form
-			const form = e.target as HTMLFormElement;
-			const isChildOptionCheckbox = form.querySelector('#meal-for-children') as HTMLInputElement;
-			const isChildOption = isChildOptionCheckbox ? isChildOptionCheckbox.checked : false;
-			
 			const response = await fetch('/api/admin/meal-options', {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'Cache-Control': 'no-cache, no-store, must-revalidate'
-				},
-				cache: 'no-store',
-				body: JSON.stringify({
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ 
 					name: newMealOption.trim(),
-					isChildOption: isChildOption
-				}),
+					isChildOption: isChildMealOption
+				})
 			})
-			
+
 			const data = await response.json()
 			
 			if (!response.ok) {
 				throw new Error(data.error || 'Failed to add meal option')
 			}
-			
-			fetchOptions()
-			fetchStatistics()
-			setNewMealOption('')
-			
-			toast({
-				title: "Success",
-				description: `Added ${isChildOption ? "children's" : ""} meal option: ${newMealOption}`,
-			})
+
+			if (data.option) {
+				setMealOptions(prev => [...prev, data.option])
+				setNewMealOption("")
+				setIsChildMealOption(false)
+				toast({
+					title: "Success",
+					description: "Meal option added successfully"
+				})
+				// Refresh statistics after adding option
+				await fetchStatistics()
+			}
 		} catch (error) {
 			console.error('Error adding meal option:', error)
 			toast({
-				title: "Error",
-				description: "Failed to add meal option.",
 				variant: "destructive",
+				title: "Error",
+				description: error instanceof Error ? error.message : "Failed to add meal option"
 			})
-		} finally {
-			setIsMealAdding(false)
 		}
 	}
 
 	const handleAddDessertOption = async (e: React.FormEvent) => {
 		e.preventDefault()
-		
 		if (!newDessertOption.trim()) {
 			toast({
-				title: "Error",
-				description: "Please enter a dessert option name.",
 				variant: "destructive",
+				title: "Error",
+				description: "Please enter a dessert option name"
 			})
 			return
 		}
-		
-		setIsDessertAdding(true)
-		
+
 		try {
-			// Extract isChildOption from the form
-			const form = e.target as HTMLFormElement;
-			const isChildOptionCheckbox = form.querySelector('#dessert-for-children') as HTMLInputElement;
-			const isChildOption = isChildOptionCheckbox ? isChildOptionCheckbox.checked : false;
-			
 			const response = await fetch('/api/admin/dessert-options', {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'Cache-Control': 'no-cache, no-store, must-revalidate'
-				},
-				cache: 'no-store',
-				body: JSON.stringify({
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ 
 					name: newDessertOption.trim(),
-					isChildOption: isChildOption
-				}),
+					isChildOption: isChildDessertOption
+				})
 			})
-			
+
 			const data = await response.json()
 			
 			if (!response.ok) {
 				throw new Error(data.error || 'Failed to add dessert option')
 			}
-			
-			fetchOptions()
-			fetchStatistics()
-			setNewDessertOption('')
-			
-			toast({
-				title: "Success",
-				description: `Added ${isChildOption ? "children's" : ""} dessert option: ${newDessertOption}`,
-			})
+
+			if (data.option) {
+				setDessertOptions(prev => [...prev, data.option])
+				setNewDessertOption("")
+				setIsChildDessertOption(false)
+				toast({
+					title: "Success",
+					description: "Dessert option added successfully"
+				})
+				// Refresh statistics after adding option
+				await fetchStatistics()
+			}
 		} catch (error) {
 			console.error('Error adding dessert option:', error)
 			toast({
-				title: "Error",
-				description: "Failed to add dessert option.",
 				variant: "destructive",
+				title: "Error",
+				description: error instanceof Error ? error.message : "Failed to add dessert option"
 			})
-		} finally {
-			setIsDessertAdding(false)
 		}
 	}
 
@@ -335,10 +301,6 @@ export default function MenuOptionsPage() {
 		try {
 			const response = await fetch(`/api/admin/${type}-options/${id}`, {
 				method: 'DELETE',
-				cache: 'no-store',
-				headers: {
-					'Cache-Control': 'no-cache, no-store, must-revalidate'
-				}
 			})
 
 			if (response.ok) {
@@ -413,28 +375,20 @@ export default function MenuOptionsPage() {
 								onChange={(e) => setNewMealOption(e.target.value)}
 								placeholder="Add new meal option..."
 								className="max-w-xs bg-gray-50 border-gray-200 focus:border-gold focus:ring-gold"
-								disabled={isMealAdding}
 							/>
-							<Button type="submit" className="bg-gold hover:bg-[#c19b2f] text-white" disabled={isMealAdding}>
-								{isMealAdding ? (
-									<>Loading...</>
-								) : (
-									<>
-										<Plus className="h-4 w-4 mr-2" />
-										Add Option
-									</>
-								)}
+							<Button type="submit" className="bg-gold hover:bg-[#c19b2f] text-white">
+								<Plus className="h-4 w-4 mr-2" />
+								Add Option
 							</Button>
 						</div>
 						<div className="flex items-center space-x-2">
 							<Checkbox 
-								id="meal-for-children"
+								id="isChildOption"
 								checked={isChildMealOption}
 								onCheckedChange={(checked) => setIsChildMealOption(checked === true)}
-								disabled={isMealAdding}
 							/>
 							<label
-								htmlFor="meal-for-children"
+								htmlFor="isChildOption"
 								className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
 							>
 								This is a children's meal option
@@ -451,28 +405,28 @@ export default function MenuOptionsPage() {
 							strategy={verticalListSortingStrategy}
 						>
 							<div className="space-y-2">
-								{mealOptions.map((option, index) => (
+								{mealOptions.map((option) => (
 									<SortableItem key={option.id} id={option.id}>
-										<div 
-											className="flex items-center justify-between bg-card p-3 rounded-md border mb-2 cursor-grab"
-										>
-											<div className="flex-1 mr-4 flex items-center">
-											<span className="mr-1">{option.name}</span>
+										<div className="flex items-center gap-2">
+											<span className="flex-1 text-gray-900">{option.name}</span>
 											{option.isChildOption && (
-												<span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded ml-2 dark:bg-blue-900 dark:text-blue-300">
-												Child
-												</span>
+												<Badge variant="outline" className="mr-2 bg-blue-50 text-blue-700 border-blue-200">
+													Child
+												</Badge>
 											)}
-											</div>
-											<Button
-												variant="ghost"
-												size="sm"
-												onClick={() => setDeleteConfirmation({ isOpen: true, optionId: option.id, optionType: 'meal' })}
-												className="text-destructive"
-											>
-												<Trash className="h-4 w-4" />
-											</Button>
 										</div>
+										<Button
+											variant="ghost"
+											size="sm"
+											onClick={() => setDeleteConfirmation({
+												isOpen: true,
+												optionId: option.id,
+												optionType: 'meal'
+											})}
+											className="hover:bg-red-50 hover:text-red-500"
+										>
+											<X className="h-4 w-4" />
+										</Button>
 									</SortableItem>
 								))}
 							</div>
@@ -489,28 +443,20 @@ export default function MenuOptionsPage() {
 								onChange={(e) => setNewDessertOption(e.target.value)}
 								placeholder="Add new dessert option..."
 								className="max-w-xs bg-gray-50 border-gray-200 focus:border-gold focus:ring-gold"
-								disabled={isDessertAdding}
 							/>
-							<Button type="submit" className="bg-gold hover:bg-[#c19b2f] text-white" disabled={isDessertAdding}>
-								{isDessertAdding ? (
-									<>Loading...</>
-								) : (
-									<>
-										<Plus className="h-4 w-4 mr-2" />
-										Add Option
-									</>
-								)}
+							<Button type="submit" className="bg-gold hover:bg-[#c19b2f] text-white">
+								<Plus className="h-4 w-4 mr-2" />
+								Add Option
 							</Button>
 						</div>
 						<div className="flex items-center space-x-2">
 							<Checkbox 
-								id="dessert-for-children"
+								id="isChildDessertOption"
 								checked={isChildDessertOption}
 								onCheckedChange={(checked) => setIsChildDessertOption(checked === true)}
-								disabled={isDessertAdding}
 							/>
 							<label
-								htmlFor="dessert-for-children"
+								htmlFor="isChildDessertOption"
 								className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
 							>
 								This is a children's dessert option
@@ -527,28 +473,28 @@ export default function MenuOptionsPage() {
 							strategy={verticalListSortingStrategy}
 						>
 							<div className="space-y-2">
-								{dessertOptions.map((option, index) => (
+								{dessertOptions.map((option) => (
 									<SortableItem key={option.id} id={option.id}>
-										<div 
-											className="flex items-center justify-between bg-card p-3 rounded-md border mb-2 cursor-grab"
-										>
-											<div className="flex-1 mr-4 flex items-center">
-											<span className="mr-1">{option.name}</span>
+										<div className="flex items-center gap-2">
+											<span className="flex-1 text-gray-900">{option.name}</span>
 											{option.isChildOption && (
-												<span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded ml-2 dark:bg-blue-900 dark:text-blue-300">
-												Child
-												</span>
+												<Badge variant="outline" className="mr-2 bg-blue-50 text-blue-700 border-blue-200">
+													Child
+												</Badge>
 											)}
-											</div>
-											<Button
-												variant="ghost"
-												size="sm"
-												onClick={() => setDeleteConfirmation({ isOpen: true, optionId: option.id, optionType: 'dessert' })}
-												className="text-destructive"
-											>
-												<Trash className="h-4 w-4" />
-											</Button>
 										</div>
+										<Button
+											variant="ghost"
+											size="sm"
+											onClick={() => setDeleteConfirmation({
+												isOpen: true,
+												optionId: option.id,
+												optionType: 'dessert'
+											})}
+											className="hover:bg-red-50 hover:text-red-500"
+										>
+											<X className="h-4 w-4" />
+										</Button>
 									</SortableItem>
 								))}
 							</div>

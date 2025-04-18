@@ -10,8 +10,9 @@ export async function GET() {
 			where: { 
 				isActive: true,
 				isChildOption: false
-			} as any,
-			orderBy: { createdAt: 'asc' }
+			},
+			orderBy: { createdAt: 'asc' },
+			select: { id: true, name: true, isChildOption: true }
 		})
 		console.log('Found regular meal options:', regularMealOptions)
 
@@ -20,8 +21,9 @@ export async function GET() {
 			where: { 
 				isActive: true,
 				isChildOption: true
-			} as any,
-			orderBy: { createdAt: 'asc' }
+			},
+			orderBy: { createdAt: 'asc' },
+			select: { id: true, name: true, isChildOption: true }
 		})
 		console.log('Found child meal options:', childMealOptions)
 
@@ -30,8 +32,9 @@ export async function GET() {
 			where: { 
 				isActive: true,
 				isChildOption: false
-			} as any,
-			orderBy: { createdAt: 'asc' }
+			},
+			orderBy: { createdAt: 'asc' },
+			select: { id: true, name: true, isChildOption: true }
 		})
 		console.log('Found regular dessert options:', regularDessertOptions)
 
@@ -40,8 +43,9 @@ export async function GET() {
 			where: { 
 				isActive: true,
 				isChildOption: true
-			} as any,
-			orderBy: { createdAt: 'asc' }
+			},
+			orderBy: { createdAt: 'asc' },
+			select: { id: true, name: true, isChildOption: true }
 		})
 		console.log('Found child dessert options:', childDessertOptions)
 
@@ -50,10 +54,6 @@ export async function GET() {
 			childMealOptions: childMealOptions,
 			dessertOptions: regularDessertOptions,
 			childDessertOptions: childDessertOptions
-		}, {
-			headers: {
-				'Cache-Control': 'no-store, max-age=0, must-revalidate'
-			}
 		})
 	} catch (error) {
 		console.error("GET options error:", error)
