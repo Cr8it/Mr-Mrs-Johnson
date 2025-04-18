@@ -49,6 +49,23 @@ export async function GET() {
 		})
 		console.log('Found child dessert options:', childDessertOptions)
 
+		// Debug each option to verify isChildOption flag
+		regularMealOptions.forEach(option => {
+			console.log(`Regular meal option: ${option.name}, isChildOption=${option.isChildOption}`);
+		});
+		
+		childMealOptions.forEach(option => {
+			console.log(`Child meal option: ${option.name}, isChildOption=${option.isChildOption}`);
+		});
+		
+		regularDessertOptions.forEach(option => {
+			console.log(`Regular dessert option: ${option.name}, isChildOption=${option.isChildOption}`);
+		});
+		
+		childDessertOptions.forEach(option => {
+			console.log(`Child dessert option: ${option.name}, isChildOption=${option.isChildOption}`);
+		});
+
 		// Debug summary
 		console.log(`RSVP Options Summary:
 		- Regular meal options: ${regularMealOptions.length}

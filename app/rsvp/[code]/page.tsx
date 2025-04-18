@@ -76,6 +76,15 @@ export default function RSVPForm() {
     fetchData()
   }, [params.code, toast])
 
+  // Debug effect to log fetched data
+  useEffect(() => {
+    console.log("Debug - Household data:", household);
+    console.log("Debug - Regular meal options:", mealOptions);
+    console.log("Debug - Child meal options:", childMealOptions);
+    console.log("Debug - Regular dessert options:", dessertOptions);
+    console.log("Debug - Child dessert options:", childDessertOptions);
+  }, [household, mealOptions, childMealOptions, dessertOptions, childDessertOptions]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -140,6 +149,15 @@ export default function RSVPForm() {
               {household.guests.map((guest) => (
                 <div key={guest.id} className="space-y-4">
                   <h3 className="text-xl font-cormorant">{guest.name}</h3>
+                  {/* Debug info - visible on page */}
+                  <div className="bg-yellow-100 text-black p-2 text-xs rounded mb-2">
+                    <p><strong>Debug info:</strong></p>
+                    <p>isChild flag: {String(guest.isChild)}</p>
+                    <p>Will see: {guest.isChild ? "Child options" : "Adult options"}</p>
+                    <p>Available meal options: {guest.isChild ? childMealOptions.length : mealOptions.length}</p>
+                    <p>Child meal options available: {childMealOptions.length}</p>
+                    <p>Regular meal options available: {mealOptions.length}</p>
+                  </div>
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id={`attending-${guest.id}`}
