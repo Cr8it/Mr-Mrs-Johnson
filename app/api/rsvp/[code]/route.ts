@@ -38,14 +38,16 @@ export async function GET(
     const transformedHousehold = {
       ...household,
       guests: household.guests.map(guest => {
-        // Debug output for isChild flag
-        console.log(`Guest ${guest.name}: isChild=${guest.isChild}, type=${typeof guest.isChild}`);
+        // Debug output for isChild flag - also log raw value for debugging
+        const isChildValue = guest.isChild === true;
+        console.log(`Guest ${guest.name}: isChild=${guest.isChild}, type=${typeof guest.isChild}, transformedValue=${isChildValue}`);
         
         return {
           ...guest,
           mealChoice: guest.mealChoice?.id || null,
           dessertChoice: guest.dessertChoice?.id || null,
-          isChild: guest.isChild || false,
+          // Use explicit comparison to ensure boolean value is preserved
+          isChild: isChildValue,
           responses: guest.responses.map(response => ({
             questionId: response.questionId,
             answer: response.answer
@@ -109,13 +111,13 @@ export async function POST(request: Request, { params }: { params: { code: strin
       const mealOptionId = responses[`meal-${guest.id}`]
       const dessertOptionId = responses[`dessert-${guest.id}`]
       
-      console.log(`Guest ${guest.name}: Attending=${isAttending}, Meal=${mealOptionId}, Dessert=${dessertOptionId}`)
+      console.log(`Guest ${guest.name}: Attending=${isAttending}, Meal=${mealOptionId}, Dessert=${dessertOptionId}, isChild=${guest.isChild}`)
 
       // Track changes for logging
       const mealChanged = guest.mealOptionId !== mealOptionId
       const dessertChanged = guest.dessertOptionId !== dessertOptionId
       
-      // Update the guest record
+      // Update the guest record, explicitly preserving the isChild status
       await prisma.guest.update({
         where: {
           id: guest.id,
@@ -124,6 +126,7 @@ export async function POST(request: Request, { params }: { params: { code: strin
           isAttending,
           mealOptionId: isAttending ? mealOptionId : null,
           dessertOptionId: isAttending ? dessertOptionId : null,
+          // We're not modifying isChild - it stays as set in the database
         },
       })
 

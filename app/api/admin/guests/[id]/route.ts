@@ -51,7 +51,7 @@ export async function PUT(
 ) {
 	try {
 		const data = await request.json()
-		const { name, email, householdName, isAttending, mealChoice, dessertChoice, dietaryNotes } = data
+		const { name, email, householdName, isAttending, mealChoice, dessertChoice, dietaryNotes, isChild } = data
 
 		// Get current guest state
 		const currentGuest = await prisma.guest.findUnique({
@@ -63,6 +63,9 @@ export async function PUT(
 			}
 		})
 
+		// Log the isChild status before the update
+		console.log(`Updating guest ${name}, isChild current=${currentGuest?.isChild}, new value=${isChild}`);
+
 		const guest = await prisma.guest.update({
 			where: { id: params.id },
 			data: {
@@ -70,6 +73,8 @@ export async function PUT(
 				email,
 				isAttending,
 				dietaryNotes,
+				// Preserve isChild status if it's provided in the request, otherwise don't modify it
+				isChild: isChild !== undefined ? isChild === true : undefined,
 				mealChoice: mealChoice ? { connect: { id: mealChoice.id } } : { disconnect: true },
 				dessertChoice: dessertChoice ? { connect: { id: dessertChoice.id } } : { disconnect: true },
 				household: {
@@ -135,6 +140,17 @@ export async function PUT(
 					}
 				})
 			}
+
+			// Log isChild change if it was changed
+			if (isChild !== undefined && currentGuest.isChild !== isChild) {
+				await prisma.guestActivity.create({
+					data: {
+						guestId: params.id,
+						action: 'UPDATE_CHILD_STATUS',
+						details: `Admin updated child status from ${currentGuest.isChild} to ${isChild}`
+					}
+				})
+			}
 		}
 
 		// Format response
@@ -146,6 +162,7 @@ export async function PUT(
 			mealChoice: guest.mealChoice,
 			dessertChoice: guest.dessertChoice,
 			dietaryNotes: guest.dietaryNotes,
+			isChild: guest.isChild,
 			responses: guest.responses,
 			household: {
 				name: guest.household.name,

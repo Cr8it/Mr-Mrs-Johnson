@@ -81,7 +81,11 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
 
   useEffect(() => {
     if (initialData) {
-      setFormData(initialData)
+      console.log('Initializing form with data:', initialData);
+      setFormData({
+        ...initialData,
+        isChild: initialData.isChild === true
+      });
     }
   }, [initialData])
 
@@ -112,6 +116,8 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
       const endpoint = mode === 'create' ? '/api/admin/guests' : `/api/admin/guests/${initialData?.id}`
       const method = mode === 'create' ? 'POST' : 'PUT'
 
+      console.log('Submitting form with isChild =', formData.isChild);
+
       const submissionData = {
         name: formData.name,
         email: formData.email || null,
@@ -120,8 +126,10 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
         mealChoice: formData.mealChoice ? { id: formData.mealChoice.id } : null,
         dessertChoice: formData.dessertChoice ? { id: formData.dessertChoice.id } : null,
         dietaryNotes: formData.dietaryNotes || null,
-        isChild: formData.isChild || false
+        isChild: formData.isChild === true
       }
+
+      console.log('Submission data:', submissionData);
 
       const response = await fetch(endpoint, {
         method,
@@ -226,7 +234,10 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
               </Label>
               <Select
                 value={formData.isChild ? "true" : "false"}
-                onValueChange={(value) => setFormData({ ...formData, isChild: value === "true" })}
+                onValueChange={(value) => {
+                  console.log('Child status changed to:', value);
+                  setFormData({ ...formData, isChild: value === "true" });
+                }}
               >
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="Is this a child?" />
