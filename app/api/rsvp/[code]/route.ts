@@ -111,10 +111,22 @@ export async function POST(
   { params }: { params: { code: string } }
 ) {
   try {
-    const household = await request.json();
+    const { guests: submittedGuests, householdResponses } = await request.json();
+    
+    // Log the received data for debugging
+    console.log('Received RSVP data:', { 
+      guests: submittedGuests, 
+      householdResponses 
+    });
+    
+    if (!submittedGuests || !Array.isArray(submittedGuests)) {
+      return NextResponse.json({ 
+        error: "Invalid guest data format" 
+      }, { status: 400 });
+    }
     
     // Normalize guest data before saving
-    const normalizedGuests = household.guests.map((guest: any) => {
+    const normalizedGuests = submittedGuests.map((guest: any) => {
       // More robust boolean conversion for isChild
       let isChildValue: boolean;
       
@@ -175,65 +187,129 @@ export async function POST(
       }
     }
 
-    // Update household with normalized and validated guests
-    const updatedHousehold = await prisma.household.update({
-      where: {
-        code: params.code,
-      },
-      data: {
-        guests: {
-          update: normalizedGuests.map((guest: any) => ({
-            where: { id: guest.id },
-            data: {
-              isAttending: guest.isAttending,
-              mealChoice: guest.mealChoice,
-              dessertChoice: guest.dessertChoice,
-              dietaryNotes: guest.dietaryNotes,
-              isChild: guest.isChild,
-              responses: guest.responses
-            },
-          })),
+    // Process operations in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Update household guests
+      const updatedHousehold = await tx.household.update({
+        where: {
+          code: params.code,
         },
-      },
-      include: {
-        guests: true,
-      },
-    });
+        data: {
+          guests: {
+            update: normalizedGuests.map((guest: any) => ({
+              where: { id: guest.id },
+              data: {
+                isAttending: guest.isAttending,
+                mealOptionId: guest.mealChoice,
+                dessertOptionId: guest.dessertChoice,
+                dietaryNotes: guest.dietaryNotes,
+                isChild: guest.isChild,
+              },
+            })),
+          },
+        },
+        include: {
+          guests: true,
+        },
+      });
 
-    // Log the meal and dessert choices in guest activity
-    for (const guest of normalizedGuests) {
-      if (guest.isAttending) {
-        if (guest.mealChoice) {
-          const mealChoice = mealOptions.find(m => m.id === guest.mealChoice);
-          await prisma.guestActivity.create({
-            data: {
+      // 2. Handle question responses: First, delete existing responses for these guests
+      const guestIds = normalizedGuests.map(g => g.id);
+      await tx.questionResponse.deleteMany({
+        where: {
+          guestId: {
+            in: guestIds
+          }
+        }
+      });
+
+      // 3. Create all new responses
+      const responsesToCreate = [];
+      
+      // Add guest-specific responses
+      for (const guest of normalizedGuests) {
+        if (guest.responses && Array.isArray(guest.responses)) {
+          for (const response of guest.responses) {
+            if (response.answer && response.answer.trim()) {
+              responsesToCreate.push({
+                guestId: guest.id,
+                questionId: response.questionId,
+                answer: response.answer.trim()
+              });
+            }
+          }
+        }
+      }
+      
+      // Process household-level responses
+      if (householdResponses && Array.isArray(householdResponses)) {
+        // For household questions, assign response to the first attending guest
+        const firstAttendingGuest = normalizedGuests.find(g => g.isAttending === true);
+        
+        if (firstAttendingGuest) {
+          for (const response of householdResponses) {
+            if (response.answer && response.answer.trim()) {
+              responsesToCreate.push({
+                guestId: firstAttendingGuest.id,
+                questionId: response.questionId,
+                answer: response.answer.trim()
+              });
+            }
+          }
+        }
+      }
+      
+      // Create all responses in bulk if there are any
+      if (responsesToCreate.length > 0) {
+        await tx.questionResponse.createMany({
+          data: responsesToCreate
+        });
+      }
+
+      // 4. Log activity for meal and dessert choices
+      const activities = [];
+      for (const guest of normalizedGuests) {
+        if (guest.isAttending) {
+          if (guest.mealChoice) {
+            const mealChoice = mealOptions.find(m => m.id === guest.mealChoice);
+            activities.push({
               guestId: guest.id,
               action: 'UPDATE_MEAL',
               details: `Selected meal option: ${mealChoice?.name || guest.mealChoice}`
-            }
-          });
-        }
-        
-        if (guest.dessertChoice) {
-          const dessertChoice = dessertOptions.find(d => d.id === guest.dessertChoice);
-          await prisma.guestActivity.create({
-            data: {
+            });
+          }
+          
+          if (guest.dessertChoice) {
+            const dessertChoice = dessertOptions.find(d => d.id === guest.dessertChoice);
+            activities.push({
               guestId: guest.id,
               action: 'UPDATE_DESSERT',
               details: `Selected dessert option: ${dessertChoice?.name || guest.dessertChoice}`
-            }
-          });
+            });
+          }
         }
       }
-    }
+      
+      // Create activities in bulk
+      if (activities.length > 0) {
+        await tx.guestActivity.createMany({
+          data: activities
+        });
+      }
+      
+      return { 
+        success: true, 
+        household: updatedHousehold 
+      };
+    });
 
-    return NextResponse.json({ household: updatedHousehold });
+    return NextResponse.json(result);
   } catch (error) {
-    console.error("Error processing RSVP:", error)
+    console.error("Error processing RSVP:", error);
     return NextResponse.json({ 
       error: "Failed to process RSVP",
       details: error instanceof Error ? error.message : "Unknown error"
-    }, { status: 500 })
+    }, { status: 500 });
   }
 }
 

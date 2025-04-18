@@ -122,6 +122,46 @@ export default function RSVPForm() {
         setDessertOptions(optionsData.dessertOptions || [])
         setChildDessertOptions(optionsData.childDessertOptions || [])
 
+        // Debug questions
+        console.log('Loaded questions:', householdData.questions);
+
+        // Set up initial responses based on existing data
+        const initialResponses: Record<string, any> = {};
+        
+        // Initialize attendance, meal, and dessert choices
+        normalizedGuests.forEach(guest => {
+          // Pre-fill attendance status
+          if (guest.isAttending !== undefined) {
+            initialResponses[`attending-${guest.id}`] = guest.isAttending;
+          }
+          
+          // Pre-fill meal choice
+          if (guest.mealChoice) {
+            initialResponses[`meal-${guest.id}`] = guest.mealChoice;
+          }
+          
+          // Pre-fill dessert choice
+          if (guest.dessertChoice) {
+            initialResponses[`dessert-${guest.id}`] = guest.dessertChoice;
+          }
+          
+          // Pre-fill dietary notes
+          if (guest.dietaryNotes) {
+            initialResponses[`dietary-${guest.id}`] = guest.dietaryNotes;
+          }
+          
+          // Pre-fill guest-specific question responses
+          if (guest.responses && Array.isArray(guest.responses)) {
+            guest.responses.forEach((response: any) => {
+              initialResponses[`${response.questionId}-${guest.id}`] = response.answer;
+            });
+          }
+        });
+        
+        // Set initial responses
+        setResponses(initialResponses);
+        console.log('Initial responses set:', initialResponses);
+
       } catch (error) {
         console.error('Error fetching RSVP data:', error)
         setError('Failed to load RSVP form. Please try again later.')
@@ -192,6 +232,50 @@ export default function RSVPForm() {
         return
       }
 
+      // Format the data for the API
+      const formattedGuests = household.guests.map(guest => {
+        const isAttending = responses[`attending-${guest.id}`] === true;
+        const mealChoice = isAttending ? responses[`meal-${guest.id}`] : null;
+        const dessertChoice = isAttending ? responses[`dessert-${guest.id}`] : null;
+        const dietaryNotes = responses[`dietary-${guest.id}`] || null;
+        
+        // Collect question responses for this guest
+        const guestResponses = questions
+          .filter(q => q.perGuest)
+          .map(question => ({
+            questionId: question.id,
+            answer: String(responses[`${question.id}-${guest.id}`] || '')
+          }))
+          .filter(r => r.answer.trim() !== ''); // Only include non-empty responses
+        
+        return {
+          id: guest.id,
+          name: guest.name,
+          isAttending,
+          mealChoice: isAttending ? mealChoice : null,
+          dessertChoice: isAttending ? dessertChoice : null,
+          dietaryNotes,
+          isChild: guest.isChild,
+          responses: guestResponses
+        };
+      });
+      
+      // Add household-level questions
+      const householdResponses = questions
+        .filter(q => !q.perGuest)
+        .map(question => ({
+          questionId: question.id,
+          answer: String(responses[question.id] || '')
+        }))
+        .filter(r => r.answer.trim() !== '');
+      
+      const apiData = {
+        guests: formattedGuests,
+        householdResponses
+      };
+      
+      console.log('Submitting RSVP data:', apiData);
+
       const response = await fetch(`/api/rsvp/${params.code}`, {
         method: 'POST',
         headers: {
@@ -199,35 +283,78 @@ export default function RSVPForm() {
           'Cache-Control': 'no-cache, no-store, must-revalidate'
         },
         cache: 'no-store',
-        body: JSON.stringify({ responses }),
-      })
+        body: JSON.stringify(apiData),
+      });
 
       if (!response.ok) {
-        throw new Error('Failed to submit RSVP')
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to submit RSVP');
       }
 
       toast({
         title: "Success",
         description: "Your RSVP has been submitted successfully",
-      })
+      });
+      
+      // Redirect to success page or close modal
+      setTimeout(() => {
+        router.push('/');
+      }, 2000);
 
     } catch (error) {
-      console.error('Error submitting RSVP:', error)
+      console.error('Error submitting RSVP:', error);
       toast({
         title: "Error",
-        description: "Failed to submit RSVP. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to submit RSVP. Please try again.",
         variant: "destructive",
-      })
+      });
     }
   }
 
   const getQuestionOptions = (question: Question): string[] => {
-    if (question.type !== "MULTIPLE_CHOICE") return []
+    if (question.type !== "MULTIPLE_CHOICE") return [];
+    
     try {
-      return JSON.parse(question.options)
-    } catch {
-      console.error(`Failed to parse options for question ${question.id}`)
-      return []
+      // Handle different potential formats for options
+      if (!question.options) {
+        console.warn(`Question ${question.id} has no options string`);
+        return [];
+      }
+      
+      if (typeof question.options === 'string') {
+        // Try to parse as JSON string
+        if (question.options.trim() === '') {
+          console.warn(`Question ${question.id} has empty options string`);
+          return [];
+        }
+        
+        try {
+          const parsed = JSON.parse(question.options);
+          if (Array.isArray(parsed)) {
+            return parsed;
+          } else if (typeof parsed === 'object') {
+            // Handle case where it might be an object with options
+            return Object.values(parsed).map(v => String(v));
+          } else {
+            // Single option case
+            return [String(parsed)];
+          }
+        } catch (e) {
+          // If not valid JSON, treat as comma-separated list
+          console.warn(`Failed to parse JSON for question ${question.id}, treating as comma-separated: ${e}`);
+          return question.options.split(',').map(o => o.trim()).filter(o => o.length > 0);
+        }
+      } else if (Array.isArray(question.options)) {
+        // Already an array
+        return question.options.map(o => String(o));
+      } else {
+        console.warn(`Unexpected options format for question ${question.id}: ${typeof question.options}`);
+        return [];
+      }
+    } catch (error) {
+      console.error(`Error processing options for question ${question.id}:`, error);
+      console.error(`Raw options data:`, question.options);
+      return [];
     }
   }
 
