@@ -37,12 +37,16 @@ export async function POST(request: Request) {
 			})
 		}
 
+		console.log(`Creating meal option: "${data.name.trim()}", isChildOption=${data.isChildOption === true}, raw value=${data.isChildOption}`);
+
 		const option = await prisma.mealOption.create({
 			data: {
 				name: data.name.trim(),
 				isChildOption: data.isChildOption === true
 			}
 		})
+
+		console.log(`Created meal option: ${JSON.stringify(option)}`);
 
 		return new Response(JSON.stringify({ option }), {
 			status: 201,

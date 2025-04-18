@@ -37,16 +37,21 @@ export async function GET(
     // Transform the data to include existing choices
     const transformedHousehold = {
       ...household,
-      guests: household.guests.map(guest => ({
-        ...guest,
-        mealChoice: guest.mealChoice?.id || null,
-        dessertChoice: guest.dessertChoice?.id || null,
-        isChild: guest.isChild || false,
-        responses: guest.responses.map(response => ({
-          questionId: response.questionId,
-          answer: response.answer
-        }))
-      }))
+      guests: household.guests.map(guest => {
+        // Debug output for isChild flag
+        console.log(`Guest ${guest.name}: isChild=${guest.isChild}, type=${typeof guest.isChild}`);
+        
+        return {
+          ...guest,
+          mealChoice: guest.mealChoice?.id || null,
+          dessertChoice: guest.dessertChoice?.id || null,
+          isChild: guest.isChild || false,
+          responses: guest.responses.map(response => ({
+            questionId: response.questionId,
+            answer: response.answer
+          }))
+        };
+      })
     }
 
     // Transform questions to parse options for multiple choice questions

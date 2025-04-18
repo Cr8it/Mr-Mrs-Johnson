@@ -49,6 +49,14 @@ export async function GET() {
 		})
 		console.log('Found child dessert options:', childDessertOptions)
 
+		// Debug summary
+		console.log(`RSVP Options Summary:
+		- Regular meal options: ${regularMealOptions.length}
+		- Child meal options: ${childMealOptions.length}
+		- Regular dessert options: ${regularDessertOptions.length}
+		- Child dessert options: ${childDessertOptions.length}
+		`);
+
 		return NextResponse.json({ 
 			mealOptions: regularMealOptions, 
 			childMealOptions: childMealOptions,

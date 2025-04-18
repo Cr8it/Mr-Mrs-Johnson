@@ -141,15 +141,19 @@ export async function POST(request: Request) {
           
           try {
             // Create the guest
+            const isChildValue = member.Child === 'C' || 
+                     member.Child === 'true' || 
+                     member.Child?.toLowerCase() === 'yes' || 
+                     member.Child === 'Y' || 
+                     member.Child === 'YES';
+            
+            console.log(`Creating guest: ${guestName}, Child value in CSV: "${member.Child}", Setting isChild=${isChildValue}`);
+            
             await prisma.guest.create({
               data: {
                 name: guestName,
                 email: member.Email ? member.Email.trim() : null,
-                isChild: member.Child === 'C' || 
-                         member.Child === 'true' || 
-                         member.Child?.toLowerCase() === 'yes' || 
-                         member.Child === 'Y' || 
-                         member.Child === 'YES',
+                isChild: isChildValue,
                 isTeenager: member.Teenager === 'T' || 
                             member.Teenager === 'true' || 
                             member.Teenager?.toLowerCase() === 'yes' || 
