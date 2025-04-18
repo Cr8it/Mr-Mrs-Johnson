@@ -129,7 +129,7 @@ export default function RSVPForm() {
         const initialResponses: Record<string, any> = {};
         
         // Initialize attendance, meal, and dessert choices
-        normalizedGuests.forEach(guest => {
+        normalizedGuests.forEach((guest: Guest) => {
           // Pre-fill attendance status
           if (guest.isAttending !== undefined) {
             initialResponses[`attending-${guest.id}`] = guest.isAttending;
@@ -152,7 +152,7 @@ export default function RSVPForm() {
           
           // Pre-fill guest-specific question responses
           if (guest.responses && Array.isArray(guest.responses)) {
-            guest.responses.forEach((response: any) => {
+            guest.responses.forEach((response: { questionId: string; answer: string }) => {
               initialResponses[`${response.questionId}-${guest.id}`] = response.answer;
             });
           }
@@ -189,7 +189,7 @@ export default function RSVPForm() {
       // Validate responses
       const errors: string[] = []
       
-      household.guests.forEach(guest => {
+      household.guests.forEach((guest: Guest) => {
         const isAttending = responses[`attending-${guest.id}`]
         if (isAttending === undefined) {
           errors.push(`Please indicate if ${guest.name} is attending`)
@@ -346,7 +346,7 @@ export default function RSVPForm() {
         }
       } else if (Array.isArray(question.options)) {
         // Already an array
-        return question.options.map(o => String(o));
+        return question.options.map((o: any) => String(o));
       } else {
         console.warn(`Unexpected options format for question ${question.id}: ${typeof question.options}`);
         return [];
