@@ -96,6 +96,13 @@ export default function RSVPForm() {
         const householdData = await householdResponse.json()
         const optionsData = await optionsResponse.json()
         
+        // Debug output to verify questions
+        console.log('Fetched questions data:', householdData.questions)
+        console.log('Questions with perGuest=true:', 
+                    householdData.questions?.filter((q: Question) => q.perGuest)?.length || 0)
+        console.log('Questions with perGuest=false:', 
+                    householdData.questions?.filter((q: Question) => !q.perGuest)?.length || 0)
+        
         // Validate child options
         if (householdData.household.guests.some((g: Guest) => g.isChild) && 
             (!optionsData.childMealOptions?.length || !optionsData.childDessertOptions?.length)) {
@@ -193,63 +200,74 @@ export default function RSVPForm() {
     }
   }, [params.code, toast])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // Validate all responses and return errors if any
+  const validateResponses = () => {
+    if (!household) return ['No household data found'];
     
-    if (!household) return
-
-    try {
-      // Validate responses
-      const errors: string[] = []
+    const errors: string[] = [];
+    
+    household.guests.forEach((guest: Guest) => {
+      const isAttending = responses[`attending-${guest.id}`];
+      if (isAttending === undefined) {
+        errors.push(`Please indicate if ${guest.name} is attending`);
+      }
       
-      household.guests.forEach((guest: Guest) => {
-        const isAttending = responses[`attending-${guest.id}`]
-        if (isAttending === undefined) {
-          errors.push(`Please indicate if ${guest.name} is attending`)
+      if (isAttending) {
+        const mealChoice = responses[`meal-${guest.id}`];
+        const dessertChoice = responses[`dessert-${guest.id}`];
+        
+        if (!mealChoice) {
+          errors.push(`Please select a meal for ${guest.name}`);
+        }
+        if (!dessertChoice) {
+          errors.push(`Please select a dessert for ${guest.name}`);
         }
         
-        if (isAttending) {
-          const mealChoice = responses[`meal-${guest.id}`]
-          const dessertChoice = responses[`dessert-${guest.id}`]
+        // Validate child options - normalize isChild to Boolean for consistency
+        const isChild = Boolean(guest.isChild);
+        if (isChild) {
+          console.log(`Validating child options for ${guest.name} (isChild=${isChild})`);
+          const selectedMeal = childMealOptions.find(o => o.id === mealChoice);
+          const selectedDessert = childDessertOptions.find(o => o.id === dessertChoice);
           
-          if (!mealChoice) {
-            errors.push(`Please select a meal for ${guest.name}`)
+          if (mealChoice && !selectedMeal) {
+            errors.push(`Please select a children's meal for ${guest.name}`);
           }
-          if (!dessertChoice) {
-            errors.push(`Please select a dessert for ${guest.name}`)
-          }
-          
-          // Validate child options - normalize isChild to Boolean for consistency
-          const isChild = Boolean(guest.isChild);
-          if (isChild) {
-            console.log(`Validating child options for ${guest.name} (isChild=${isChild})`);
-            const selectedMeal = childMealOptions.find(o => o.id === mealChoice)
-            const selectedDessert = childDessertOptions.find(o => o.id === dessertChoice)
-            
-            if (mealChoice && !selectedMeal) {
-              errors.push(`Please select a children's meal for ${guest.name}`)
-            }
-            if (dessertChoice && !selectedDessert) {
-              errors.push(`Please select a children's dessert for ${guest.name}`)
-            }
+          if (dessertChoice && !selectedDessert) {
+            errors.push(`Please select a children's dessert for ${guest.name}`);
           }
         }
-      })
+      }
+    });
+    
+    return errors;
+  }
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!household) return;
+
+    try {
+      console.log('Starting RSVP submission...');
+      
+      // Validate responses
+      const errors = validateResponses();
+      
       if (errors.length > 0) {
         toast({
           title: "Validation Error",
           description: errors.join('. '),
           variant: "destructive",
-        })
-        return
+        });
+        return;
       }
 
       // Format the data for the API
       const formattedGuests = household.guests.map(guest => {
         const isAttending = responses[`attending-${guest.id}`] === true;
-        const mealChoice = isAttending ? responses[`meal-${guest.id}`] : null;
-        const dessertChoice = isAttending ? responses[`dessert-${guest.id}`] : null;
+        const mealChoiceId = isAttending ? responses[`meal-${guest.id}`] : null;
+        const dessertChoiceId = isAttending ? responses[`dessert-${guest.id}`] : null;
         const dietaryNotes = responses[`dietary-${guest.id}`] || null;
         
         // Collect question responses for this guest
@@ -265,8 +283,8 @@ export default function RSVPForm() {
           id: guest.id,
           name: guest.name,
           isAttending,
-          mealChoice: isAttending ? mealChoice : null,
-          dessertChoice: isAttending ? dessertChoice : null,
+          mealChoice: isAttending ? mealChoiceId : null,
+          dessertChoice: isAttending ? dessertChoiceId : null,
           dietaryNotes,
           isChild: guest.isChild,
           responses: guestResponses
@@ -287,21 +305,25 @@ export default function RSVPForm() {
         householdResponses
       };
       
-      console.log('Submitting RSVP data:', apiData);
+      console.log('Submitting RSVP data:', JSON.stringify(apiData, null, 2));
 
+      // Add a loading state for submit button
+      setLoading(true);
+      
       const response = await fetch(`/api/rsvp/${params.code}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache, no-store, must-revalidate'
         },
-        cache: 'no-store',
         body: JSON.stringify(apiData),
       });
 
+      const responseData = await response.json();
+      console.log('Server response:', responseData);
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to submit RSVP');
+        throw new Error(responseData.error || responseData.details || 'Failed to submit RSVP');
       }
 
       toast({
@@ -321,6 +343,8 @@ export default function RSVPForm() {
         description: error instanceof Error ? error.message : "Failed to submit RSVP. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -609,10 +633,12 @@ export default function RSVPForm() {
                 ))}
 
               <div className="flex justify-end space-x-4">
-                <Button variant="outline" type="button" onClick={onBack}>
+                <Button variant="outline" type="button" onClick={onBack} disabled={loading}>
                   Back
                 </Button>
-                <Button type="submit">Submit RSVP</Button>
+                <Button type="submit" disabled={loading}>
+                  {loading ? 'Submitting...' : 'Submit RSVP'}
+                </Button>
               </div>
             </form>
           </CardContent>

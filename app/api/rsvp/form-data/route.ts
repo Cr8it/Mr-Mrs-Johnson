@@ -61,15 +61,20 @@ export async function GET() {
 		// Fetch questions
 		const questions = await prisma.question.findMany({
 			where: { isActive: true },
-			orderBy: { createdAt: 'asc' },
+			orderBy: { order: 'asc' },
 			select: {
 				id: true,
 				question: true,
 				type: true,
 				options: true,
-				isRequired: true
+				isRequired: true,
+				perGuest: true,
+				order: true
 			}
 		})
+		
+		console.log(`Found ${questions.length} active questions:`, 
+               questions.map(q => ({ id: q.id, question: q.question, perGuest: q.perGuest })))
 
 		// Transform questions to parse options for multiple choice questions
 		const transformedQuestions = questions.map(question => ({

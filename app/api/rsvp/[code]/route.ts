@@ -40,8 +40,22 @@ export async function GET(
 
     const questions = await prisma.question.findMany({
       where: { isActive: true },
-      orderBy: { order: 'asc' }
+      orderBy: { order: 'asc' },
+      select: {
+        id: true,
+        question: true,
+        type: true,
+        options: true,
+        isRequired: true,
+        perGuest: true,
+        order: true,
+        isActive: true
+      }
     })
+    
+    console.log('Found questions:', questions.length ? 'Yes' : 'No', 
+                'Count:', questions.length,
+                'Sample:', questions.length > 0 ? questions[0] : 'None');
 
     // Transform the data to include existing choices
     const transformedHousehold = {
