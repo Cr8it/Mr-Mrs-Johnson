@@ -33,13 +33,20 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
   const [childDessertOptions, setChildDessertOptions] = useState<{ id: string; name: string }[]>([])
   const [validationErrors, setValidationErrors] = useState<Record<string, string[]>>({})
   const [guests, setGuests] = useState<Guest[]>(() => {
-    return household.guests.map(guest => ({
-      ...guest,
-      mealChoice: guest.mealChoice || null,
-      dessertChoice: guest.dessertChoice || null,
-      responses: guest.responses || [],
-      isAttending: guest.isAttending ?? null
-    }));
+    return household.guests.map(guest => {
+      // Log the isChild value to make sure it's being correctly loaded
+      console.log(`Initializing guest ${guest.name}, isChild=${guest.isChild}`);
+      
+      return {
+        ...guest,
+        mealChoice: guest.mealChoice || null,
+        dessertChoice: guest.dessertChoice || null,
+        responses: guest.responses || [],
+        isAttending: guest.isAttending ?? null,
+        // Make sure isChild is explicitly preserved
+        isChild: guest.isChild === true
+      };
+    });
   });
 
   // Add handleBack function
@@ -57,6 +64,7 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
   // Define fetchData function before using it
   const fetchData = async () => {
     try {
+      console.log("Fetching meal and dessert options...");
       const optionsResponse = await fetch('/api/rsvp/form-data')
       const optionsData = await optionsResponse.json()
       
@@ -64,17 +72,29 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
         throw new Error(optionsData.error || 'Failed to fetch options')
       }
       
+      console.log("Received options data:", optionsData);
+      
       if (optionsData.mealOptions?.length > 0) {
+        console.log(`Setting ${optionsData.mealOptions.length} regular meal options`);
         setRegularMealOptions(optionsData.mealOptions)
       }
       if (optionsData.childMealOptions?.length > 0) {
+        console.log(`Setting ${optionsData.childMealOptions.length} child meal options:`, 
+          optionsData.childMealOptions.map((o: any) => ({ id: o.id, name: o.name, isChildOption: o.isChildOption })));
         setChildMealOptions(optionsData.childMealOptions)
+      } else {
+        console.warn("No child meal options received!");
       }
       if (optionsData.dessertOptions?.length > 0) {
+        console.log(`Setting ${optionsData.dessertOptions.length} regular dessert options`);
         setRegularDessertOptions(optionsData.dessertOptions)
       }
       if (optionsData.childDessertOptions?.length > 0) {
+        console.log(`Setting ${optionsData.childDessertOptions.length} child dessert options:`, 
+          optionsData.childDessertOptions.map((o: any) => ({ id: o.id, name: o.name, isChildOption: o.isChildOption })));
         setChildDessertOptions(optionsData.childDessertOptions)
+      } else {
+        console.warn("No child dessert options received!");
       }
     } catch (error) {
       console.error('Failed to fetch data:', error)
@@ -89,13 +109,19 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
   // Add effect to update state when household changes
   useEffect(() => {
     // Reset form state when household changes
-    const newGuests = household.guests.map(guest => ({
-      ...guest,
-      mealChoice: guest.mealChoice || null,
-      dessertChoice: guest.dessertChoice || null,
-      responses: guest.responses || [],
-      isAttending: guest.isAttending ?? null
-    }));
+    const newGuests = household.guests.map(guest => {
+      console.log(`Updating guest ${guest.name} from household change, isChild=${guest.isChild}`);
+      
+      return {
+        ...guest,
+        mealChoice: guest.mealChoice || null,
+        dessertChoice: guest.dessertChoice || null,
+        responses: guest.responses || [],
+        isAttending: guest.isAttending ?? null,
+        // Make sure isChild flag is preserved
+        isChild: guest.isChild === true
+      };
+    });
     
     setGuests(newGuests);
     
@@ -180,7 +206,12 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
     regularDessertOptions,
     childDessertOptions,
     questions,
-    guests
+    guests: guests.map(g => ({
+      id: g.id,
+      name: g.name,
+      isChild: g.isChild,
+      isAttending: g.isAttending
+    }))
   })
 
   const saveToLocalStorage = (updatedGuests: Guest[]) => {
@@ -190,6 +221,28 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
       questions,
       code: household.code
     }));
+  };
+
+  // Debug function to help identify meal option selection issues
+  const debugMealOptions = (guest: Guest) => {
+    console.log(`DEBUG - Meal options for ${guest.name}:`, {
+      isChild: guest.isChild,
+      availableOptions: guest.isChild ? childMealOptions : regularMealOptions,
+      selectedOption: guest.mealChoice,
+      childOptionsCount: childMealOptions.length,
+      regularOptionsCount: regularMealOptions.length
+    });
+  };
+
+  // Debug function to help identify dessert option selection issues
+  const debugDessertOptions = (guest: Guest) => {
+    console.log(`DEBUG - Dessert options for ${guest.name}:`, {
+      isChild: guest.isChild,
+      availableOptions: guest.isChild ? childDessertOptions : regularDessertOptions,
+      selectedOption: guest.dessertChoice,
+      childOptionsCount: childDessertOptions.length,
+      regularOptionsCount: regularDessertOptions.length
+    });
   };
 
   const clearFieldError = (guestId: string, errorText: string) => {
@@ -231,15 +284,28 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
   const handleMealChoice = (guestId: string, meal: string) => {
     clearFieldError(guestId, 'Meal choice');
     setGuests(prev => {
-      const updated = prev.map(guest =>
-        guest.id === guestId ? { 
+      const updated = prev.map(guest => {
+        if (guest.id !== guestId) return guest;
+        
+        // Call debug function to log information about this selection
+        debugMealOptions(guest);
+        
+        // Find the correct option name based on whether this is a child
+        const options = guest.isChild ? childMealOptions : regularMealOptions;
+        const selectedOption = options.find(opt => opt.id === meal);
+        
+        if (!selectedOption) {
+          console.error(`Could not find meal option with ID ${meal} for ${guest.name} (isChild: ${guest.isChild})`);
+        }
+        
+        return { 
           ...guest, 
           mealChoice: { 
             id: meal,
-            name: regularMealOptions.find(opt => opt.id === meal)?.name || ''
+            name: selectedOption?.name || 'Unknown option'
           } 
-        } : guest
-      );
+        };
+      });
       saveToLocalStorage(updated);
       return updated;
     });
@@ -248,15 +314,28 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
   const handleDessertChoice = (guestId: string, dessert: string) => {
     clearFieldError(guestId, 'Dessert choice');
     setGuests(prev => {
-      const updated = prev.map(guest =>
-        guest.id === guestId ? { 
+      const updated = prev.map(guest => {
+        if (guest.id !== guestId) return guest;
+        
+        // Call debug function to log information about this selection
+        debugDessertOptions(guest);
+        
+        // Find the correct option name based on whether this is a child
+        const options = guest.isChild ? childDessertOptions : regularDessertOptions;
+        const selectedOption = options.find(opt => opt.id === dessert);
+        
+        if (!selectedOption) {
+          console.error(`Could not find dessert option with ID ${dessert} for ${guest.name} (isChild: ${guest.isChild})`);
+        }
+        
+        return { 
           ...guest, 
           dessertChoice: { 
             id: dessert,
-            name: regularDessertOptions.find(opt => opt.id === dessert)?.name || ''
+            name: selectedOption?.name || 'Unknown option'
           } 
-        } : guest
-      );
+        };
+      });
       saveToLocalStorage(updated);
       return updated;
     });
@@ -393,6 +472,30 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
     guests: guests.map(g => ({ id: g.id, name: g.name, isChild: g.isChild }))
   })
 
+  // Add this function to log when child options are used
+  const logChildOptionsUsage = () => {
+    console.log("CHILD OPTIONS SUMMARY:");
+    console.log("- Regular meal options:", regularMealOptions.length, regularMealOptions.map(o => o.name));
+    console.log("- Child meal options:", childMealOptions.length, childMealOptions.map(o => o.name));
+    console.log("- Regular dessert options:", regularDessertOptions.length, regularDessertOptions.map(o => o.name));
+    console.log("- Child dessert options:", childDessertOptions.length, childDessertOptions.map(o => o.name));
+    
+    guests.forEach(guest => {
+      console.log(`Guest ${guest.name}:`, {
+        isChild: guest.isChild,
+        willUseMealOptions: guest.isChild ? 'child' : 'regular',
+        willUseDessertOptions: guest.isChild ? 'child' : 'regular',
+        mealChoice: guest.mealChoice,
+        dessertChoice: guest.dessertChoice
+      });
+    });
+  };
+  
+  // Call this in useEffect to log each time options change
+  useEffect(() => {
+    logChildOptionsUsage();
+  }, [regularMealOptions, childMealOptions, regularDessertOptions, childDessertOptions, guests]);
+
   return (
     <MotionDiv
 
@@ -444,6 +547,17 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
               </div>
             </div>
 
+            {/* Debugging information */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="p-2 bg-yellow-800/50 rounded text-xs mt-2 border border-yellow-600">
+                <p className="font-bold border-b border-yellow-600 pb-1 mb-1">Debug Info:</p>
+                <p className="mb-1"><span className="font-semibold">isChild:</span> {String(guest.isChild)}</p>
+                <p className="mb-1"><span className="font-semibold">Child meal options:</span> {childMealOptions.length} available</p>
+                <p className="mb-1"><span className="font-semibold">Regular meal options:</span> {regularMealOptions.length} available</p>
+                <p className="mb-1"><span className="font-semibold">Will use:</span> {guest.isChild ? "Child options" : "Adult options"}</p>
+              </div>
+            )}
+
             <AnimatePresence>
             {guest.isAttending && (
                 <MotionDiv
@@ -474,6 +588,12 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                       <p className="text-red-500 text-sm mt-1">Please select a meal option</p>
                     )}
                   <SelectContent className="bg-black border border-white border-opacity-20 text-white" sideOffset={5}>
+                    {process.env.NODE_ENV === 'development' && (
+                      <div className="p-2 bg-blue-900/30 mb-2 text-xs">
+                        <p>Using {guest.isChild ? "child" : "adult"} meal options</p>
+                        <p>Options count: {(guest.isChild ? childMealOptions : regularMealOptions).length}</p>
+                      </div>
+                    )}
                     {guest.isChild ? childMealOptions.map((option) => (
                       <SelectItem key={option.id} value={option.id}>
                         {option.name}
@@ -508,6 +628,12 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                       <p className="text-red-500 text-sm mt-1">Please select a dessert option</p>
                     )}
                     <SelectContent className="bg-black border border-white border-opacity-20 text-white" sideOffset={5}>
+                      {process.env.NODE_ENV === 'development' && (
+                        <div className="p-2 bg-blue-900/30 mb-2 text-xs">
+                          <p>Using {guest.isChild ? "child" : "adult"} dessert options</p>
+                          <p>Options count: {(guest.isChild ? childDessertOptions : regularDessertOptions).length}</p>
+                        </div>
+                      )}
                       {guest.isChild ? childDessertOptions.map((option) => (
                         <SelectItem key={option.id} value={option.id}>
                           {option.name}
