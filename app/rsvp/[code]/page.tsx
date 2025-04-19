@@ -21,6 +21,34 @@ interface LocalGuest {
   isChild?: boolean
 }
 
+// Define types for API responses
+interface GuestResponse {
+  id: string
+  name: string
+  isChild?: boolean
+  mealChoice?: string | null
+  dessertChoice?: string | null
+  [key: string]: any
+}
+
+interface HouseholdResponse {
+  name: string
+  guests: GuestResponse[]
+  [key: string]: any
+}
+
+interface RsvpResponse {
+  household: HouseholdResponse
+  questions: Question[]
+}
+
+interface OptionsResponse {
+  mealOptions: Option[]
+  childMealOptions: Option[]
+  dessertOptions: Option[]
+  childDessertOptions: Option[]
+}
+
 export default function RSVPForm() {
   const params = useParams()
   const { toast } = useToast()
@@ -40,11 +68,16 @@ export default function RSVPForm() {
           fetch('/api/rsvp/options')
         ])
         
-        const householdData = await householdResponse.json()
-        const optionsData = await optionsResponse.json()
+        const householdData = await householdResponse.json() as RsvpResponse
+        const optionsData = await optionsResponse.json() as OptionsResponse
+        
+        // Check if householdData has the expected structure
+        if (!householdData.household || !Array.isArray(householdData.household.guests)) {
+          throw new Error("Invalid response format from server");
+        }
         
         // Log the raw household data to debug isChild values
-        console.log("Raw household data received:", JSON.stringify(householdData.household.guests.map(g => ({
+        console.log("Raw household data received:", JSON.stringify(householdData.household.guests.map((g: GuestResponse) => ({
           id: g.id,
           name: g.name,
           isChild: g.isChild,
@@ -52,13 +85,16 @@ export default function RSVPForm() {
         })), null, 2));
         
         // Ensure isChild is properly converted to boolean before setting state
-        const processedGuests = householdData.household.guests.map(guest => ({
-          ...guest,
+        const processedGuests = householdData.household.guests.map((guest: GuestResponse): LocalGuest => ({
+          id: guest.id,
+          name: guest.name,
+          mealOptionId: guest.mealChoice || undefined,
+          dessertOptionId: guest.dessertChoice || undefined,
           isChild: Boolean(guest.isChild) // Force conversion to boolean
         }));
         
         setHousehold({
-          ...householdData.household,
+          name: householdData.household.name,
           guests: processedGuests
         });
         
@@ -68,6 +104,7 @@ export default function RSVPForm() {
         setDessertOptions(optionsData.dessertOptions)
         setChildDessertOptions(optionsData.childDessertOptions || [])
       } catch (error) {
+        console.error("Error fetching RSVP data:", error);
         toast({
           title: "Error",
           description: "Failed to load RSVP form",
@@ -83,7 +120,7 @@ export default function RSVPForm() {
   useEffect(() => {
     if (household) {
       console.log("RSVP Component State - Guests with isChild status:");
-      household.guests.forEach(guest => {
+      household.guests.forEach((guest: LocalGuest) => {
         console.log(`${guest.name}: isChild=${guest.isChild} (${typeof guest.isChild})`);
       });
     }
@@ -93,7 +130,7 @@ export default function RSVPForm() {
     e.preventDefault()
 
     // Validate required fields for attending guests
-    const hasInvalidResponses = household?.guests.some(guest => {
+    const hasInvalidResponses = household?.guests.some((guest: LocalGuest) => {
       if (responses[`attending-${guest.id}`]) {
         if (!responses[`meal-${guest.id}`] || !responses[`dessert-${guest.id}`]) {
           return true
@@ -126,6 +163,7 @@ export default function RSVPForm() {
         description: "Your RSVP has been submitted successfully",
       })
     } catch (error) {
+      console.error("Error submitting RSVP:", error);
       toast({
         title: "Error",
         description: "Failed to submit RSVP",
@@ -184,7 +222,7 @@ export default function RSVPForm() {
                       <label>Meal Preference</label>
                       {(() => {
                         console.log(`Rendering meal options for ${guest.name}: isChild=${guest.isChild}`);
-                        console.log(guest.isChild ? `Using child options: ${childMealOptions.length} options` : `Using adult options: ${mealOptions.length} options`);
+                        console.log(Boolean(guest.isChild) ? `Using child options: ${childMealOptions.length} options` : `Using adult options: ${mealOptions.length} options`);
                         return null;
                       })()}
                       <Select
@@ -200,7 +238,7 @@ export default function RSVPForm() {
                         <SelectValue placeholder="Select a meal" />
                         </SelectTrigger>
                         <SelectContent>
-                        {(Boolean(guest.isChild) ? childMealOptions : mealOptions).map((option) => (
+                        {(Boolean(guest.isChild) ? childMealOptions : mealOptions).map((option: Option) => (
                           <SelectItem key={option.id} value={option.id}>
                           {option.name}
                           </SelectItem>
@@ -212,7 +250,7 @@ export default function RSVPForm() {
                       <label>Dessert Choice</label>
                       {(() => {
                         console.log(`Rendering dessert options for ${guest.name}: isChild=${guest.isChild}`);
-                        console.log(guest.isChild ? `Using child desserts: ${childDessertOptions.length} options` : `Using adult desserts: ${dessertOptions.length} options`);
+                        console.log(Boolean(guest.isChild) ? `Using child desserts: ${childDessertOptions.length} options` : `Using adult desserts: ${dessertOptions.length} options`);
                         return null;
                       })()}
                       <Select
@@ -228,7 +266,7 @@ export default function RSVPForm() {
                         <SelectValue placeholder="Select a dessert" />
                         </SelectTrigger>
                         <SelectContent>
-                        {(Boolean(guest.isChild) ? childDessertOptions : dessertOptions).map((option) => (
+                        {(Boolean(guest.isChild) ? childDessertOptions : dessertOptions).map((option: Option) => (
                           <SelectItem key={option.id} value={option.id}>
                           {option.name}
                           </SelectItem>

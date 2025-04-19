@@ -6,10 +6,44 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
 
+interface NiyahData {
+  id: string
+  name: string
+  isChild: boolean
+  householdName: string
+  householdCode: string
+}
+
+interface Guest {
+  id: string
+  name: string
+  isChild: boolean
+  [key: string]: any
+}
+
+interface Household {
+  id: string
+  name: string
+  code: string
+  guests: Guest[]
+  [key: string]: any
+}
+
+interface GuestsResponse {
+  households: Household[]
+}
+
+interface FixResponse {
+  success: boolean
+  message: string
+  previousValue: boolean
+  newValue: boolean
+}
+
 export default function FixNiyahPage() {
   const [loading, setLoading] = useState(false)
   const [searchLoading, setSearchLoading] = useState(false)
-  const [niyahData, setNiyahData] = useState<any>(null)
+  const [niyahData, setNiyahData] = useState<NiyahData | null>(null)
   const [success, setSuccess] = useState(false)
   const { toast } = useToast()
 
@@ -21,19 +55,19 @@ export default function FixNiyahPage() {
     try {
       setSearchLoading(true)
       const response = await fetch('/api/admin/guests')
-      const data = await response.json()
+      const data = await response.json() as GuestsResponse
       
-      let niyahFound = null
+      let niyahFound: NiyahData | null = null
       
       // Search through all households and guests to find Niyah Dublin
-      data.households.forEach((household: any) => {
-        household.guests.forEach((guest: any) => {
+      data.households.forEach((household: Household) => {
+        household.guests.forEach((guest: Guest) => {
           // Check for name containing "Niyah" and "Dublin" (case insensitive)
           if (guest.name.toLowerCase().includes('niyah') && guest.name.toLowerCase().includes('dublin')) {
             niyahFound = {
               id: guest.id,
               name: guest.name,
-              isChild: guest.isChild,
+              isChild: Boolean(guest.isChild),
               householdName: household.name,
               householdCode: household.code
             }
@@ -51,6 +85,7 @@ export default function FixNiyahPage() {
         })
       }
     } catch (error) {
+      console.error("Error finding Niyah:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -80,10 +115,10 @@ export default function FixNiyahPage() {
         }),
       })
       
-      const data = await response.json()
+      const data = await response.json() as FixResponse
       
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to fix child status')
+        throw new Error(data.message || 'Failed to fix child status')
       }
       
       setSuccess(true)
@@ -97,6 +132,7 @@ export default function FixNiyahPage() {
         description: data.message || "Successfully fixed Niyah's child status"
       })
     } catch (error) {
+      console.error("Error fixing child status:", error);
       toast({
         variant: "destructive",
         title: "Error",

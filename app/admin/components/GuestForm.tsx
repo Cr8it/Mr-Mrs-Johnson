@@ -179,6 +179,10 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
       setLoading(true);
       console.log(`Fixing isChild status for guest ID ${guestId} to ${correctValue}`);
       
+      if (!guestId) {
+        throw new Error('Guest ID is required');
+      }
+      
       // Direct database update to fix the issue
       const response = await fetch(`/api/admin/guests/${guestId}`, {
         method: 'PUT',
@@ -190,7 +194,8 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
       });
       
       if (!response.ok) {
-        throw new Error('Failed to update child status');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update child status');
       }
       
       const updatedGuest = await response.json();
@@ -211,7 +216,7 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to update child status",
+        description: error instanceof Error ? error.message : "Failed to update child status",
       });
     } finally {
       setLoading(false);
