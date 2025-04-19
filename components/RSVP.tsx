@@ -190,7 +190,7 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
           });
           
           // Ensure isChild is a boolean for each guest
-          verifyData.household.guests = verifyData.household.guests.map(guest => {
+          verifyData.household.guests = verifyData.household.guests.map((guest: { name: string; isChild?: boolean }) => {
             console.log(`Validating guest ${guest.name} from API:`, {
               originalIsChild: guest.isChild,
               type: typeof guest.isChild
@@ -204,7 +204,7 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
           });
           
           console.log("After validation, guest isChild status:", 
-            verifyData.household.guests.map(g => ({ 
+            verifyData.household.guests.map((g: { name: string; isChild: boolean }) => ({ 
               name: g.name, 
               isChild: g.isChild,
               type: typeof g.isChild
@@ -323,12 +323,12 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
     
     // Ensure isChild is a boolean for each guest
     if (data && data.guests) {
-      data.guests = data.guests.map(guest => ({
+      data.guests = data.guests.map((guest: { name: string; isChild?: boolean }) => ({
         ...guest,
         isChild: guest.isChild === true
       }));
       
-      console.log('Guest child status validated:', data.guests.map((g: any) => ({ 
+      console.log('Guest child status validated:', data.guests.map((g: { name: string; isChild: boolean }) => ({ 
         name: g.name, 
         isChild: g.isChild,
         type: typeof g.isChild
