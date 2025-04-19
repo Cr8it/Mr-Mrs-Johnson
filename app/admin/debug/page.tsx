@@ -10,11 +10,13 @@ export default function DebugPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [createSuccess, setCreateSuccess] = useState<string | null>(null)
+  const [createdItems, setCreatedItems] = useState<{meal: string[], dessert: string[]} | null>(null)
 
   const fetchDebugData = async () => {
     setLoading(true)
     setError(null)
     setCreateSuccess(null)
+    setCreatedItems(null)
     try {
       const response = await fetch("/api/debug/meal-options")
       if (!response.ok) throw new Error("Failed to fetch debug data")
@@ -31,13 +33,26 @@ export default function DebugPage() {
     setLoading(true)
     setError(null)
     setCreateSuccess(null)
+    setCreatedItems(null)
     try {
       const response = await fetch("/api/debug/create-test-child-options", {
         method: "POST"
       })
       if (!response.ok) throw new Error("Failed to create test options")
       const result = await response.json()
-      setCreateSuccess("Created child meal and dessert options successfully!")
+      
+      if (result.success) {
+        setCreateSuccess("Created child meal and dessert options successfully!")
+        
+        // Extract the created items for display
+        const mealNames = result.created.mealOptions.map((o: any) => o.name)
+        const dessertNames = result.created.dessertOptions.map((o: any) => o.name)
+        setCreatedItems({
+          meal: mealNames,
+          dessert: dessertNames
+        })
+      }
+      
       // Refresh data
       fetchDebugData()
     } catch (err) {
@@ -69,9 +84,30 @@ export default function DebugPage() {
 
       {createSuccess && (
         <div className="bg-green-50 text-green-800 p-4 rounded-md border border-green-200">
-          {createSuccess}
+          <p>{createSuccess}</p>
+          {createdItems && (
+            <div className="mt-2 text-sm">
+              <p><strong>Created Meal Options:</strong> {createdItems.meal.join(", ")}</p>
+              <p><strong>Created Dessert Options:</strong> {createdItems.dessert.join(", ")}</p>
+            </div>
+          )}
         </div>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Debug Tools</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <a href="/admin/debug/household">
+              <Button variant="outline" className="w-full">
+                Check Specific Household
+              </Button>
+            </a>
+          </div>
+        </CardContent>
+      </Card>
 
       {data && (
         <div className="space-y-8">

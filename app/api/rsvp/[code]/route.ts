@@ -79,6 +79,11 @@ export async function GET(
         console.log(`- Database isChild value: ${rawDbValue} (type: ${typeof rawDbValue})`);
         console.log(`- Using triple equals check: isChildValue = ${isChildValue} (${typeof isChildValue})`);
         
+        // Log a very clear message if this is a child guest
+        if (isChildValue) {
+          console.log(`⭐ IMPORTANT: ${guest.name} IS A CHILD - should see child meal options`);
+        }
+        
         return {
           ...guest,
           mealChoice: guest.mealChoice?.id || null,
