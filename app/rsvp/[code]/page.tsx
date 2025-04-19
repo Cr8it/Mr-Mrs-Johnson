@@ -208,6 +208,10 @@ export default function RSVPForm() {
                     <p>Available meal options: {guest.isChild === true ? childMealOptions.length : mealOptions.length}</p>
                     <p>Child meal options available: {childMealOptions.length}</p>
                     <p>Regular meal options available: {mealOptions.length}</p>
+                    <hr className="my-1" />
+                    <p>Available dessert options: {guest.isChild === true ? childDessertOptions.length : dessertOptions.length}</p>
+                    <p>Child dessert options available: {childDessertOptions.length}</p>
+                    <p>Regular dessert options available: {dessertOptions.length}</p>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Checkbox
@@ -228,27 +232,55 @@ export default function RSVPForm() {
                       <label>Meal Preference</label>
                       {(() => {
                         console.log(`Rendering meal options for ${guest.name}: isChild=${guest.isChild}`);
-                        console.log(guest.isChild === true ? `Using child options: ${childMealOptions.length} options` : `Using adult options: ${mealOptions.length} options`);
+                        const isChildGuest = guest.isChild === true;
+                        
+                        // Log detailed info about available options
+                        console.log(`Guest ${guest.name} is ${isChildGuest ? "a child" : "an adult"}`);
+                        console.log(`Available options for ${guest.name}:`, {
+                          type: isChildGuest ? "child" : "adult",
+                          availableCount: isChildGuest ? childMealOptions.length : mealOptions.length,
+                          allChildOptions: childMealOptions.map(o => o.name),
+                          allRegularOptions: mealOptions.map(o => o.name)
+                        });
+                        
                         return null;
                       })()}
                       <Select
                         value={responses[`meal-${guest.id}`]}
-                        onValueChange={(value) =>
-                        setResponses({
-                          ...responses,
-                          [`meal-${guest.id}`]: value,
-                        })
-                        }
+                        onValueChange={(value) => {
+                          console.log(`Selected meal for ${guest.name}: ${value}`);
+                          setResponses({
+                            ...responses,
+                            [`meal-${guest.id}`]: value,
+                          });
+                        }}
                       >
                         <SelectTrigger>
                         <SelectValue placeholder="Select a meal" />
                         </SelectTrigger>
                         <SelectContent>
-                        {(guest.isChild === true ? childMealOptions : mealOptions).map((option: Option) => (
-                          <SelectItem key={option.id} value={option.id}>
-                          {option.name}
-                          </SelectItem>
-                        ))}
+                        {(() => {
+                          // Use strict boolean comparison
+                          const isChildGuest = guest.isChild === true;
+                          const options = isChildGuest ? childMealOptions : mealOptions;
+                          
+                          // Check if we have options to display
+                          if (options.length === 0) {
+                            console.error(`No meal options available for ${guest.name} (${isChildGuest ? "child" : "adult"})`);
+                            return <SelectItem value="no-options" disabled>No options available</SelectItem>;
+                          }
+                          
+                          // Log what we're rendering
+                          console.log(`Rendering ${options.length} meal options for ${guest.name}:`, 
+                            options.map(o => o.name));
+                          
+                          // Return the mapped options
+                          return options.map((option: Option) => (
+                            <SelectItem key={option.id} value={option.id}>
+                              {option.name}
+                            </SelectItem>
+                          ));
+                        })()}
                         </SelectContent>
                       </Select>
                       </div>
@@ -256,27 +288,54 @@ export default function RSVPForm() {
                       <label>Dessert Choice</label>
                       {(() => {
                         console.log(`Rendering dessert options for ${guest.name}: isChild=${guest.isChild}`);
-                        console.log(guest.isChild === true ? `Using child desserts: ${childDessertOptions.length} options` : `Using adult desserts: ${dessertOptions.length} options`);
+                        const isChildGuest = guest.isChild === true;
+                        
+                        // Log detailed info about available options
+                        console.log(`Available dessert options for ${guest.name}:`, {
+                          type: isChildGuest ? "child" : "adult",
+                          availableCount: isChildGuest ? childDessertOptions.length : dessertOptions.length,
+                          allChildOptions: childDessertOptions.map(o => o.name),
+                          allRegularOptions: dessertOptions.map(o => o.name)
+                        });
+                        
                         return null;
                       })()}
                       <Select
                         value={responses[`dessert-${guest.id}`]}
-                        onValueChange={(value) =>
-                        setResponses({
-                          ...responses,
-                          [`dessert-${guest.id}`]: value,
-                        })
-                        }
+                        onValueChange={(value) => {
+                          console.log(`Selected dessert for ${guest.name}: ${value}`);
+                          setResponses({
+                            ...responses,
+                            [`dessert-${guest.id}`]: value,
+                          });
+                        }}
                       >
                         <SelectTrigger>
                         <SelectValue placeholder="Select a dessert" />
                         </SelectTrigger>
                         <SelectContent>
-                        {(guest.isChild === true ? childDessertOptions : dessertOptions).map((option: Option) => (
-                          <SelectItem key={option.id} value={option.id}>
-                          {option.name}
-                          </SelectItem>
-                        ))}
+                        {(() => {
+                          // Use strict boolean comparison
+                          const isChildGuest = guest.isChild === true;
+                          const options = isChildGuest ? childDessertOptions : dessertOptions;
+                          
+                          // Check if we have options to display
+                          if (options.length === 0) {
+                            console.error(`No dessert options available for ${guest.name} (${isChildGuest ? "child" : "adult"})`);
+                            return <SelectItem value="no-options" disabled>No options available</SelectItem>;
+                          }
+                          
+                          // Log what we're rendering
+                          console.log(`Rendering ${options.length} dessert options for ${guest.name}:`, 
+                            options.map(o => o.name));
+                          
+                          // Return the mapped options
+                          return options.map((option: Option) => (
+                            <SelectItem key={option.id} value={option.id}>
+                              {option.name}
+                            </SelectItem>
+                          ));
+                        })()}
                         </SelectContent>
                       </Select>
                       </div>
