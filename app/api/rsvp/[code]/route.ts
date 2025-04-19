@@ -54,23 +54,36 @@ export async function GET(
       orderBy: { order: 'asc' }
     })
 
+    // Debug specific guest for Niyah Dublin
+    const niyahGuest = household.guests.find(g => g.name.toLowerCase().includes('niyah'));
+    if (niyahGuest) {
+      console.log("========================== NIYAH DEBUG ==========================");
+      console.log(`FOUND NIYAH: Name=${niyahGuest.name}, ID=${niyahGuest.id}`);
+      console.log(`Raw isChild value in database: ${niyahGuest.isChild} (${typeof niyahGuest.isChild})`);
+      console.log(`isChild === true: ${niyahGuest.isChild === true}`);
+      console.log(`Boolean(isChild): ${Boolean(niyahGuest.isChild)}`);
+      console.log("=================================================================");
+    }
+
     // Transform the data to include existing choices - paying special attention to isChild
     const transformedHousehold = {
       ...household,
       guests: household.guests.map(guest => {
         // IMPORTANT: Force isChild to be a proper boolean by directly reading from database
         const rawDbValue = rawGuests.find(g => g.id === guest.id)?.isChild;
-        const isChildValue = Boolean(rawDbValue);
+        
+        // Use triple equals to ensure we get a true boolean (avoid truthy/falsy issues)
+        const isChildValue = rawDbValue === true;
         
         console.log(`Processing guest ${guest.name}:`);
         console.log(`- Database isChild value: ${rawDbValue} (type: ${typeof rawDbValue})`);
-        console.log(`- Processed isChild value: ${isChildValue} (type: ${typeof isChildValue})`);
+        console.log(`- Using triple equals check: isChildValue = ${isChildValue} (${typeof isChildValue})`);
         
         return {
           ...guest,
           mealChoice: guest.mealChoice?.id || null,
           dessertChoice: guest.dessertChoice?.id || null,
-          // Use the forced boolean value from our raw database check
+          // Use strict equality check for boolean conversion
           isChild: isChildValue,
           responses: guest.responses.map(response => ({
             questionId: response.questionId,
@@ -97,7 +110,7 @@ export async function GET(
     // Log the final guest data being sent to client for debugging
     console.log("FINAL DATA BEING SENT TO CLIENT:");
     transformedHousehold.guests.forEach(guest => {
-      console.log(`FINAL: Guest ${guest.name}: isChild=${guest.isChild}, type=${typeof guest.isChild}`);
+      console.log(`FINAL: Guest ${guest.name}: isChild=${guest.isChild}, type=${typeof guest.isChild}, isChild===true: ${guest.isChild === true}`);
     });
 
     return NextResponse.json({ 
@@ -141,7 +154,7 @@ export async function POST(request: Request, { params }: { params: { code: strin
       const mealOptionId = responses[`meal-${guest.id}`]
       const dessertOptionId = responses[`dessert-${guest.id}`]
       
-      console.log(`Guest ${guest.name}: Attending=${isAttending}, Meal=${mealOptionId}, Dessert=${dessertOptionId}, isChild=${guest.isChild}`)
+      console.log(`Guest ${guest.name}: Attending=${isAttending}, Meal=${mealOptionId}, Dessert=${dessertOptionId}, isChild=${guest.isChild === true}`);
 
       // Track changes for logging
       const mealChanged = guest.mealOptionId !== mealOptionId

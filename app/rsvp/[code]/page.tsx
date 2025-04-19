@@ -90,8 +90,15 @@ export default function RSVPForm() {
           name: guest.name,
           mealOptionId: guest.mealChoice || undefined,
           dessertOptionId: guest.dessertChoice || undefined,
-          isChild: Boolean(guest.isChild) // Force conversion to boolean
+          isChild: guest.isChild === true
         }));
+        
+        // Log the processed guests for debugging
+        console.log("Processed guests after strict equality check:", processedGuests.map(g => ({
+          name: g.name,
+          isChild: g.isChild,
+          isChildType: typeof g.isChild
+        })));
         
         setHousehold({
           name: householdData.household.name,
@@ -197,9 +204,8 @@ export default function RSVPForm() {
                     <p>isChild raw value: {String(guest.isChild)}</p>
                     <p>isChild type: {typeof guest.isChild}</p>
                     <p>isChild === true: {String(guest.isChild === true)}</p>
-                    <p>Boolean(isChild): {String(Boolean(guest.isChild))}</p>
-                    <p>Will use: {Boolean(guest.isChild) ? "Child options" : "Adult options"}</p>
-                    <p>Available meal options: {Boolean(guest.isChild) ? childMealOptions.length : mealOptions.length}</p>
+                    <p>Will use: {guest.isChild === true ? "Child options" : "Adult options"}</p>
+                    <p>Available meal options: {guest.isChild === true ? childMealOptions.length : mealOptions.length}</p>
                     <p>Child meal options available: {childMealOptions.length}</p>
                     <p>Regular meal options available: {mealOptions.length}</p>
                   </div>
@@ -222,7 +228,7 @@ export default function RSVPForm() {
                       <label>Meal Preference</label>
                       {(() => {
                         console.log(`Rendering meal options for ${guest.name}: isChild=${guest.isChild}`);
-                        console.log(Boolean(guest.isChild) ? `Using child options: ${childMealOptions.length} options` : `Using adult options: ${mealOptions.length} options`);
+                        console.log(guest.isChild === true ? `Using child options: ${childMealOptions.length} options` : `Using adult options: ${mealOptions.length} options`);
                         return null;
                       })()}
                       <Select
@@ -238,7 +244,7 @@ export default function RSVPForm() {
                         <SelectValue placeholder="Select a meal" />
                         </SelectTrigger>
                         <SelectContent>
-                        {(Boolean(guest.isChild) ? childMealOptions : mealOptions).map((option: Option) => (
+                        {(guest.isChild === true ? childMealOptions : mealOptions).map((option: Option) => (
                           <SelectItem key={option.id} value={option.id}>
                           {option.name}
                           </SelectItem>
@@ -250,7 +256,7 @@ export default function RSVPForm() {
                       <label>Dessert Choice</label>
                       {(() => {
                         console.log(`Rendering dessert options for ${guest.name}: isChild=${guest.isChild}`);
-                        console.log(Boolean(guest.isChild) ? `Using child desserts: ${childDessertOptions.length} options` : `Using adult desserts: ${dessertOptions.length} options`);
+                        console.log(guest.isChild === true ? `Using child desserts: ${childDessertOptions.length} options` : `Using adult desserts: ${dessertOptions.length} options`);
                         return null;
                       })()}
                       <Select
@@ -266,7 +272,7 @@ export default function RSVPForm() {
                         <SelectValue placeholder="Select a dessert" />
                         </SelectTrigger>
                         <SelectContent>
-                        {(Boolean(guest.isChild) ? childDessertOptions : dessertOptions).map((option: Option) => (
+                        {(guest.isChild === true ? childDessertOptions : dessertOptions).map((option: Option) => (
                           <SelectItem key={option.id} value={option.id}>
                           {option.name}
                           </SelectItem>

@@ -37,13 +37,20 @@ export async function POST(request: Request) {
           }
         })
 
-        // Update guest basic info
+        console.log(`Updating guest ${guest.id}:`, {
+          isAttending: guest.isAttending,
+          mealOptionId: guest.isAttending ? guest.mealChoice?.id : null,
+          dessertOptionId: guest.isAttending ? guest.dessertChoice?.id : null
+        })
+
+        // Update guest basic info - ensure meal and dessert choices are properly set
         const updatedGuest = await prisma.guest.update({
           where: { id: guest.id },
           data: {
             isAttending: guest.isAttending,
-            mealOptionId: guest.mealChoice?.id || null,
-            dessertOptionId: guest.dessertChoice?.id || null,
+            // Explicitly set meal and dessert option IDs
+            mealOptionId: guest.isAttending ? guest.mealChoice?.id : null,
+            dessertOptionId: guest.isAttending ? guest.dessertChoice?.id : null,
             dietaryNotes: guest.dietaryNotes,
           },
           include: {
@@ -51,6 +58,15 @@ export async function POST(request: Request) {
             mealChoice: true,
             dessertChoice: true
           }
+        })
+
+        // Verify the update was successful
+        console.log(`Guest ${guest.id} updated:`, {
+          isAttending: updatedGuest.isAttending,
+          mealOptionId: updatedGuest.mealOptionId,
+          mealChoice: updatedGuest.mealChoice?.name || 'None',
+          dessertOptionId: updatedGuest.dessertOptionId,
+          dessertChoice: updatedGuest.dessertChoice?.name || 'None'
         })
 
         // Try to log activities
@@ -67,7 +83,7 @@ export async function POST(request: Request) {
           }
 
           // Log meal choice change
-          if (currentGuest?.mealChoice?.id !== guest.mealChoice?.id && guest.mealChoice) {
+          if (currentGuest?.mealChoice?.id !== guest.mealChoice?.id && guest.mealChoice && guest.isAttending) {
             await prisma.guestActivity.create({
               data: {
                 guestId: guest.id,
@@ -78,7 +94,7 @@ export async function POST(request: Request) {
           }
 
           // Log dessert choice change
-          if (currentGuest?.dessertChoice?.id !== guest.dessertChoice?.id && guest.dessertChoice) {
+          if (currentGuest?.dessertChoice?.id !== guest.dessertChoice?.id && guest.dessertChoice && guest.isAttending) {
             await prisma.guestActivity.create({
               data: {
                 guestId: guest.id,
@@ -115,7 +131,31 @@ export async function POST(request: Request) {
     })
 
     const updatedGuests = await Promise.all(updates)
-    console.log("Updated guests:", updatedGuests)
+    console.log("Successfully updated all guests with meal and dessert choices.")
+
+    // Force-refresh the statistics to ensure they're up to date
+    try {
+      console.log("Refreshing statistics after RSVP submission...")
+      // Intentionally not awaiting this to speed up response time
+      // We just want to trigger a statistics refresh in the background
+      prisma.mealOption.findMany({
+        select: {
+          _count: {
+            select: { guests: { where: { isAttending: true } } }
+          }
+        }
+      })
+      prisma.dessertOption.findMany({
+        select: {
+          _count: {
+            select: { guests: { where: { isAttending: true } } }
+          }
+        }
+      })
+    } catch (refreshError) {
+      // Non-critical error, just log it
+      console.error("Failed to refresh statistics:", refreshError)
+    }
 
     // Send confirmation email
     try {

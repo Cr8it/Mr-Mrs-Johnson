@@ -428,17 +428,41 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
       return;
     }
 
+    // Log what we're about to submit for debugging
+    console.log("Submitting guest data:", guests.map(g => ({
+      id: g.id,
+      name: g.name,
+      isAttending: g.isAttending,
+      mealChoice: g.mealChoice,
+      dessertChoice: g.dessertChoice,
+      isChild: g.isChild
+    })));
+
     try {
       const response = await fetch("/api/rsvp/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ guests }),
+        body: JSON.stringify({ 
+          guests: guests.map(guest => ({
+            id: guest.id,
+            name: guest.name,
+            isAttending: guest.isAttending,
+            mealChoice: guest.mealChoice,
+            dessertChoice: guest.dessertChoice,
+            dietaryNotes: guest.dietaryNotes,
+            responses: guest.responses,
+            isChild: guest.isChild
+          }))
+        }),
       });
 
-      const data = await response.json();
       if (!response.ok) {
+        const data = await response.json();
         throw new Error(data.error || "Failed to submit RSVP");
       }
+
+      const data = await response.json();
+      console.log("RSVP submission response:", data);
 
       // Clear stored data
       localStorage.removeItem(`rsvp-${household.code}`);

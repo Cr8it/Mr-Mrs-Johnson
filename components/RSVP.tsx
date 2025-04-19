@@ -223,6 +223,13 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
 
 
   const handleRsvpSuccess = (guests: Guest[]) => {
+    console.log("RSVP success - Guests data:", guests.map(g => ({
+      name: g.name,
+      isAttending: g.isAttending,
+      mealChoice: g.mealChoice,
+      dessertChoice: g.dessertChoice
+    })));
+    
     const notAttending = guests.every(guest => guest.isAttending === false);
     setAllNotAttending(notAttending);
     localStorage.setItem('rsvp-attendance', JSON.stringify({ allNotAttending: notAttending }));
