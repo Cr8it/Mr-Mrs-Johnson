@@ -19,6 +19,25 @@ export async function POST(request: Request) {
     // Normalize the code (uppercase and remove spaces)
     const normalizedCode = code.toUpperCase().replace(/\s+/g, '')
 
+    // First get raw data to validate isChild values
+    const rawGuests = await prisma.guest.findMany({
+      where: {
+        household: {
+          code: normalizedCode
+        }
+      },
+      select: {
+        id: true,
+        name: true,
+        isChild: true
+      }
+    });
+    
+    console.log("Raw guest data for isChild validation:");
+    rawGuests.forEach(g => {
+      console.log(`- Guest ${g.name} (${g.id}): raw isChild=${g.isChild}, type=${typeof g.isChild}`);
+    });
+
     const [household, questions] = await Promise.all([
       prisma.household.findFirst({
       where: {
@@ -33,6 +52,7 @@ export async function POST(request: Request) {
           name: true,
           email: true,
           isAttending: true,
+          isChild: true, // Explicitly request isChild field
           mealChoice: true, // Include full meal choice data
           dessertChoice: true, // Include full dessert choice data
           dietaryNotes: true,
@@ -91,28 +111,46 @@ export async function POST(request: Request) {
       []
     }))
 
-    // Transform the household data to parse options in responses
+    // Transform the household data to parse options in responses and ensure isChild is a boolean
     const transformedHousehold = {
       ...household,
-      guests: household?.guests.map(guest => ({
-      ...guest,
-      responses: guest.responses.map(response => ({
-        ...response,
-        question: {
-        ...response.question,
-        options: response.question.type === "MULTIPLE_CHOICE" ? 
-          (() => {
-          try {
-            return JSON.parse(response.question.options)
-          } catch {
-            return []
-          }
-          })() : 
-          []
-        }
-      }))
-      }))
+      guests: household?.guests.map(guest => {
+        // Ensure isChild is a proper boolean using the raw data
+        const rawGuest = rawGuests.find(g => g.id === guest.id);
+        const isChildValue = rawGuest?.isChild === true;
+        
+        console.log(`Processing guest ${guest.name} for response:`);
+        console.log(`- Raw isChild: ${rawGuest?.isChild} (${typeof rawGuest?.isChild})`);
+        console.log(`- Setting isChild to: ${isChildValue} (${typeof isChildValue})`);
+        
+        return {
+          ...guest,
+          // Ensure isChild is a boolean
+          isChild: isChildValue,
+          responses: guest.responses.map(response => ({
+            ...response,
+            question: {
+              ...response.question,
+              options: response.question.type === "MULTIPLE_CHOICE" ? 
+                (() => {
+                  try {
+                    return JSON.parse(response.question.options)
+                  } catch {
+                    return []
+                  }
+                })() : 
+                []
+            }
+          }))
+        };
+      })
     }
+
+    // Log the final guest data being sent to the client
+    console.log("Final guest data being sent to client:");
+    transformedHousehold.guests.forEach(guest => {
+      console.log(`- Guest ${guest.name}: isChild=${guest.isChild}, type=${typeof guest.isChild}`);
+    });
 
     return NextResponse.json({
       success: true,

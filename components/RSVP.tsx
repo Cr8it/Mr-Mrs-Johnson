@@ -181,6 +181,37 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
       if (verifyResponse.ok) {
         const verifyData = await verifyResponse.json();
         
+        // Validate and ensure isChild is correctly set for each guest
+        if (verifyData.household && verifyData.household.guests) {
+          console.log("Received household data from server: ", {
+            name: verifyData.household.name,
+            code: verifyData.household.code,
+            guestCount: verifyData.household.guests.length
+          });
+          
+          // Ensure isChild is a boolean for each guest
+          verifyData.household.guests = verifyData.household.guests.map(guest => {
+            console.log(`Validating guest ${guest.name} from API:`, {
+              originalIsChild: guest.isChild,
+              type: typeof guest.isChild
+            });
+            
+            return {
+              ...guest,
+              // Ensure isChild is explicitly a boolean
+              isChild: guest.isChild === true
+            };
+          });
+          
+          console.log("After validation, guest isChild status:", 
+            verifyData.household.guests.map(g => ({ 
+              name: g.name, 
+              isChild: g.isChild,
+              type: typeof g.isChild
+            }))
+          );
+        }
+        
         // Check for saved form data
         const storageKey = `rsvp-${householdCode}`;
         const savedData = localStorage.getItem(storageKey);
@@ -289,17 +320,24 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
 
   const handleCodeSuccess = (data: any) => {
     console.log('Household data received:', data);
-    setHousehold(data)
-    setTab('guestForm')
-    setLoading(false)
     
-    // Log child status for debugging
-    if (data?.guests) {
-      console.log('Guest child status:', data.guests.map((g: any) => ({ 
+    // Ensure isChild is a boolean for each guest
+    if (data && data.guests) {
+      data.guests = data.guests.map(guest => ({
+        ...guest,
+        isChild: guest.isChild === true
+      }));
+      
+      console.log('Guest child status validated:', data.guests.map((g: any) => ({ 
         name: g.name, 
-        isChild: g.isChild 
+        isChild: g.isChild,
+        type: typeof g.isChild
       })));
     }
+    
+    setHousehold(data);
+    setTab('guestForm');
+    setLoading(false);
   }
 
   return (

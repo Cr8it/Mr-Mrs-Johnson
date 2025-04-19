@@ -35,7 +35,11 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
   const [guests, setGuests] = useState<Guest[]>(() => {
     return household.guests.map(guest => {
       // Log the isChild value to make sure it's being correctly loaded
-      console.log(`Initializing guest ${guest.name}, isChild=${guest.isChild}`);
+      console.log(`Initializing guest ${guest.name}, raw isChild=${guest.isChild}, type=${typeof guest.isChild}`);
+      
+      // Ensure isChild is properly cast to a boolean
+      const isChildValue = guest.isChild === true;
+      console.log(`  - Converted isChild for ${guest.name}: ${isChildValue} (${typeof isChildValue})`);
       
       return {
         ...guest,
@@ -43,8 +47,8 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
         dessertChoice: guest.dessertChoice || null,
         responses: guest.responses || [],
         isAttending: guest.isAttending ?? null,
-        // Make sure isChild is explicitly preserved
-        isChild: guest.isChild === true
+        // Make sure isChild is explicitly a boolean
+        isChild: isChildValue
       };
     });
   });
@@ -110,7 +114,11 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
   useEffect(() => {
     // Reset form state when household changes
     const newGuests = household.guests.map(guest => {
-      console.log(`Updating guest ${guest.name} from household change, isChild=${guest.isChild}`);
+      console.log(`Updating guest ${guest.name} from household change, raw isChild=${guest.isChild}, type=${typeof guest.isChild}`);
+      
+      // Ensure isChild is properly cast to a boolean
+      const isChildValue = guest.isChild === true;
+      console.log(`  - Converted isChild for ${guest.name}: ${isChildValue} (${typeof isChildValue})`);
       
       return {
         ...guest,
@@ -118,8 +126,8 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
         dessertChoice: guest.dessertChoice || null,
         responses: guest.responses || [],
         isAttending: guest.isAttending ?? null,
-        // Make sure isChild flag is preserved
-        isChild: guest.isChild === true
+        // Make sure isChild flag is explicitly a boolean
+        isChild: isChildValue
       };
     });
     
