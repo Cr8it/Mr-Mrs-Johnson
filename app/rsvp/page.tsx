@@ -12,6 +12,11 @@ export default function RsvpPage() {
   const [allNotAttending, setAllNotAttending] = useState(false)
   const router = useRouter()
 
+  // Add debugging for initial state
+  useEffect(() => {
+    console.log("RsvpPage initial state:", { isConfirmed, hasRSVPed, isOpen, allNotAttending })
+  }, [])
+
   useEffect(() => {
     const checkRsvpStatus = async () => {
       const response = await fetch("/api/rsvp/check-status")
@@ -30,6 +35,7 @@ export default function RsvpPage() {
     if (savedAttendance) {
       try {
         const { allNotAttending: savedNotAttending } = JSON.parse(savedAttendance)
+        console.log("Found saved attendance:", { savedNotAttending })
         setAllNotAttending(savedNotAttending)
       } catch (error) {
         console.error('Error parsing saved attendance:', error)
@@ -37,30 +43,49 @@ export default function RsvpPage() {
     }
   }, [router])
 
+  // Log when state changes
+  useEffect(() => {
+    console.log("RsvpPage state updated:", { hasRSVPed, allNotAttending, isOpen })
+  }, [hasRSVPed, allNotAttending, isOpen])
+
   const handleRSVPComplete = (code: string) => {
+    console.log("*** RSVP COMPLETE CALLED ***", { code })
     setIsConfirmed(true)
     setHasRSVPed(true)
     console.log(`RSVP completed with code: ${code}, allNotAttending: ${allNotAttending}`)
   }
 
   const handleClose = () => {
-    console.log(`Closing modal - hasRSVPed: ${hasRSVPed}, allNotAttending: ${allNotAttending}`)
+    console.log("*** PARENT HANDLE CLOSE CALLED ***");
+    console.log(`Closing modal - current state:`, { 
+      hasRSVPed, 
+      allNotAttending, 
+      isOpen,
+      isConfirmed
+    });
+    
     // Only allow close if either:
     // 1. User has RSVPed and at least one person is attending, or
     // 2. Admin has forced close (not implemented here but could be added)
     if (hasRSVPed && !allNotAttending) {
+      console.log("Close conditions met - CLOSING MODAL");
       setIsOpen(false)
       setTimeout(() => {
+        console.log("Timeout complete - navigating to home page");
         router.push("/")
       }, 300)
     } else {
-      console.log('Cannot close modal - conditions not met')
+      console.log('Cannot close modal - conditions not met:', {
+        hasRSVPed,
+        allNotAttending,
+        canClose: hasRSVPed && !allNotAttending
+      });
     }
   }
 
   const handleRSVPStatus = (notAttending: boolean) => {
-    console.log(`Setting allNotAttending to: ${notAttending}`)
-    setAllNotAttending(notAttending)
+    console.log(`Setting allNotAttending to: ${notAttending}`);
+    setAllNotAttending(notAttending);
   }
 
   if (!isOpen) return null;

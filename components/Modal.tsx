@@ -26,10 +26,17 @@ export default function Modal({ isOpen, onClose, children, allowClose = false, a
   }, [isOpen]);
 
   const handleClose = () => {
+    console.log("*** MODAL HANDLE CLOSE CALLED ***");
+    console.log("Modal props:", { isOpen, allowClose, allNotAttending, hasOnClose: !!onClose });
+    
     if (onClose) {
+      console.log("Calling Modal onClose function");
       // Force the modal to close regardless of conditions
       document.body.style.overflow = 'unset';
       onClose();
+      console.log("Modal onClose function called successfully");
+    } else {
+      console.error("Modal onClose function is not defined!");
     }
   };
 

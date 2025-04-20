@@ -429,7 +429,21 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
               </Button>
               {!allNotAttending && (
                 <Button 
-                  onClick={() => onClose && onClose()}
+                  onClick={() => {
+                    console.log("*** CLOSE BUTTON CLICKED ***");
+                    console.log("Current state:", { 
+                      showSuccess, 
+                      allNotAttending,
+                      onCloseType: typeof onClose,
+                      hasOnClose: !!onClose 
+                    });
+                    if (onClose) {
+                      console.log("Calling onClose function");
+                      onClose();
+                    } else {
+                      console.error("onClose function is not defined!");
+                    }
+                  }}
                   className="w-full bg-green-600 text-white hover:bg-green-700"
                 >
                   Close and View Wedding Details
@@ -494,7 +508,21 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
                       </Button>
                       {!allNotAttending && (
                         <Button 
-                          onClick={() => onClose && onClose()}
+                          onClick={() => {
+                            console.log("*** SECOND CLOSE BUTTON CLICKED ***");
+                            console.log("Current state:", { 
+                              showSuccess, 
+                              allNotAttending,
+                              onCloseType: typeof onClose,
+                              hasOnClose: !!onClose 
+                            });
+                            if (onClose) {
+                              console.log("Calling onClose function");
+                              onClose();
+                            } else {
+                              console.error("onClose function is not defined!");
+                            }
+                          }}
                           className="w-full bg-green-600 text-white hover:bg-green-700"
                         >
                           Close and View Wedding Details
