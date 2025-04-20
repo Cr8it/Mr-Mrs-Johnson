@@ -5,6 +5,15 @@ export async function GET() {
 	try {
 		console.log('Fetching meal and dessert options...')
 		
+		// First do a raw query to verify the data directly from the database
+		const rawMealOptions = await prisma.$queryRaw`
+			SELECT id, name, "isChildOption" 
+			FROM "MealOption" 
+			WHERE "isActive" = true
+			ORDER BY "createdAt" ASC
+		`
+		console.log('Raw meal options from database:', rawMealOptions)
+		
 		// Fetch meal options (regular)
 		const regularMealOptions = await prisma.mealOption.findMany({
 			where: { 
@@ -26,6 +35,10 @@ export async function GET() {
 			select: { id: true, name: true, isChildOption: true }
 		})
 		console.log('Found child meal options:', childMealOptions)
+		
+		// Verify raw children options from the database
+		const rawChildMealOptions = (rawMealOptions as any[]).filter(o => o.isChildOption === true)
+		console.log(`Raw child meal options (count: ${rawChildMealOptions.length}):`, rawChildMealOptions)
 
 		// Fetch regular dessert options
 		const regularDessertOptions = await prisma.dessertOption.findMany({
@@ -74,11 +87,24 @@ export async function GET() {
 		- Child dessert options: ${childDessertOptions.length}
 		`);
 
+		// Additional check - see if any child options exist at all
+		if (childMealOptions.length === 0) {
+			console.warn("WARNING: No child meal options found in the database!")
+			// Check directly if any records with isChildOption=true exist
+			const directCheck = await prisma.mealOption.count({
+				where: { isChildOption: true }
+			})
+			console.log(`Direct check for child meal options: ${directCheck} found`)
+		}
+
 		return NextResponse.json({ 
 			mealOptions: regularMealOptions, 
 			childMealOptions: childMealOptions,
 			dessertOptions: regularDessertOptions,
-			childDessertOptions: childDessertOptions
+			childDessertOptions: childDessertOptions,
+			debug: {
+				rawChildMealOptions: rawChildMealOptions
+			}
 		})
 	} catch (error) {
 		console.error("GET options error:", error)
