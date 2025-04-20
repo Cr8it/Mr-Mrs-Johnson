@@ -3,43 +3,60 @@ import { Play, Pause } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 export default function AudioPlayer() {
-  // Initialize state from localStorage or default to true
-  const [isPlaying, setIsPlaying] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('audioPlayerState')
-      return saved ? JSON.parse(saved) : true
-    }
-    return true
-  })
+  const [isPlaying, setIsPlaying] = useState(true)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const hasInteracted = useRef(false)
 
-  // Initialize audio on mount
+  // Initialize audio and attempt autoplay
   useEffect(() => {
-    if (!audioRef.current) {
-      audioRef.current = new Audio('/background-music.mp3')
-      audioRef.current.loop = true
-      audioRef.current.volume = 0.6
+    const initializeAudio = () => {
+      if (!audioRef.current) {
+        audioRef.current = new Audio('/background-music.mp3')
+        audioRef.current.loop = true
+        audioRef.current.volume = 0.6
+      }
+
+      const attemptPlay = async () => {
+        try {
+          if (audioRef.current) {
+            await audioRef.current.play()
+            setIsPlaying(true)
+          }
+        } catch (error) {
+          console.log('Autoplay prevented, waiting for interaction')
+          setIsPlaying(false)
+        }
+      }
+
+      attemptPlay()
     }
 
-    // Try to play if isPlaying is true
-    if (isPlaying) {
-      const playPromise = audioRef.current.play()
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.log('Auto-play prevented:', error)
-          setIsPlaying(false)
-          localStorage.setItem('audioPlayerState', 'false')
-        })
+    initializeAudio()
+
+    // Add interaction listeners
+    const handleInteraction = () => {
+      if (!hasInteracted.current && audioRef.current) {
+        hasInteracted.current = true
+        audioRef.current.play()
+          .then(() => setIsPlaying(true))
+          .catch(error => console.log('Play failed after interaction:', error))
       }
     }
 
-    // Cleanup function
+    // Listen for any user interaction
+    window.addEventListener('click', handleInteraction)
+    window.addEventListener('touchstart', handleInteraction)
+    window.addEventListener('keydown', handleInteraction)
+
     return () => {
+      window.removeEventListener('click', handleInteraction)
+      window.removeEventListener('touchstart', handleInteraction)
+      window.removeEventListener('keydown', handleInteraction)
       if (audioRef.current) {
         audioRef.current.pause()
       }
     }
-  }, []) // Empty dependency array for mount only
+  }, [])
 
   // Handle play state changes
   useEffect(() => {
@@ -49,18 +66,19 @@ export default function AudioPlayer() {
         if (playPromise !== undefined) {
           playPromise.catch(error => {
             console.log('Play prevented:', error)
-            setIsPlaying(false)
+            if (!hasInteracted.current) {
+              setIsPlaying(false)
+            }
           })
         }
       } else {
         audioRef.current.pause()
       }
-      // Save state to localStorage
-      localStorage.setItem('audioPlayerState', JSON.stringify(isPlaying))
     }
   }, [isPlaying])
 
-  const togglePlay = () => {
+  const togglePlay = async () => {
+    hasInteracted.current = true
     setIsPlaying(!isPlaying)
   }
 
