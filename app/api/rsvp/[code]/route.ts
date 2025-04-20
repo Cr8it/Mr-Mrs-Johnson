@@ -6,13 +6,29 @@ export async function GET(
   { params }: { params: { code: string } }
 ) {
   try {
-    // Find the household
+    // First let's get the raw database values for debugging
+    const rawGuests = await prisma.guest.findMany({
+      where: {
+        household: {
+          code: params.code
+        }
+      },
+      select: {
+        id: true,
+        name: true,
+        isChild: true
+      }
+    });
+    
+    console.log("RAW DATABASE VALUES:");
+    rawGuests.forEach(g => {
+      console.log(`DB RAW: Guest ${g.name} (${g.id}): isChild raw value = ${g.isChild}, type = ${typeof g.isChild}`);
+    });
+
+    // Now get full household data
     const household = await prisma.household.findFirst({
       where: {
-        code: {
-          equals: params.code,
-          mode: 'insensitive'
-        }
+        code: params.code,
       },
       include: {
         guests: {
@@ -25,24 +41,64 @@ export async function GET(
               }
             }
           }
-        }
-      }
+        },
+      },
     })
 
     if (!household) {
-      return NextResponse.json(
-        { error: "Household not found" },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: "Household not found" }, { status: 404 })
     }
 
-    // Get active questions
     const questions = await prisma.question.findMany({
       where: { isActive: true },
-      orderBy: { createdAt: 'asc' }
+      orderBy: { order: 'asc' }
     })
 
-    // Transform questions to parse options
+    // Debug specific guest for Niyah Dublin
+    const niyahGuest = household.guests.find(g => g.name.toLowerCase().includes('niyah'));
+    if (niyahGuest) {
+      console.log("========================== NIYAH DEBUG ==========================");
+      console.log(`FOUND NIYAH: Name=${niyahGuest.name}, ID=${niyahGuest.id}`);
+      console.log(`Raw isChild value in database: ${niyahGuest.isChild} (${typeof niyahGuest.isChild})`);
+      console.log(`isChild === true: ${niyahGuest.isChild === true}`);
+      console.log(`Boolean(isChild): ${Boolean(niyahGuest.isChild)}`);
+      console.log("=================================================================");
+    }
+
+    // Transform the data to include existing choices - paying special attention to isChild
+    const transformedHousehold = {
+      ...household,
+      guests: household.guests.map(guest => {
+        // IMPORTANT: Force isChild to be a proper boolean by directly reading from database
+        const rawDbValue = rawGuests.find(g => g.id === guest.id)?.isChild;
+        
+        // Use triple equals to ensure we get a true boolean (avoid truthy/falsy issues)
+        const isChildValue = rawDbValue === true;
+        
+        console.log(`Processing guest ${guest.name}:`);
+        console.log(`- Database isChild value: ${rawDbValue} (type: ${typeof rawDbValue})`);
+        console.log(`- Using triple equals check: isChildValue = ${isChildValue} (${typeof isChildValue})`);
+        
+        // Log a very clear message if this is a child guest
+        if (isChildValue) {
+          console.log(`⭐ IMPORTANT: ${guest.name} IS A CHILD - should see child meal options`);
+        }
+        
+        return {
+          ...guest,
+          mealChoice: guest.mealChoice?.id || null,
+          dessertChoice: guest.dessertChoice?.id || null,
+          // Use strict equality check for boolean conversion
+          isChild: isChildValue,
+          responses: guest.responses.map(response => ({
+            questionId: response.questionId,
+            answer: response.answer
+          }))
+        };
+      })
+    }
+
+    // Transform questions to parse options for multiple choice questions
     const transformedQuestions = questions.map(question => ({
       ...question,
       options: question.type === "MULTIPLE_CHOICE" ? 
@@ -56,71 +112,35 @@ export async function GET(
         []
     }))
 
-    // Process guests to ensure proper typing
-    const processedGuests = household.guests.map(guest => {
-      // Ensure isChild is a boolean
-      const isChildValue = guest.isChild === true;
-      
-      console.log(`Processing guest ${guest.name}, isChild=${isChildValue}`);
-      
-      return {
-        ...guest,
-        isChild: isChildValue,
-        // Also convert other nullable fields to a proper format
-        mealChoice: guest.mealChoice?.id || null,
-        dessertChoice: guest.dessertChoice?.id || null,
-        isAttending: guest.isAttending
-      };
+    // Log the final guest data being sent to client for debugging
+    console.log("FINAL DATA BEING SENT TO CLIENT:");
+    transformedHousehold.guests.forEach(guest => {
+      console.log(`FINAL: Guest ${guest.name}: isChild=${guest.isChild}, type=${typeof guest.isChild}, isChild===true: ${guest.isChild === true}`);
     });
 
-    const responseData = {
-      household: {
-        ...household,
-        guests: processedGuests
-      },
-      questions: transformedQuestions
-    };
-
-    // Return the response with cache control headers to prevent stale data
-    return NextResponse.json(responseData, {
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      }
-    });
+    return NextResponse.json({ 
+      household: transformedHousehold, 
+      questions: transformedQuestions 
+    })
   } catch (error) {
-    console.error("Error fetching household data:", error)
-    return NextResponse.json(
-      { error: "Failed to fetch household data" },
-      { status: 500 }
-    )
+    console.error("Error fetching RSVP data:", error)
+    return NextResponse.json({ error: "Failed to load RSVP data" }, { status: 500 })
   }
 }
 
 export async function POST(request: Request, { params }: { params: { code: string } }) {
   try {
-    const responses = await request.json()
-    
-    // Debugging the incoming responses
-    console.log(`Received RSVP responses for household code: ${params.code}`, {
-      responseKeys: Object.keys(responses),
-      sampleValues: Object.entries(responses).slice(0, 5).map(([key, value]) => `${key}: ${value}`)
-    })
-
-    // Find the household with all guest data including meal and dessert choices
+    console.log(`Processing RSVP submission for household code: ${params.code}`)
+    const { responses } = await request.json()
     const household = await prisma.household.findFirst({
       where: {
-        code: {
-          equals: params.code,
-          mode: 'insensitive'
-        },
+        code: params.code,
       },
       include: {
         guests: {
           include: {
             mealChoice: true,
-            dessertChoice: true,
+            dessertChoice: true
           }
         },
       },
@@ -135,38 +155,28 @@ export async function POST(request: Request, { params }: { params: { code: strin
     
     // Process responses for each guest
     for (const guest of household.guests) {
-      // Ensure isChild is a boolean
-      const isChildValue = guest.isChild === true;
-      
       const isAttending = responses[`attending-${guest.id}`]
       const mealOptionId = responses[`meal-${guest.id}`]
       const dessertOptionId = responses[`dessert-${guest.id}`]
       
-      console.log(`Guest ${guest.name}: Attending=${isAttending}, Meal=${mealOptionId}, Dessert=${dessertOptionId}, isChild=${isChildValue}`);
+      console.log(`Guest ${guest.name}: Attending=${isAttending}, Meal=${mealOptionId}, Dessert=${dessertOptionId}, isChild=${guest.isChild === true}`);
 
       // Track changes for logging
-      const mealChanged = guest.mealChoice?.id !== mealOptionId
-      const dessertChanged = guest.dessertChoice?.id !== dessertOptionId
+      const mealChanged = guest.mealOptionId !== mealOptionId
+      const dessertChanged = guest.dessertOptionId !== dessertOptionId
       
-      try {
-        // Update the guest record, explicitly preserving the isChild status
-        await prisma.guest.update({
-          where: {
-            id: guest.id,
-          },
-          data: {
-            isAttending,
-            mealChoice: isAttending && mealOptionId ? { connect: { id: mealOptionId } } : { disconnect: true },
-            dessertChoice: isAttending && dessertOptionId ? { connect: { id: dessertOptionId } } : { disconnect: true },
-            // We're not modifying isChild - it stays as set in the database
-          },
-        })
-        
-        console.log(`Successfully updated guest: ${guest.name} (ID: ${guest.id}), isAttending: ${isAttending}`);
-      } catch (err) {
-        console.error(`Error updating guest ${guest.name} (ID: ${guest.id}):`, err);
-        continue; // Skip activity logging for failed updates
-      }
+      // Update the guest record, explicitly preserving the isChild status
+      await prisma.guest.update({
+        where: {
+          id: guest.id,
+        },
+        data: {
+          isAttending,
+          mealOptionId: isAttending ? mealOptionId : null,
+          dessertOptionId: isAttending ? dessertOptionId : null,
+          // We're not modifying isChild - it stays as set in the database
+        },
+      })
 
       // Log guest activities for significant changes
       if (isAttending) {
@@ -226,53 +236,45 @@ export async function POST(request: Request, { params }: { params: { code: strin
       }
 
       // Save guest-specific responses
-      try {
-        const guestResponses = Object.entries(responses)
-          .filter(([key]) => key.endsWith(`-${guest.id}`))
-          .filter(([key]) => !key.startsWith('meal-') && !key.startsWith('dessert-') && !key.startsWith('attending-'))
-          .map(([key, value]) => ({
-            questionId: key.split("-")[0],
-            guestId: guest.id,
-            answer: String(value),
-          }))
+      const guestResponses = Object.entries(responses)
+        .filter(([key]) => key.endsWith(`-${guest.id}`))
+        .filter(([key]) => !key.startsWith('meal-') && !key.startsWith('dessert-') && !key.startsWith('attending-'))
+        .map(([key, value]) => ({
+          questionId: key.split("-")[0],
+          guestId: guest.id,
+          answer: String(value),
+        }))
 
-        if (guestResponses.length > 0) {
-          // Delete existing responses first
-          await prisma.questionResponse.deleteMany({
-            where: { guestId: guest.id }
-          })
+      if (guestResponses.length > 0) {
+        // Delete existing responses first
+        await prisma.questionResponse.deleteMany({
+          where: { guestId: guest.id }
+        })
 
-          // Create new responses
-          await prisma.questionResponse.createMany({
-            data: guestResponses,
-          })
-          
-          console.log(`Saved ${guestResponses.length} question responses for ${guest.name}`)
-        }
-      } catch (err) {
-        console.error(`Error saving responses for guest ${guest.name} (ID: ${guest.id}):`, err);
+        // Create new responses
+        await prisma.questionResponse.createMany({
+          data: guestResponses,
+        })
+        
+        console.log(`Saved ${guestResponses.length} question responses for ${guest.name}`)
       }
     }
 
     // Save household-level responses
-    try {
-      const householdResponses = Object.entries(responses)
-        .filter(([key]) => !key.includes("-"))
-        .map(([questionId, value]) => ({
-          questionId,
-          guestId: household.guests[0].id,
-          answer: String(value),
-        }))
+    const householdResponses = Object.entries(responses)
+      .filter(([key]) => !key.includes("-"))
+      .map(([questionId, value]) => ({
+        questionId,
+        guestId: household.guests[0].id,
+        answer: String(value),
+      }))
 
-      if (householdResponses.length > 0) {
-        await prisma.questionResponse.createMany({
-          data: householdResponses,
-        })
-        
-        console.log(`Saved ${householdResponses.length} household-level responses`)
-      }
-    } catch (err) {
-      console.error("Error saving household responses:", err);
+    if (householdResponses.length > 0) {
+      await prisma.questionResponse.createMany({
+        data: householdResponses,
+      })
+      
+      console.log(`Saved ${householdResponses.length} household-level responses`)
     }
 
     console.log(`RSVP submission completed successfully for household: ${household.name}`)
