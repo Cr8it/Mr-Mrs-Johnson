@@ -100,6 +100,36 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
       } else {
         console.warn("No child dessert options received!");
       }
+      
+      // Force a refresh of guest data after options are loaded
+      // This ensures the correct options are available before guest selection happens
+      const updatedGuests = guests.map(guest => {
+        // Ensure isChild is properly cast to a boolean
+        const isChildValue = guest.isChild === true;
+        
+        // Recheck available options
+        const hasMealOptions = isChildValue ? 
+          optionsData.childMealOptions?.length > 0 : 
+          optionsData.mealOptions?.length > 0;
+          
+        const hasDessertOptions = isChildValue ? 
+          optionsData.childDessertOptions?.length > 0 : 
+          optionsData.dessertOptions?.length > 0;
+          
+        console.log(`Refreshed guest ${guest.name} after options load:`, { 
+          isChild: isChildValue,
+          hasMealOptions,
+          hasDessertOptions
+        });
+        
+        return {
+          ...guest,
+          isChild: isChildValue
+        };
+      });
+      
+      setGuests(updatedGuests);
+      
     } catch (error) {
       console.error('Failed to fetch data:', error)
       toast({
@@ -235,7 +265,11 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
   const debugMealOptions = (guest: Guest) => {
     console.log(`DEBUG - Meal options for ${guest.name}:`, {
       isChild: guest.isChild,
-      availableOptions: guest.isChild ? childMealOptions : regularMealOptions,
+      childOptionsAvailable: childMealOptions.length > 0,
+      regularOptionsAvailable: regularMealOptions.length > 0,
+      usingFallback: guest.isChild && childMealOptions.length === 0,
+      actualOptionsUsed: guest.isChild && childMealOptions.length === 0 ? 'FALLBACK to regular' : (guest.isChild ? 'CHILD' : 'REGULAR'),
+      availableOptions: guest.isChild ? (childMealOptions.length > 0 ? childMealOptions : regularMealOptions) : regularMealOptions,
       selectedOption: guest.mealChoice,
       childOptionsCount: childMealOptions.length,
       regularOptionsCount: regularMealOptions.length
@@ -246,7 +280,11 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
   const debugDessertOptions = (guest: Guest) => {
     console.log(`DEBUG - Dessert options for ${guest.name}:`, {
       isChild: guest.isChild,
-      availableOptions: guest.isChild ? childDessertOptions : regularDessertOptions,
+      childOptionsAvailable: childDessertOptions.length > 0,
+      regularOptionsAvailable: regularDessertOptions.length > 0,
+      usingFallback: guest.isChild && childDessertOptions.length === 0,
+      actualOptionsUsed: guest.isChild && childDessertOptions.length === 0 ? 'FALLBACK to regular' : (guest.isChild ? 'CHILD' : 'REGULAR'),
+      availableOptions: guest.isChild ? (childDessertOptions.length > 0 ? childDessertOptions : regularDessertOptions) : regularDessertOptions,
       selectedOption: guest.dessertChoice,
       childOptionsCount: childDessertOptions.length,
       regularOptionsCount: regularDessertOptions.length
@@ -298,8 +336,16 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
         // Call debug function to log information about this selection
         debugMealOptions(guest);
         
-        // Find the correct option name based on whether this is a child
-        const options = guest.isChild ? childMealOptions : regularMealOptions;
+        // First determine which set of options to use
+        let options = guest.isChild ? childMealOptions : regularMealOptions;
+        
+        // If there are no child options but this is a child, fall back to regular options
+        if (guest.isChild && childMealOptions.length === 0) {
+          console.warn(`No child meal options for ${guest.name}, falling back to regular options`);
+          options = regularMealOptions;
+        }
+        
+        // Find the selected option
         const selectedOption = options.find(opt => opt.id === meal);
         
         if (!selectedOption) {
@@ -328,8 +374,16 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
         // Call debug function to log information about this selection
         debugDessertOptions(guest);
         
-        // Find the correct option name based on whether this is a child
-        const options = guest.isChild ? childDessertOptions : regularDessertOptions;
+        // First determine which set of options to use
+        let options = guest.isChild ? childDessertOptions : regularDessertOptions;
+        
+        // If there are no child options but this is a child, fall back to regular options
+        if (guest.isChild && childDessertOptions.length === 0) {
+          console.warn(`No child dessert options for ${guest.name}, falling back to regular options`);
+          options = regularDessertOptions;
+        }
+        
+        // Find the selected option
         const selectedOption = options.find(opt => opt.id === dessert);
         
         if (!selectedOption) {
@@ -664,7 +718,7 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                           >
                             <SelectValue placeholder="Select an option" />
                           </SelectTrigger>
-                          <SelectContent className="bg-black border-white border-opacity-20">
+                          <SelectContent className="bg-black border border-white border-opacity-20">
                             {(() => {
                               try {
                                 const options = typeof question.options === 'string' ? 
@@ -729,17 +783,33 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                       <div className="p-2 bg-blue-900/30 mb-2 text-xs">
                         <p>Using {guest.isChild ? "child" : "adult"} meal options</p>
                         <p>Options count: {(guest.isChild ? childMealOptions : regularMealOptions).length}</p>
+                        {guest.isChild && childMealOptions.length === 0 && (
+                          <p className="text-yellow-300">⚠️ No child options - using regular options</p>
+                        )}
                       </div>
                     )}
-                    {guest.isChild ? childMealOptions.map((option) => (
-                      <SelectItem key={option.id} value={option.id}>
-                        {option.name}
-                      </SelectItem>
-                    )) : regularMealOptions.map((option) => (
-                      <SelectItem key={option.id} value={option.id}>
-                        {option.name}
-                      </SelectItem>
-                    ))}
+                    {(() => {
+                      // First determine options based on child status
+                      let options = guest.isChild ? childMealOptions : regularMealOptions;
+                      
+                      // If there are no child options but this is a child, fall back to regular options
+                      if (guest.isChild && childMealOptions.length === 0) {
+                        console.warn(`No child meal options for ${guest.name}, falling back to regular options`);
+                        options = regularMealOptions;
+                      }
+                      
+                      // If still no options, show a message
+                      if (options.length === 0) {
+                        return <SelectItem disabled value="none">No options available</SelectItem>;
+                      }
+                      
+                      // Otherwise, render the options
+                      return options.map((option) => (
+                        <SelectItem key={option.id} value={option.id}>
+                          {option.name}
+                        </SelectItem>
+                      ));
+                    })()}
                   </SelectContent>
                   </Select>
                 </div>
@@ -769,17 +839,33 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
                         <div className="p-2 bg-blue-900/30 mb-2 text-xs">
                           <p>Using {guest.isChild ? "child" : "adult"} dessert options</p>
                           <p>Options count: {(guest.isChild ? childDessertOptions : regularDessertOptions).length}</p>
+                          {guest.isChild && childDessertOptions.length === 0 && (
+                            <p className="text-yellow-300">⚠️ No child options - using regular options</p>
+                          )}
                         </div>
                       )}
-                      {guest.isChild ? childDessertOptions.map((option) => (
-                        <SelectItem key={option.id} value={option.id}>
-                          {option.name}
-                        </SelectItem>
-                      )) : regularDessertOptions.map((option) => (
-                        <SelectItem key={option.id} value={option.id}>
-                          {option.name}
-                        </SelectItem>
-                      ))}
+                      {(() => {
+                        // First determine options based on child status
+                        let options = guest.isChild ? childDessertOptions : regularDessertOptions;
+                        
+                        // If there are no child options but this is a child, fall back to regular options
+                        if (guest.isChild && childDessertOptions.length === 0) {
+                          console.warn(`No child dessert options for ${guest.name}, falling back to regular options`);
+                          options = regularDessertOptions;
+                        }
+                        
+                        // If still no options, show a message
+                        if (options.length === 0) {
+                          return <SelectItem disabled value="none">No options available</SelectItem>;
+                        }
+                        
+                        // Otherwise, render the options
+                        return options.map((option) => (
+                          <SelectItem key={option.id} value={option.id}>
+                            {option.name}
+                          </SelectItem>
+                        ));
+                      })()}
                     </SelectContent>
                   </Select>
                 </div>

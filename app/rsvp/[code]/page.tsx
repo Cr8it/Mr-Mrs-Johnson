@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion } from "framer-motion"
 import { useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -59,17 +59,38 @@ export default function RSVPForm() {
   const [childMealOptions, setChildMealOptions] = useState<Option[]>([])
   const [dessertOptions, setDessertOptions] = useState<Option[]>([])
   const [childDessertOptions, setChildDessertOptions] = useState<Option[]>([])
+  const [optionsLoaded, setOptionsLoaded] = useState(false)
+  const initialLoadCompleted = useRef(false)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [householdResponse, optionsResponse] = await Promise.all([
-          fetch(`/api/rsvp/${params.code}`),
-          fetch('/api/rsvp/options')
-        ])
-        
-        const householdData = await householdResponse.json() as RsvpResponse
+        // First fetch the options separately to ensure they're loaded
+        console.log("INITIAL FETCH: Getting meal and dessert options first");
+        const optionsResponse = await fetch('/api/rsvp/options')
         const optionsData = await optionsResponse.json() as OptionsResponse
+        
+        console.log("INITIAL OPTIONS DATA:", {
+          regularMealOptions: optionsData.mealOptions.length,
+          childMealOptions: optionsData.childMealOptions?.length || 0,
+          regularDessertOptions: optionsData.dessertOptions.length,
+          childDessertOptions: optionsData.childDessertOptions?.length || 0
+        });
+        
+        // Set options immediately to ensure they're available
+        setMealOptions(optionsData.mealOptions)
+        setChildMealOptions(optionsData.childMealOptions || [])
+        setDessertOptions(optionsData.dessertOptions)
+        setChildDessertOptions(optionsData.childDessertOptions || [])
+        setOptionsLoaded(true)
+        
+        // Small delay to ensure options state is updated before continuing
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Now fetch the household data
+        console.log("SECOND FETCH: Getting household data");
+        const householdResponse = await fetch(`/api/rsvp/${params.code}`)
+        const householdData = await householdResponse.json() as RsvpResponse
         
         // Check if householdData has the expected structure
         if (!householdData.household || !Array.isArray(householdData.household.guests)) {
@@ -95,10 +116,10 @@ export default function RSVPForm() {
           console.log(`- Meal choice options: Will use ${isChildValue ? 'CHILD' : 'ADULT'} options`);
           
           // Check if meal/dessert options are missing
-          if (isChildValue && optionsData.childMealOptions.length === 0) {
+          if (isChildValue && optionsData.childMealOptions?.length === 0) {
             console.warn(`WARNING: Child guest ${guest.name} has no child meal options available!`);
           }
-          if (isChildValue && optionsData.childDessertOptions.length === 0) {
+          if (isChildValue && optionsData.childDessertOptions?.length === 0) {
             console.warn(`WARNING: Child guest ${guest.name} has no child dessert options available!`);
           }
           
@@ -125,31 +146,8 @@ export default function RSVPForm() {
         
         setQuestions(householdData.questions)
         
-        // ENHANCED: Check if meal and dessert options are available
-        if (optionsData.mealOptions.length === 0) {
-          console.warn("WARNING: No regular meal options available!");
-        }
-        if (optionsData.childMealOptions.length === 0) {
-          console.warn("WARNING: No child meal options available!");
-        }
-        if (optionsData.dessertOptions.length === 0) {
-          console.warn("WARNING: No regular dessert options available!");
-        }
-        if (optionsData.childDessertOptions.length === 0) {
-          console.warn("WARNING: No child dessert options available!");
-        }
-        
-        console.log("Setting meal options:", {
-          regular: optionsData.mealOptions.length,
-          child: optionsData.childMealOptions.length,
-          regularDessert: optionsData.dessertOptions.length,
-          childDessert: optionsData.childDessertOptions.length
-        });
-        
-        setMealOptions(optionsData.mealOptions)
-        setChildMealOptions(optionsData.childMealOptions || [])
-        setDessertOptions(optionsData.dessertOptions)
-        setChildDessertOptions(optionsData.childDessertOptions || [])
+        // Mark that initial load is complete
+        initialLoadCompleted.current = true;
       } catch (error) {
         console.error("Error fetching RSVP data:", error);
         toast({
@@ -165,13 +163,19 @@ export default function RSVPForm() {
 
   // Debug effect to log state after it's been set
   useEffect(() => {
-    if (household) {
-      console.log("RSVP Component State - Guests with isChild status:");
+    if (household && optionsLoaded) {
+      console.log("RSVP Component State After Both Loaded - Options availability:");
+      console.log(`- Regular meal options: ${mealOptions.length}`);
+      console.log(`- Child meal options: ${childMealOptions.length}`);
+      console.log(`- Regular dessert options: ${dessertOptions.length}`);
+      console.log(`- Child dessert options: ${childDessertOptions.length}`);
+      
+      console.log("Guest child status:");
       household.guests.forEach((guest: LocalGuest) => {
-        console.log(`${guest.name}: isChild=${guest.isChild} (${typeof guest.isChild})`);
+        console.log(`${guest.name}: isChild=${guest.isChild} (${typeof guest.isChild}), will see ${guest.isChild ? 'CHILD' : 'ADULT'} options`);
       });
     }
-  }, [household]);
+  }, [household, optionsLoaded, mealOptions, childMealOptions, dessertOptions, childDessertOptions]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -249,10 +253,13 @@ export default function RSVPForm() {
                     <p>Available meal options: {guest.isChild === true ? childMealOptions.length : mealOptions.length}</p>
                     <p>Child meal options available: {childMealOptions.length}</p>
                     <p>Regular meal options available: {mealOptions.length}</p>
+                    <p>Fallback active: {guest.isChild === true && childMealOptions.length === 0 ? "YES - using regular options" : "NO"}</p>
                     <hr className="my-1" />
                     <p>Available dessert options: {guest.isChild === true ? childDessertOptions.length : dessertOptions.length}</p>
                     <p>Child dessert options available: {childDessertOptions.length}</p>
                     <p>Regular dessert options available: {dessertOptions.length}</p>
+                    <p>Fallback active: {guest.isChild === true && childDessertOptions.length === 0 ? "YES - using regular options" : "NO"}</p>
+                    <p>Options fully loaded: {optionsLoaded ? "YES" : "NO"}</p>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Checkbox
@@ -303,7 +310,15 @@ export default function RSVPForm() {
                         {(() => {
                           // Use strict boolean comparison
                           const isChildGuest = guest.isChild === true;
-                          const options = isChildGuest ? childMealOptions : mealOptions;
+                          
+                          // First determine which set of options to use
+                          let options = isChildGuest ? childMealOptions : mealOptions;
+                          
+                          // If we have no child options but this is a child, fall back to regular options
+                          if (isChildGuest && options.length === 0) {
+                            console.warn(`No child meal options available for ${guest.name}, falling back to regular options`);
+                            options = mealOptions;
+                          }
                           
                           // Check if we have options to display
                           if (options.length === 0) {
@@ -312,7 +327,7 @@ export default function RSVPForm() {
                           }
                           
                           // Log what we're rendering
-                          console.log(`Rendering ${options.length} meal options for ${guest.name}:`, 
+                          console.log(`RENDER OPTIONS: Displaying ${options.length} meal options for ${guest.name} (${isChildGuest ? "child" : "adult"})`, 
                             options.map(o => o.name));
                           
                           // Return the mapped options
@@ -358,7 +373,15 @@ export default function RSVPForm() {
                         {(() => {
                           // Use strict boolean comparison
                           const isChildGuest = guest.isChild === true;
-                          const options = isChildGuest ? childDessertOptions : dessertOptions;
+                          
+                          // First determine which set of options to use
+                          let options = isChildGuest ? childDessertOptions : dessertOptions;
+                          
+                          // If we have no child options but this is a child, fall back to regular options
+                          if (isChildGuest && options.length === 0) {
+                            console.warn(`No child dessert options available for ${guest.name}, falling back to regular options`);
+                            options = dessertOptions;
+                          }
                           
                           // Check if we have options to display
                           if (options.length === 0) {
@@ -367,7 +390,7 @@ export default function RSVPForm() {
                           }
                           
                           // Log what we're rendering
-                          console.log(`Rendering ${options.length} dessert options for ${guest.name}:`, 
+                          console.log(`RENDER OPTIONS: Displaying ${options.length} dessert options for ${guest.name} (${isChildGuest ? "child" : "adult"})`, 
                             options.map(o => o.name));
                           
                           // Return the mapped options
