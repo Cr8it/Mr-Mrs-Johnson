@@ -8,10 +8,9 @@ interface RawGuestData {
   isChild: boolean | null;
 }
 
-export async function POST(request: Request) {
+// Helper function to handle both GET and POST requests
+async function processRequest(code: string) {
   try {
-    const { code } = await request.json()
-
     if (!code) {
       return NextResponse.json(
         { error: "Household code is required" },
@@ -168,6 +167,43 @@ export async function POST(request: Request) {
           'Surrogate-Control': 'no-store'
         }
       }
+    )
+  }
+}
+
+// Handle POST requests
+export async function POST(request: Request) {
+  try {
+    const { code } = await request.json()
+    return processRequest(code)
+  } catch (error) {
+    console.error("POST processing error:", error)
+    return NextResponse.json(
+      { error: "Invalid request format" },
+      { status: 400 }
+    )
+  }
+}
+
+// Handle GET requests - use URL search params
+export async function GET(request: Request) {
+  try {
+    const url = new URL(request.url)
+    const code = url.searchParams.get('code')
+    
+    if (!code) {
+      return NextResponse.json(
+        { error: "Household code is required (use ?code=YOUR_CODE)" },
+        { status: 400 }
+      )
+    }
+    
+    return processRequest(code)
+  } catch (error) {
+    console.error("GET processing error:", error)
+    return NextResponse.json(
+      { error: "Invalid request" },
+      { status: 400 }
     )
   }
 }
