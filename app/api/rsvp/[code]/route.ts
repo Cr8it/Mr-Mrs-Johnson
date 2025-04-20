@@ -6,29 +6,22 @@ export async function GET(
   { params }: { params: { code: string } }
 ) {
   try {
-    // First let's get the raw database values for debugging
-    const rawGuests = await prisma.guest.findMany({
-      where: {
-        household: {
-          code: params.code
-        }
-      },
-      select: {
-        id: true,
-        name: true,
-        isChild: true
-      }
-    });
-    
-    console.log("RAW DATABASE VALUES:");
-    rawGuests.forEach(g => {
-      console.log(`DB RAW: Guest ${g.name} (${g.id}): isChild raw value = ${g.isChild}, type = ${typeof g.isChild}`);
-    });
+    // Check cache first
+    const cacheKey = `rsvp_household_${params.code}`;
+    const cachedData = await caches.default.match(cacheKey);
+    if (cachedData) {
+      const data = await cachedData.json();
+      console.log(`Using cached data for household ${params.code}`);
+      return NextResponse.json(data);
+    }
 
-    // Now get full household data
+    // Find the household
     const household = await prisma.household.findFirst({
       where: {
-        code: params.code,
+        code: {
+          equals: params.code,
+          mode: 'insensitive'
+        }
       },
       include: {
         guests: {
@@ -41,63 +34,24 @@ export async function GET(
               }
             }
           }
-        },
-      },
+        }
+      }
     })
 
     if (!household) {
-      return NextResponse.json({ error: "Household not found" }, { status: 404 })
+      return NextResponse.json(
+        { error: "Household not found" },
+        { status: 404 }
+      )
     }
 
+    // Get active questions
     const questions = await prisma.question.findMany({
       where: { isActive: true },
-      orderBy: { order: 'asc' }
+      orderBy: { createdAt: 'asc' }
     })
 
-    // IMPORTANT: Add explicit logs for each guest's child status
-    console.log("CHILD STATUS CHECK FOR EACH GUEST:");
-    household.guests.forEach(guest => {
-      // Force type to boolean for clarity
-      const isChildValue = guest.isChild === true;
-      console.log(`- ${guest.name}: raw isChild=${guest.isChild} (${typeof guest.isChild}), processed isChild=${isChildValue}`);
-    });
-
-    // Transform the data to include existing choices - paying special attention to isChild
-    const transformedHousehold = {
-      ...household,
-      guests: household.guests.map(guest => {
-        // IMPORTANT: Force isChild to be a proper boolean by directly reading from database
-        const rawDbValue = rawGuests.find(g => g.id === guest.id)?.isChild;
-        
-        // Use triple equals to ensure we get a true boolean (avoid truthy/falsy issues)
-        const isChildValue = rawDbValue === true;
-        
-        console.log(`Processing guest ${guest.name}:`);
-        console.log(`- Database isChild value: ${rawDbValue} (type: ${typeof rawDbValue})`);
-        console.log(`- Using triple equals check: isChildValue = ${isChildValue} (${typeof isChildValue})`);
-        
-        // Log a very clear message if this is a child guest
-        if (isChildValue) {
-          console.log(`⭐ IMPORTANT: ${guest.name} IS A CHILD - should see child meal options`);
-        }
-        
-        return {
-          ...guest,
-          mealChoice: guest.mealChoice?.id || null,
-          dessertChoice: guest.dessertChoice?.id || null,
-          // Use strict equality check for boolean conversion
-          isChild: isChildValue,
-          // ADDED: Extra property for debugging
-          isChildExplicit: isChildValue,
-          responses: guest.responses.map(response => ({
-            questionId: response.questionId,
-            answer: response.answer
-          }))
-        };
-      })
-    }
-
-    // Transform questions to parse options for multiple choice questions
+    // Transform questions to parse options
     const transformedQuestions = questions.map(question => ({
       ...question,
       options: question.type === "MULTIPLE_CHOICE" ? 
@@ -111,19 +65,49 @@ export async function GET(
         []
     }))
 
-    // Log the final guest data being sent to client for debugging
-    console.log("FINAL DATA BEING SENT TO CLIENT:");
-    transformedHousehold.guests.forEach(guest => {
-      console.log(`FINAL: Guest ${guest.name}: isChild=${guest.isChild}, type=${typeof guest.isChild}, isChild===true: ${guest.isChild === true}`);
+    // Process guests to ensure proper typing
+    const processedGuests = household.guests.map(guest => {
+      // Force isChild to be a proper boolean
+      const isChildValue = guest.isChild === true;
+      
+      console.log(`Processing guest ${guest.name}:`, {
+        id: guest.id,
+        originalIsChild: guest.isChild,
+        originalType: typeof guest.isChild,
+        processedIsChild: isChildValue,
+        processedType: typeof isChildValue
+      });
+      
+      return {
+        ...guest,
+        isChild: isChildValue,
+        // Also convert other nullable fields to a proper format
+        mealChoice: guest.mealChoiceId,
+        dessertChoice: guest.dessertChoiceId,
+        isAttending: guest.isAttending
+      };
     });
 
-    return NextResponse.json({ 
-      household: transformedHousehold, 
-      questions: transformedQuestions 
-    })
+    const responseData = {
+      household: {
+        ...household,
+        guests: processedGuests
+      },
+      questions: transformedQuestions
+    };
+
+    // Cache the response for 5 minutes
+    const response = NextResponse.json(responseData);
+    const clonedResponse = response.clone();
+    await caches.default.put(cacheKey, clonedResponse);
+
+    return response;
   } catch (error) {
-    console.error("Error fetching RSVP data:", error)
-    return NextResponse.json({ error: "Failed to load RSVP data" }, { status: 500 })
+    console.error("Error fetching household data:", error)
+    return NextResponse.json(
+      { error: "Failed to fetch household data" },
+      { status: 500 }
+    )
   }
 }
 

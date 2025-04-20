@@ -19,16 +19,17 @@ interface LocalGuest {
   isAttending?: boolean
   mealOptionId?: string
   dessertOptionId?: string
-  isChild?: boolean
+  isChild: boolean // Changed to non-optional for clarity
 }
 
 // Define types for API responses
 interface GuestResponse {
   id: string
   name: string
-  isChild?: boolean
+  isChild: boolean // Changed to non-optional
   mealChoice?: string | null
   dessertChoice?: string | null
+  isAttending?: boolean | null
   [key: string]: any
 }
 
@@ -58,25 +59,39 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
   const [childMealOptions, setChildMealOptions] = useState<Option[]>([])
   const [dessertOptions, setDessertOptions] = useState<Option[]>([])
   const [childDessertOptions, setChildDessertOptions] = useState<Option[]>([])
-  const [guests, setGuests] = useState<LocalGuest[]>([])
+  const [responses, setResponses] = useState<Record<string, any>>({})
   const [questionsData, setQuestionsData] = useState<Question[]>([])
   const [hasLoadedOptions, setHasLoadedOptions] = useState(false)
   const [error, setError] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
-  const [responses, setResponses] = useState<Record<string, any>>({})
   const router = useRouter()
+
+  // Debug logger function
+  const logDebugInfo = (message: string, data: any) => {
+    console.log(`[RSVP Debug] ${message}:`, data);
+  };
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        console.log('Fetching RSVP form data...')
+        logDebugInfo('Fetching RSVP form data for code', params.code);
+        const codeParam = typeof params.code === 'string' ? params.code : params.code[0];
+        
         const [householdResponse, optionsResponse] = await Promise.all([
-          fetch(`/api/rsvp/${params.code}`),
+          fetch(`/api/rsvp/${codeParam}`),
           fetch('/api/rsvp/options')
         ])
         
-        const householdData = await householdResponse.json() as RsvpResponse
-        const optionsData = await optionsResponse.json() as OptionsResponse
+        if (!householdResponse.ok) {
+          throw new Error(`Failed to fetch household data: ${householdResponse.statusText}`);
+        }
+        
+        if (!optionsResponse.ok) {
+          throw new Error(`Failed to fetch options data: ${optionsResponse.statusText}`);
+        }
+        
+        const householdData = await householdResponse.json() as RsvpResponse;
+        const optionsData = await optionsResponse.json() as OptionsResponse;
         
         // Check if householdData has the expected structure
         if (!householdData.household || !Array.isArray(householdData.household.guests)) {
@@ -84,58 +99,33 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
         }
         
         // Log all the options data for debugging
-        console.log("Options data received:", {
+        logDebugInfo("Options data received", {
           regularMealOptions: optionsData.mealOptions?.length || 0,
           childMealOptions: optionsData.childMealOptions?.length || 0,
           regularDessertOptions: optionsData.dessertOptions?.length || 0,
           childDessertOptions: optionsData.childDessertOptions?.length || 0
         });
         
-        // Force childMealOptions and childDessertOptions to be arrays
+        // Ensure options are arrays even if empty
         const safeMealOptions = optionsData.mealOptions || [];
         const safeChildMealOptions = optionsData.childMealOptions || [];
         const safeDessertOptions = optionsData.dessertOptions || [];
         const safeChildDessertOptions = optionsData.childDessertOptions || [];
         
-        // Log the raw household data to debug isChild values
-        console.log("Raw household data received:", JSON.stringify(householdData.household.guests.map((g: GuestResponse) => ({
-          id: g.id,
-          name: g.name,
-          isChild: g.isChild,
-          isChildType: typeof g.isChild
-        })), null, 2));
+        // Log the guest data received from the server for debugging
+        logDebugInfo("Raw household data received", 
+          householdData.household.guests.map((g: GuestResponse) => ({
+            id: g.id,
+            name: g.name,
+            isChild: g.isChild,
+            isChildType: typeof g.isChild,
+            mealChoice: g.mealChoice,
+            dessertChoice: g.dessertChoice,
+            isAttending: g.isAttending
+          }))
+        );
         
-        // Ensure isChild is properly converted to boolean before setting state
-        const processedGuests = householdData.household.guests.map((guest: GuestResponse): LocalGuest => {
-          // Get the raw isChild value
-          const rawIsChild = guest.isChild;
-          // Force it to be a boolean using strict equality
-          const isChildValue = rawIsChild === true;
-          
-          console.log(`Processing ${guest.name}:`, {
-            rawIsChild,
-            rawIsChildType: typeof rawIsChild,
-            isChildValue,
-            isChildValueType: typeof isChildValue
-          });
-          
-          return {
-            id: guest.id,
-            name: guest.name,
-            mealOptionId: guest.mealChoice || undefined,
-            dessertOptionId: guest.dessertChoice || undefined,
-            isChild: isChildValue
-          };
-        });
-        
-        // Log the processed guests for debugging
-        console.log("Processed guests after strict equality check:", processedGuests.map(g => ({
-          name: g.name,
-          isChild: g.isChild,
-          isChildType: typeof g.isChild
-        })));
-        
-        // Set options first, then household data to avoid race conditions
+        // Set options first to ensure they're available
         setMealOptions(safeMealOptions);
         setChildMealOptions(safeChildMealOptions);
         setDessertOptions(safeDessertOptions);
@@ -144,9 +134,8 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
         // Mark options as loaded
         setHasLoadedOptions(true);
         
-        // Then set household data
+        // Set household data and questions
         setHousehold(householdData.household);
-        
         setQuestionsData(householdData.questions || []);
         
         // Initialize responses with existing data
@@ -154,12 +143,14 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
         
         // Set initial response values based on existing data for each guest
         householdData.household.guests.forEach((guest: GuestResponse) => {
-          // If the guest already has an attendance value, initialize it
-          if (guest.isAttending !== undefined && guest.isAttending !== null) {
-            initialResponses[`attending-${guest.id}`] = guest.isAttending;
-          }
+          // Default to false if undefined
+          const attending = guest.isAttending === true;
           
-          // If the guest already has meal/dessert choices, initialize them
+          // Set attendance status
+          initialResponses[`attending-${guest.id}`] = attending;
+          
+          // If the guest already has meal/dessert choices, or if we're showing
+          // meal options regardless of attendance, initialize them
           if (guest.mealChoice) {
             initialResponses[`meal-${guest.id}`] = guest.mealChoice;
           }
@@ -167,15 +158,26 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
           if (guest.dessertChoice) {
             initialResponses[`dessert-${guest.id}`] = guest.dessertChoice;
           }
+          
+          logDebugInfo(`Initialized responses for ${guest.name}`, {
+            isChild: guest.isChild,
+            attending: attending,
+            mealChoice: guest.mealChoice,
+            dessertChoice: guest.dessertChoice
+          });
         });
         
         // Set the initial responses
         setResponses(initialResponses);
         
-        // Log success message
-        console.log("Successfully loaded all RSVP form data");
+        logDebugInfo("Successfully loaded all RSVP form data", {
+          household: householdData.household.name,
+          guestCount: householdData.household.guests.length,
+          hasChildGuests: householdData.household.guests.some((g: GuestResponse) => g.isChild === true)
+        });
       } catch (error) {
         console.error("Error fetching RSVP data:", error);
+        setError(error instanceof Error ? error.message : "Failed to load RSVP form");
         toast({
           title: "Error",
           description: "Failed to load RSVP form",
@@ -187,25 +189,35 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
     fetchData()
   }, [params.code, toast])
 
-  // Extra debug effect to log changes in child options
+  // Debug effect to log changes in child options
   useEffect(() => {
     if (hasLoadedOptions) {
-      console.log("Child options loaded:", {
+      logDebugInfo("Child options loaded", {
         childMealOptions: childMealOptions.map(o => o.name),
         childDessertOptions: childDessertOptions.map(o => o.name),
       });
     }
   }, [hasLoadedOptions, childMealOptions, childDessertOptions]);
 
-  // Debug effect to log state after it's been set
+  // Debug effect to log household state after it's been set
   useEffect(() => {
     if (household) {
-      console.log("RSVP Component State - Guests with isChild status:");
-      household.guests.forEach((guest: GuestResponse) => {
-        console.log(`${guest.name}: isChild=${guest.isChild} (${typeof guest.isChild})`);
-      });
+      logDebugInfo("RSVP Component State - Guests with isChild status", 
+        household.guests.map(guest => ({
+          name: guest.name,
+          isChild: guest.isChild,
+          type: typeof guest.isChild
+        }))
+      );
     }
   }, [household]);
+
+  // Debug effect to log responses when they change
+  useEffect(() => {
+    if (Object.keys(responses).length > 0) {
+      logDebugInfo("Current responses", responses);
+    }
+  }, [responses]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -232,7 +244,8 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
     }
 
     try {
-      const response = await fetch(`/api/rsvp/${params.code}`, {
+      const codeParam = typeof params.code === 'string' ? params.code : params.code[0];
+      const response = await fetch(`/api/rsvp/${codeParam}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -260,11 +273,11 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
   }
 
   // Add a function to render meal options for a guest
-  const renderMealOptions = (guest: LocalGuest) => {
+  const renderMealOptions = (guest: GuestResponse) => {
     // Force the isChild value to be a proper boolean
     const isChildGuest = guest.isChild === true;
     
-    console.log(`RENDER MEAL OPTIONS for ${guest.name}:`, {
+    logDebugInfo(`Rendering meal options for ${guest.name}`, {
       isChild: guest.isChild,
       isChildType: typeof guest.isChild,
       isChildGuest,
@@ -275,15 +288,13 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
     // Explicitly select the options array based on guest type
     const optionsToUse = isChildGuest ? childMealOptions : mealOptions;
     
-    console.log(`Selected options array for ${guest.name}:`, {
-      isChild: isChildGuest,
-      usingChildOptions: isChildGuest,
-      options: optionsToUse.map(o => o.name),
-      optionsLength: optionsToUse.length
-    });
-    
     if (!optionsToUse || optionsToUse.length === 0) {
-      return <p className="text-red-500">No meal options available</p>;
+      return (
+        <div className="space-y-2">
+          <label>Meal Preference ({isChildGuest ? 'Child Menu' : 'Adult Menu'})</label>
+          <p className="text-red-500">No meal options available</p>
+        </div>
+      );
     }
     
     return (
@@ -292,7 +303,10 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
         <Select
           value={responses[`meal-${guest.id}`]}
           onValueChange={(value) => {
-            console.log(`Selected meal for ${guest.name}: ${value}`);
+            logDebugInfo(`Selected meal for ${guest.name}`, {
+              value, 
+              isChild: isChildGuest
+            });
             setResponses({
               ...responses,
               [`meal-${guest.id}`]: value,
@@ -315,11 +329,11 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
   };
   
   // Add a function to render dessert options for a guest
-  const renderDessertOptions = (guest: LocalGuest) => {
+  const renderDessertOptions = (guest: GuestResponse) => {
     // Force the isChild value to be a proper boolean
     const isChildGuest = guest.isChild === true;
     
-    console.log(`RENDER DESSERT OPTIONS for ${guest.name}:`, {
+    logDebugInfo(`Rendering dessert options for ${guest.name}`, {
       isChild: guest.isChild,
       isChildType: typeof guest.isChild,
       isChildGuest,
@@ -330,15 +344,13 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
     // Explicitly select the options array based on guest type
     const optionsToUse = isChildGuest ? childDessertOptions : dessertOptions;
     
-    console.log(`Selected dessert options array for ${guest.name}:`, {
-      isChild: isChildGuest,
-      usingChildOptions: isChildGuest,
-      options: optionsToUse.map(o => o.name),
-      optionsLength: optionsToUse.length
-    });
-    
     if (!optionsToUse || optionsToUse.length === 0) {
-      return <p className="text-red-500">No dessert options available</p>;
+      return (
+        <div className="space-y-2">
+          <label>Dessert Choice ({isChildGuest ? 'Child Menu' : 'Adult Menu'})</label>
+          <p className="text-red-500">No dessert options available</p>
+        </div>
+      );
     }
     
     return (
@@ -347,7 +359,10 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
         <Select
           value={responses[`dessert-${guest.id}`]}
           onValueChange={(value) => {
-            console.log(`Selected dessert for ${guest.name}: ${value}`);
+            logDebugInfo(`Selected dessert for ${guest.name}`, {
+              value, 
+              isChild: isChildGuest
+            });
             setResponses({
               ...responses,
               [`dessert-${guest.id}`]: value,
@@ -369,7 +384,40 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
     );
   };
 
-  if (!household) return null
+  if (!household) {
+    if (error) {
+      return (
+        <div className="min-h-screen bg-black text-white p-8 flex items-center justify-center">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <h3 className="text-xl font-bold text-red-500 mb-4">Error Loading RSVP Form</h3>
+                <p className="mb-4">{error}</p>
+                <Button onClick={() => router.push('/')} className="mt-4">
+                  Return to Home
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="min-h-screen bg-black text-white p-8 flex items-center justify-center">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <h3 className="text-xl font-bold mb-4">Loading RSVP Form...</h3>
+              <div className="flex justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white"></div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-white p-8">
