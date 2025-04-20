@@ -65,80 +65,118 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
     return household.questions || [];
   });
 
+  // Add this diagnostic function at the top level of the component
+  const logChildOptionsStatus = () => {
+    console.group('🔍 CHILD MEAL OPTIONS DIAGNOSTIC');
+    
+    // Log available options
+    console.log('📋 Child Meal Options:', childMealOptions.length > 0 
+      ? childMealOptions.map(o => o.name).join(', ') 
+      : '⚠️ NO CHILD MEAL OPTIONS FOUND');
+    
+    console.log('📋 Child Dessert Options:', childDessertOptions.length > 0 
+      ? childDessertOptions.map(o => o.name).join(', ') 
+      : '⚠️ NO CHILD DESSERT OPTIONS FOUND');
+    
+    // Check child guests
+    const childGuests = guests.filter(g => g.isChild === true);
+    console.log(`👶 Child Guests: ${childGuests.length}`);
+    
+    if (childGuests.length > 0) {
+      console.group('👶 Child Guests Details:');
+      childGuests.forEach(guest => {
+        console.group(`Child: ${guest.firstName} ${guest.lastName}`);
+        
+        // Check meal choice validity
+        const mealChoiceValid = guest.mealChoiceId 
+          ? childMealOptions.some(o => o.id === guest.mealChoiceId)
+          : null;
+        
+        console.log(
+          'Meal Choice:',
+          guest.mealChoiceId
+            ? `ID: ${guest.mealChoiceId} - ${
+                mealChoiceValid 
+                  ? '✓ Valid child meal option'
+                  : '❌ INVALID - Not in child meal options!'
+              }`
+            : '❓ Not set'
+        );
+        
+        // Check dessert choice validity
+        const dessertChoiceValid = guest.dessertChoiceId 
+          ? childDessertOptions.some(o => o.id === guest.dessertChoiceId)
+          : null;
+        
+        console.log(
+          'Dessert Choice:',
+          guest.dessertChoiceId
+            ? `ID: ${guest.dessertChoiceId} - ${
+                dessertChoiceValid 
+                  ? '✓ Valid child dessert option'
+                  : '❌ INVALID - Not in child dessert options!'
+              }`
+            : '❓ Not set'
+        );
+        
+        console.groupEnd();
+      });
+      console.groupEnd();
+      
+      // Issue warnings if applicable
+      if (childMealOptions.length === 0 && childGuests.length > 0) {
+        console.warn('⚠️ WARNING: Child guests exist but NO child meal options are available!');
+      }
+      if (childDessertOptions.length === 0 && childGuests.length > 0) {
+        console.warn('⚠️ WARNING: Child guests exist but NO child dessert options are available!');
+      }
+    }
+    
+    console.groupEnd();
+  };
+
+  // Add a useEffect to run diagnostic when relevant data changes
+  useEffect(() => {
+    if (regularMealOptions.length > 0 || childMealOptions.length > 0) {
+      logChildOptionsStatus();
+    }
+  }, [regularMealOptions, childMealOptions, guests]);
+
   // Define fetchData function before using it
   const fetchData = async () => {
+    setLoading(true);
     try {
-      console.log("Fetching meal and dessert options...");
-      const optionsResponse = await fetch('/api/rsvp/form-data')
-      const optionsData = await optionsResponse.json()
+      console.log("Fetching form data...");
       
-      if (!optionsResponse.ok) {
-        throw new Error(optionsData.error || 'Failed to fetch options')
-      }
+      const response = await fetch("/api/rsvp/form-data");
+      const data = await response.json();
       
-      console.log("Received options data:", optionsData);
+      if (!data) throw new Error("Failed to load form data");
       
-      if (optionsData.mealOptions?.length > 0) {
-        console.log(`Setting ${optionsData.mealOptions.length} regular meal options`);
-        setRegularMealOptions(optionsData.mealOptions)
-      }
-      if (optionsData.childMealOptions?.length > 0) {
-        console.log(`Setting ${optionsData.childMealOptions.length} child meal options:`, 
-          optionsData.childMealOptions.map((o: any) => ({ id: o.id, name: o.name, isChildOption: o.isChildOption })));
-        setChildMealOptions(optionsData.childMealOptions)
-      } else {
-        console.warn("No child meal options received!");
-      }
-      if (optionsData.dessertOptions?.length > 0) {
-        console.log(`Setting ${optionsData.dessertOptions.length} regular dessert options`);
-        setRegularDessertOptions(optionsData.dessertOptions)
-      }
-      if (optionsData.childDessertOptions?.length > 0) {
-        console.log(`Setting ${optionsData.childDessertOptions.length} child dessert options:`, 
-          optionsData.childDessertOptions.map((o: any) => ({ id: o.id, name: o.name, isChildOption: o.isChildOption })));
-        setChildDessertOptions(optionsData.childDessertOptions)
-      } else {
-        console.warn("No child dessert options received!");
-      }
+      // Set the meal and dessert options
+      const regularMeals = data.mealOptions.filter(o => !o.childOnly);
+      const childMeals = data.mealOptions.filter(o => o.childOnly);
       
-      // Force a refresh of guest data after options are loaded
-      // This ensures the correct options are available before guest selection happens
-      const updatedGuests = guests.map(guest => {
-        // Ensure isChild is properly cast to a boolean
-        const isChildValue = guest.isChild === true;
-        
-        // Recheck available options
-        const hasMealOptions = isChildValue ? 
-          optionsData.childMealOptions?.length > 0 : 
-          optionsData.mealOptions?.length > 0;
-          
-        const hasDessertOptions = isChildValue ? 
-          optionsData.childDessertOptions?.length > 0 : 
-          optionsData.dessertOptions?.length > 0;
-          
-        console.log(`Refreshed guest ${guest.name} after options load:`, { 
-          isChild: isChildValue,
-          hasMealOptions,
-          hasDessertOptions
-        });
-        
-        return {
-          ...guest,
-          isChild: isChildValue
-        };
-      });
+      const regularDesserts = data.dessertOptions.filter(o => !o.childOnly);
+      const childDesserts = data.dessertOptions.filter(o => o.childOnly);
       
-      setGuests(updatedGuests);
+      setRegularMealOptions(regularMeals);
+      setChildMealOptions(childMeals);
+      setRegularDessertOptions(regularDesserts);
+      setChildDessertOptions(childDesserts);
       
+      console.log("✓ Form data loaded successfully");
+      
+      // Add a small delay to ensure state is updated before running diagnostic
+      setTimeout(() => {
+        logChildOptionsStatus();
+      }, 100);
     } catch (error) {
-      console.error('Failed to fetch data:', error)
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load form data"
-      })
+      console.error("Error fetching form data:", error);
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
   // Add effect to update state when household changes
   useEffect(() => {
@@ -261,34 +299,31 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
     }));
   };
 
-  // Debug function to help identify meal option selection issues
-  const debugMealOptions = (guest: Guest) => {
-    console.log(`DEBUG - Meal options for ${guest.name}:`, {
-      isChild: guest.isChild,
-      childOptionsAvailable: childMealOptions.length > 0,
-      regularOptionsAvailable: regularMealOptions.length > 0,
-      usingFallback: guest.isChild && childMealOptions.length === 0,
-      actualOptionsUsed: guest.isChild && childMealOptions.length === 0 ? 'FALLBACK to regular' : (guest.isChild ? 'CHILD' : 'REGULAR'),
-      availableOptions: guest.isChild ? (childMealOptions.length > 0 ? childMealOptions : regularMealOptions) : regularMealOptions,
-      selectedOption: guest.mealChoice,
-      childOptionsCount: childMealOptions.length,
-      regularOptionsCount: regularMealOptions.length
-    });
+  // Remove old debug functions and replace with a simple version
+  const debugMealOptions = (guest: Guest, mealId: string) => {
+    const isChild = guest.isChild === true;
+    const options = isChild ? childMealOptions : regularMealOptions;
+    const option = options.find(o => o.id === mealId);
+    
+    console.log(`%c🍽️ ${guest.name} selected meal: ${option?.name || 'Unknown'}`, 
+      `color: ${isChild ? '#ff9800' : '#4caf50'}; font-weight: bold;`);
+    
+    if (isChild && childMealOptions.length === 0) {
+      console.warn(`⚠️ Child guest using adult meal (no child options available)`);
+    }
   };
 
-  // Debug function to help identify dessert option selection issues
-  const debugDessertOptions = (guest: Guest) => {
-    console.log(`DEBUG - Dessert options for ${guest.name}:`, {
-      isChild: guest.isChild,
-      childOptionsAvailable: childDessertOptions.length > 0,
-      regularOptionsAvailable: regularDessertOptions.length > 0,
-      usingFallback: guest.isChild && childDessertOptions.length === 0,
-      actualOptionsUsed: guest.isChild && childDessertOptions.length === 0 ? 'FALLBACK to regular' : (guest.isChild ? 'CHILD' : 'REGULAR'),
-      availableOptions: guest.isChild ? (childDessertOptions.length > 0 ? childDessertOptions : regularDessertOptions) : regularDessertOptions,
-      selectedOption: guest.dessertChoice,
-      childOptionsCount: childDessertOptions.length,
-      regularOptionsCount: regularDessertOptions.length
-    });
+  const debugDessertOptions = (guest: Guest, dessertId: string) => {
+    const isChild = guest.isChild === true;
+    const options = isChild ? childDessertOptions : regularDessertOptions;
+    const option = options.find(o => o.id === dessertId);
+    
+    console.log(`%c🍰 ${guest.name} selected dessert: ${option?.name || 'Unknown'}`, 
+      `color: ${isChild ? '#ff9800' : '#4caf50'}; font-weight: bold;`);
+    
+    if (isChild && childDessertOptions.length === 0) {
+      console.warn(`⚠️ Child guest using adult dessert (no child options available)`);
+    }
   };
 
   const clearFieldError = (guestId: string, errorText: string) => {
@@ -327,30 +362,35 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
     });
   };
 
+  // Add an effect to track when options change
+  useEffect(() => {
+    const hasChildGuests = guests.some(g => g.isChild === true);
+    if (hasChildGuests) {
+      console.log("%c⚡ OPTIONS CHANGED", "background: #222; color: #ff9800; font-size: 14px; padding: 3px;");
+      logChildOptionsStatus();
+    }
+  }, [regularMealOptions, childMealOptions, regularDessertOptions, childDessertOptions]);
+
+  // Replace the handleMealChoice and handleDessertChoice functions
   const handleMealChoice = (guestId: string, meal: string) => {
     clearFieldError(guestId, 'Meal choice');
     setGuests(prev => {
       const updated = prev.map(guest => {
         if (guest.id !== guestId) return guest;
         
-        // Call debug function to log information about this selection
-        debugMealOptions(guest);
+        // Log the selection with our simpler debug function
+        debugMealOptions(guest, meal);
         
         // First determine which set of options to use
         let options = guest.isChild ? childMealOptions : regularMealOptions;
         
         // If there are no child options but this is a child, fall back to regular options
         if (guest.isChild && childMealOptions.length === 0) {
-          console.warn(`No child meal options for ${guest.name}, falling back to regular options`);
           options = regularMealOptions;
         }
         
         // Find the selected option
         const selectedOption = options.find(opt => opt.id === meal);
-        
-        if (!selectedOption) {
-          console.error(`Could not find meal option with ID ${meal} for ${guest.name} (isChild: ${guest.isChild})`);
-        }
         
         return { 
           ...guest, 
@@ -371,24 +411,19 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
       const updated = prev.map(guest => {
         if (guest.id !== guestId) return guest;
         
-        // Call debug function to log information about this selection
-        debugDessertOptions(guest);
+        // Log the selection with our simpler debug function
+        debugDessertOptions(guest, dessert);
         
         // First determine which set of options to use
         let options = guest.isChild ? childDessertOptions : regularDessertOptions;
         
         // If there are no child options but this is a child, fall back to regular options
         if (guest.isChild && childDessertOptions.length === 0) {
-          console.warn(`No child dessert options for ${guest.name}, falling back to regular options`);
           options = regularDessertOptions;
         }
         
         // Find the selected option
         const selectedOption = options.find(opt => opt.id === dessert);
-        
-        if (!selectedOption) {
-          console.error(`Could not find dessert option with ID ${dessert} for ${guest.name} (isChild: ${guest.isChild})`);
-        }
         
         return { 
           ...guest, 
