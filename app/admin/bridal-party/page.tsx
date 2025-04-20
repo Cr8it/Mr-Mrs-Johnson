@@ -216,15 +216,12 @@ export default function BridalPartyAdmin() {
 		const updatedMembers = [...members];
 		const typeMembers = updatedMembers.filter(m => m.type === type);
 		
-		// Get the dragged member and hover member
+		// Get the dragged member
 		const dragMember = typeMembers[dragIndex];
-		const hoverMember = typeMembers[hoverIndex];
 		
-		// Update orders for all members of this type
-		const newOrder = typeMembers.map((member) => member.id);
-		// Remove dragged item
+		// Calculate new order values
+		const newOrder = typeMembers.map(m => m.id);
 		newOrder.splice(dragIndex, 1);
-		// Insert at new position
 		newOrder.splice(hoverIndex, 0, dragMember.id);
 		
 		// Update order numbers for all affected members
@@ -239,13 +236,13 @@ export default function BridalPartyAdmin() {
 		// Update local state immediately for smooth UI
 		setMembers(prevMembers => {
 			const newMembers = [...prevMembers];
-			reorderedMembers.forEach(updated => {
-				const index = newMembers.findIndex(m => m.id === updated.id);
-				if (index !== -1) {
-					newMembers[index] = updated;
-				}
+			// First, get all members that are not of the current type
+			const otherMembers = newMembers.filter(m => m.type !== type);
+			// Then combine with reordered members
+			return [...otherMembers, ...reorderedMembers].sort((a, b) => {
+				if (a.type !== b.type) return a.type.localeCompare(b.type);
+				return a.order - b.order;
 			});
-			return newMembers;
 		});
 		
 		// Persist changes to the server
@@ -261,7 +258,7 @@ export default function BridalPartyAdmin() {
 			}
 		} catch (error) {
 			console.error('Error saving order:', error);
-			// Optionally revert the state if save fails
+			// Revert the state if save fails
 			fetchMembers();
 		}
 	};
