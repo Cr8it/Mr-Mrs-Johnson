@@ -45,6 +45,32 @@ export default function DreamTeam() {
   // Combine sorted lists
   const sortedMembers = [...bridesmaids, ...groomsmen];
 
+  const renderTeamMember = (member: TeamMember, index: number) => (
+    <motion.div
+      key={member.id}
+      className="bg-white bg-opacity-5 p-6 rounded-lg shadow-xl w-full max-w-sm"
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.8, delay: 0.2 + index * 0.1 }}
+      viewport={{ once: true }}
+    >
+      <div className="relative w-40 h-40 mx-auto mb-4">
+        <Image
+          src={member.imageUrl}
+          alt={member.name}
+          fill
+          className={`rounded-full object-cover border-4 ${
+            imageErrors[member.id] ? 'border-red-500' : 'border-gold'
+          }`}
+          onError={() => setImageErrors(prev => ({ ...prev, [member.id]: true }))}
+        />
+      </div>
+      <h3 className="text-xl font-cormorant font-semibold text-center mb-2">{member.name}</h3>
+      <p className="text-center text-gold mb-3 font-montserrat text-sm">{member.role}</p>
+      <p className="text-center font-montserrat text-sm">{member.description}</p>
+    </motion.div>
+  );
+
   return (
     <section id="dream-team" className="py-24">
       <motion.h2
@@ -64,32 +90,34 @@ export default function DreamTeam() {
           <p className="text-white/60">Loading team members...</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {sortedMembers.map((member, index) => (
-            <motion.div
-              key={member.id}
-              className="bg-white bg-opacity-5 p-6 rounded-lg shadow-xl"
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 + index * 0.1 }}
-              viewport={{ once: true }}
-            >
-              <div className="relative w-40 h-40 mx-auto mb-4">
-                <Image
-                  src={member.imageUrl}
-                  alt={member.name}
-                  fill
-                  className={`rounded-full object-cover border-4 ${
-                    imageErrors[member.id] ? 'border-red-500' : 'border-gold'
-                  }`}
-                  onError={() => setImageErrors(prev => ({ ...prev, [member.id]: true }))}
-                />
-              </div>
-              <h3 className="text-xl font-cormorant font-semibold text-center mb-2">{member.name}</h3>
-              <p className="text-center text-gold mb-3 font-montserrat text-sm">{member.role}</p>
-              <p className="text-center font-montserrat text-sm">{member.description}</p>
-            </motion.div>
-          ))}
+        <div className="space-y-8">
+          {/* First member centered */}
+          {sortedMembers.length > 0 && (
+            <div className="flex justify-center">
+              {renderTeamMember(sortedMembers[0], 0)}
+            </div>
+          )}
+          
+          {/* Members 2-5 in a grid */}
+          {sortedMembers.length > 1 && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 max-w-6xl mx-auto">
+              {sortedMembers.slice(1, 5).map((member, index) => renderTeamMember(member, index + 1))}
+            </div>
+          )}
+          
+          {/* Sixth member centered */}
+          {sortedMembers.length > 5 && (
+            <div className="flex justify-center">
+              {renderTeamMember(sortedMembers[5], 5)}
+            </div>
+          )}
+          
+          {/* Remaining members in a grid */}
+          {sortedMembers.length > 6 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+              {sortedMembers.slice(6).map((member, index) => renderTeamMember(member, index + 6))}
+            </div>
+          )}
         </div>
       )}
     </section>
