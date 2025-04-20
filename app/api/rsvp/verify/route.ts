@@ -53,8 +53,8 @@ export async function POST(request: Request) {
     if (!household) {
       return NextResponse.json(
         { error: "Household not found" },
-        { status: 404 },
-        {
+        { 
+          status: 404,
           headers: {
             'Cache-Control': 'no-store, max-age=0',
             'Surrogate-Control': 'no-store'

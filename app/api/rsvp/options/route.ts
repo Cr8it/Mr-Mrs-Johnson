@@ -1,6 +1,19 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 
+// Define interfaces for the raw SQL query results
+interface MealOption {
+	id: string;
+	name: string;
+	isChildOption: boolean;
+}
+
+interface DessertOption {
+	id: string;
+	name: string;
+	isChildOption: boolean;
+}
+
 export async function GET() {
 	try {
 		console.log("Fetching meal and dessert options...")
@@ -13,28 +26,28 @@ export async function GET() {
 			childDessertOptions
 		] = await Promise.all([
 			// Regular meal options - using raw query with explicit boolean casting
-			prisma.$queryRaw`
+			prisma.$queryRaw<MealOption[]>`
 				SELECT id, name, "isChildOption"::boolean as "isChildOption" 
 				FROM "MealOption" 
 				WHERE "isActive" = true AND "isChildOption" = false
 				ORDER BY "createdAt" ASC
 			`,
 			// Child meal options - using raw query with explicit boolean casting
-			prisma.$queryRaw`
+			prisma.$queryRaw<MealOption[]>`
 				SELECT id, name, "isChildOption"::boolean as "isChildOption" 
 				FROM "MealOption" 
 				WHERE "isActive" = true AND "isChildOption" = true
 				ORDER BY "createdAt" ASC
 			`,
 			// Regular dessert options - using raw query with explicit boolean casting
-			prisma.$queryRaw`
+			prisma.$queryRaw<DessertOption[]>`
 				SELECT id, name, "isChildOption"::boolean as "isChildOption" 
 				FROM "DessertOption" 
 				WHERE "isActive" = true AND "isChildOption" = false
 				ORDER BY "createdAt" ASC
 			`,
 			// Child dessert options - using raw query with explicit boolean casting
-			prisma.$queryRaw`
+			prisma.$queryRaw<DessertOption[]>`
 				SELECT id, name, "isChildOption"::boolean as "isChildOption" 
 				FROM "DessertOption" 
 				WHERE "isActive" = true AND "isChildOption" = true
