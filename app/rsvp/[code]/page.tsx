@@ -29,7 +29,7 @@ interface GuestResponse {
   isChild: boolean // Changed to non-optional
   mealChoice?: string | null
   dessertChoice?: string | null
-  isAttending?: boolean | null
+  isAttending?: boolean | null // This can be null from API
   [key: string]: any
 }
 
@@ -280,100 +280,115 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
     dessertOptions, 
     childDessertOptions 
   }: { 
-    guests: LocalGuest[], 
+    guests: LocalGuest[] | GuestResponse[], // Accept either type
     mealOptions: Option[], 
     childMealOptions: Option[], 
     dessertOptions: Option[], 
     childDessertOptions: Option[] 
   }) => {
-    return (
-      <div className="bg-gray-100 p-4 mb-8 rounded-lg text-xs">
-        <h3 className="font-bold mb-2">Debug: Meal &amp; Dessert Options</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <h4 className="font-semibold">Adult Meal Options ({mealOptions.length})</h4>
-            <ul className="list-disc pl-4">
-              {mealOptions.map(o => <li key={o.id}>{o.name}</li>)}
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold">Child Meal Options ({childMealOptions.length})</h4>
-            <ul className="list-disc pl-4">
-              {childMealOptions.map(o => <li key={o.id}>{o.name}</li>)}
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold">Adult Dessert Options ({dessertOptions.length})</h4>
-            <ul className="list-disc pl-4">
-              {dessertOptions.map(o => <li key={o.id}>{o.name}</li>)}
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold">Child Dessert Options ({childDessertOptions.length})</h4>
-            <ul className="list-disc pl-4">
-              {childDessertOptions.map(o => <li key={o.id}>{o.name}</li>)}
-            </ul>
-          </div>
-        </div>
-        
-        <h4 className="font-semibold mt-4 mb-2">Guest Options</h4>
-        <div className="space-y-2">
-          {guests.map(guest => (
-            <div key={guest.id} className="border border-gray-300 p-2 rounded">
-              <p>
-                <strong>{guest.name}</strong> - {guest.isChild ? "Child" : "Adult"}
-              </p>
-              <p>
-                Meal options shown: {guest.isChild ? childMealOptions.length : mealOptions.length} options
-                ({guest.isChild ? "Child Menu" : "Adult Menu"})
-              </p>
-              <p>
-                Dessert options shown: {guest.isChild ? childDessertOptions.length : dessertOptions.length} options
-                ({guest.isChild ? "Child Menu" : "Adult Menu"})
-              </p>
+    if (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') {
+      return (
+        <div className="bg-yellow-100 text-yellow-800 p-3 rounded mb-4">
+          <h3 className="font-bold mb-2">Debug: Meal &amp; Dessert Options</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <h4 className="font-semibold">Adult Meal Options: {mealOptions.length}</h4>
+              <ul className="list-disc ml-5 text-xs">
+                {mealOptions.map(option => (
+                  <li key={option.id}>{option.name}</li>
+                ))}
+              </ul>
+              
+              <h4 className="font-semibold mt-2">Child Meal Options: {childMealOptions.length}</h4>
+              <ul className="list-disc ml-5 text-xs">
+                {childMealOptions.map(option => (
+                  <li key={option.id}>{option.name}</li>
+                ))}
+              </ul>
             </div>
-          ))}
+            
+            <div>
+              <h4 className="font-semibold">Adult Dessert Options: {dessertOptions.length}</h4>
+              <ul className="list-disc ml-5 text-xs">
+                {dessertOptions.map(option => (
+                  <li key={option.id}>{option.name}</li>
+                ))}
+              </ul>
+              
+              <h4 className="font-semibold mt-2">Child Dessert Options: {childDessertOptions.length}</h4>
+              <ul className="list-disc ml-5 text-xs">
+                {childDessertOptions.map(option => (
+                  <li key={option.id}>{option.name}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          
+          <h3 className="font-bold mt-4 mb-2">Guests:</h3>
+          <div className="space-y-2">
+            {guests.map(guest => (
+              <div key={guest.id} className="p-2 border rounded">
+                <p><strong>Name:</strong> {guest.name}</p>
+                <p><strong>Is Child:</strong> {String(guest.isChild)}</p>
+                <p><strong>Options used:</strong> {guest.isChild ? 'Child Options' : 'Adult Options'}</p>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
+    return null;
   };
 
   // Helper function to render meal options based on whether guest is a child
   const renderMealOptions = (
-    guest: LocalGuest,
+    guest: LocalGuest | GuestResponse,
     mealOptions: Option[],
     childMealOptions: Option[],
   ) => {
-    const options = guest.isChild ? childMealOptions : mealOptions;
-    const menuType = guest.isChild ? "Child Menu" : "Adult Menu";
+    // Determine which options to use based on isChild
+    const options = guest.isChild === true ? childMealOptions : mealOptions;
+    const menuType = guest.isChild === true ? "Child Menu" : "Adult Menu";
     
-    console.log(`Rendering meal options for ${guest.name} (isChild: ${guest.isChild}):`, 
-      { availableOptions: options.map(o => o.name) });
+    console.log(`Rendering meal options for ${guest.name}, isChild=${guest.isChild}, using ${menuType}`);
+    console.log(`Available options: ${options.length}`);
     
     if (options.length === 0) {
       console.warn(`No meal options available for ${guest.name} (isChild: ${guest.isChild})`);
       return <p className="text-red-500">No meal options available</p>;
     }
     
+    // Get the current selection value
+    // Handle both LocalGuest (mealOptionId) and GuestResponse (mealChoice)
+    const selectedValue = 'mealOptionId' in guest 
+      ? (guest as LocalGuest).mealOptionId || ""
+      : (guest as GuestResponse).mealChoice || "";
+
     return (
       <>
         <p className="text-sm text-gray-500 mb-1">{menuType}</p>
         <select
           className="w-full p-2 border border-gray-300 rounded"
-          value={guest.mealOptionId || ""}
+          value={selectedValue}
           onChange={(e) => {
             const updatedGuests = [...household!.guests];
             const index = updatedGuests.findIndex((g) => g.id === guest.id);
-            updatedGuests[index] = {
-              ...updatedGuests[index],
-              mealOptionId: e.target.value,
-            };
+            
+            // Check if we're updating a LocalGuest or GuestResponse
+            if ('mealOptionId' in updatedGuests[index]) {
+              // It's a LocalGuest
+              (updatedGuests[index] as LocalGuest).mealOptionId = e.target.value;
+            } else {
+              // It's a GuestResponse
+              (updatedGuests[index] as GuestResponse).mealChoice = e.target.value;
+            }
+            
             setHousehold({
               ...household!,
               guests: updatedGuests,
             });
           }}
-          required={guest.isAttending}
+          required={'isAttending' in guest ? (guest as LocalGuest).isAttending : (guest as GuestResponse).isAttending === true}
         >
           <option value="">Select meal choice</option>
           {options.map((option) => (
@@ -388,40 +403,53 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
 
   // Helper function to render dessert options based on whether guest is a child
   const renderDessertOptions = (
-    guest: LocalGuest,
+    guest: LocalGuest | GuestResponse,
     dessertOptions: Option[],
     childDessertOptions: Option[],
   ) => {
-    const options = guest.isChild ? childDessertOptions : dessertOptions;
-    const menuType = guest.isChild ? "Child Menu" : "Adult Menu";
+    // Determine which options to use based on isChild
+    const options = guest.isChild === true ? childDessertOptions : dessertOptions;
+    const menuType = guest.isChild === true ? "Child Menu" : "Adult Menu";
     
-    console.log(`Rendering dessert options for ${guest.name} (isChild: ${guest.isChild}):`, 
-      { availableOptions: options.map(o => o.name) });
+    console.log(`Rendering dessert options for ${guest.name}, isChild=${guest.isChild}, using ${menuType}`);
+    console.log(`Available options: ${options.length}`);
     
     if (options.length === 0) {
       console.warn(`No dessert options available for ${guest.name} (isChild: ${guest.isChild})`);
       return <p className="text-red-500">No dessert options available</p>;
     }
     
+    // Get the current selection value
+    // Handle both LocalGuest (dessertOptionId) and GuestResponse (dessertChoice)
+    const selectedValue = 'dessertOptionId' in guest 
+      ? (guest as LocalGuest).dessertOptionId || ""
+      : (guest as GuestResponse).dessertChoice || "";
+    
     return (
       <>
         <p className="text-sm text-gray-500 mb-1">{menuType}</p>
         <select
           className="w-full p-2 border border-gray-300 rounded"
-          value={guest.dessertOptionId || ""}
+          value={selectedValue}
           onChange={(e) => {
             const updatedGuests = [...household!.guests];
             const index = updatedGuests.findIndex((g) => g.id === guest.id);
-            updatedGuests[index] = {
-              ...updatedGuests[index],
-              dessertOptionId: e.target.value,
-            };
+            
+            // Check if we're updating a LocalGuest or GuestResponse
+            if ('dessertOptionId' in updatedGuests[index]) {
+              // It's a LocalGuest
+              (updatedGuests[index] as LocalGuest).dessertOptionId = e.target.value;
+            } else {
+              // It's a GuestResponse
+              (updatedGuests[index] as GuestResponse).dessertChoice = e.target.value;
+            }
+            
             setHousehold({
               ...household!,
               guests: updatedGuests,
             });
           }}
-          required={guest.isAttending}
+          required={'isAttending' in guest ? (guest as LocalGuest).isAttending : (guest as GuestResponse).isAttending === true}
         >
           <option value="">Select dessert choice</option>
           {options.map((option) => (
