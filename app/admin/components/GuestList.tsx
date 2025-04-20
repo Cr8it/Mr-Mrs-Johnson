@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { motion } from "framer-motion"
+import { useState, useEffect, useMemo } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import {
   Table,
   TableBody,
@@ -32,9 +32,37 @@ import {
   UserPlus,
   Pencil,
   Trash2,
-  Mail
+  Mail,
+  ChevronDown,
+  ChevronUp,
+  Users,
+  Filter,
+  SortAsc,
+  SortDesc
 } from "lucide-react"
-
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 
 interface Guest {
   id: string
@@ -66,60 +94,76 @@ interface Guest {
   }
 }
 
+interface Household {
+  name: string
+  code: string
+  guests: Guest[]
+  isExpanded?: boolean
+}
+
 interface GuestListProps {
   onGuestCountChange?: (count: number) => void
 }
 
+const GUESTS_PER_PAGE = 5; // Number of households per page
+
 export default function GuestList({ onGuestCountChange }: GuestListProps) {
-  const [guests, setGuests] = useState<Guest[]>([])
-  const [filteredGuests, setFilteredGuests] = useState<Guest[]>([])
+  const [households, setHouseholds] = useState<Household[]>([])
+  const [filteredHouseholds, setFilteredHouseholds] = useState<Household[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(true)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [isGuestFormOpen, setIsGuestFormOpen] = useState(false)
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null)
-  const [showSuccessAlert, setShowSuccessAlert] = useState(false)
-  const [successMessage, setSuccessMessage] = useState("")
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
-  const [isDeleteAllDialogOpen, setIsDeleteAllDialogOpen] = useState(false)
-  const [deleteAllLoading, setDeleteAllLoading] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [sortField, setSortField] = useState<'name' | 'guests' | 'responses'>('name')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [expandedHouseholds, setExpandedHouseholds] = useState<Set<string>>(new Set())
   const { toast } = useToast()
 
   useEffect(() => {
     fetchGuests()
   }, [])
 
-  useEffect(() => {
-    const filtered = guests.filter(guest =>
-      guest.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      guest.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      guest.household.name.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    setFilteredGuests(filtered)
-    
-    // Notify parent component about guest count
-    if (onGuestCountChange) {
-      onGuestCountChange(filtered.length)
-    }
-  }, [searchTerm, guests, onGuestCountChange])
+  // Memoized calculations for pagination
+  const totalPages = useMemo(() => 
+    Math.ceil(filteredHouseholds.length / GUESTS_PER_PAGE),
+    [filteredHouseholds]
+  )
+
+  const paginatedHouseholds = useMemo(() => {
+    const start = (currentPage - 1) * GUESTS_PER_PAGE
+    return filteredHouseholds.slice(start, start + GUESTS_PER_PAGE)
+  }, [filteredHouseholds, currentPage])
 
   const fetchGuests = async () => {
     try {
       const response = await fetch("/api/admin/guests")
       if (!response.ok) throw new Error("Failed to fetch guests")
       const data = await response.json()
-      console.log("Fetched data:", data) // Debug log
-      setGuests(data.households.flatMap((h: any) => 
-        h.guests.map((g: any) => ({
-          ...g,
-          household: {
-            name: h.name,
-            code: h.code,
-          }
-        }))
-      ))
+      
+      // Group guests by household
+      const householdMap = new Map<string, Household>()
+      data.households.forEach((h: any) => {
+        householdMap.set(h.code, {
+          name: h.name,
+          code: h.code,
+          guests: h.guests,
+          isExpanded: false
+        })
+      })
+      
+      const householdArray = Array.from(householdMap.values())
+      setHouseholds(householdArray)
+      setFilteredHouseholds(householdArray)
+      
+      // Update total guest count
+      if (onGuestCountChange) {
+        const totalGuests = householdArray.reduce((sum, h) => sum + h.guests.length, 0)
+        onGuestCountChange(totalGuests)
+      }
     } catch (error) {
-      console.error("Fetch error:", error) // Debug log
+      console.error("Fetch error:", error)
       toast({
         variant: "destructive",
         title: "Error",
@@ -128,6 +172,70 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Search functionality
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setFilteredHouseholds(households)
+      return
+    }
+
+    const searchLower = searchTerm.toLowerCase()
+    const filtered = households.filter(household => {
+      const householdMatch = household.name.toLowerCase().includes(searchLower)
+      const guestMatch = household.guests.some(guest => 
+        guest.name.toLowerCase().includes(searchLower) ||
+        guest.email?.toLowerCase().includes(searchLower)
+      )
+      return householdMatch || guestMatch
+    })
+
+    setFilteredHouseholds(filtered)
+    setCurrentPage(1) // Reset to first page when searching
+  }, [searchTerm, households])
+
+  // Sorting functionality
+  const handleSort = (field: 'name' | 'guests' | 'responses') => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  useEffect(() => {
+    const sorted = [...filteredHouseholds].sort((a, b) => {
+      let comparison = 0
+      switch (sortField) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name)
+          break
+        case 'guests':
+          comparison = a.guests.length - b.guests.length
+          break
+        case 'responses':
+          const aResponses = a.guests.filter(g => g.isAttending !== null).length
+          const bResponses = b.guests.filter(g => g.isAttending !== null).length
+          comparison = aResponses - bResponses
+          break
+      }
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+    setFilteredHouseholds(sorted)
+  }, [sortField, sortDirection])
+
+  const toggleHousehold = (code: string) => {
+    setExpandedHouseholds(prev => {
+      const next = new Set(prev)
+      if (next.has(code)) {
+        next.delete(code)
+      } else {
+        next.add(code)
+      }
+      return next
+    })
   }
 
   const handleUpload = (newHouseholds: any[]) => {
@@ -153,8 +261,14 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
 
       if (!response.ok) throw new Error("Failed to delete guest")
 
-      setGuests(guests.filter(g => g.id !== guestId))
-      setFilteredGuests(filteredGuests.filter(g => g.id !== guestId))
+      setHouseholds(households.map(h => ({
+        ...h,
+        guests: h.guests.filter(g => g.id !== guestId)
+      })))
+      setFilteredHouseholds(filteredHouseholds.map(h => ({
+        ...h,
+        guests: h.guests.filter(g => g.id !== guestId)
+      })))
       
       toast({
         title: "Success",
@@ -170,7 +284,7 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
   }
 
   const handleSendToAll = async () => {
-    const guestsWithEmail = filteredGuests.filter(g => g.email);
+    const guestsWithEmail = filteredHouseholds.flatMap(h => h.guests.filter(g => g.email));
     if (guestsWithEmail.length === 0) {
       toast({
         variant: "destructive",
@@ -203,8 +317,10 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
       }
 
       if (successCount > 0) {
-        setSuccessMessage(`Successfully sent ${successCount} invites${failCount > 0 ? ` (${failCount} failed)` : ''}`);
-        setShowSuccessDialog(true);
+        toast({
+          title: "Success",
+          description: `Successfully sent ${successCount} invites${failCount > 0 ? ` (${failCount} failed)` : ''}`,
+        });
       } else {
         toast({
           variant: "destructive",
@@ -221,7 +337,6 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
       });
     }
   };
-
 
   const handleSendInvite = async (guest: Guest) => {
     if (!guest.email) {
@@ -245,8 +360,10 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
         throw new Error(data.error || "Failed to send invite");
       }
 
-      setSuccessMessage(`Invite sent to ${guest.name}`);
-      setShowSuccessDialog(true);
+      toast({
+        title: "Success",
+        description: `Invite sent to ${guest.name}`,
+      });
     } catch (error) {
       console.error("Send invite error:", error);
       toast({
@@ -257,36 +374,29 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
     }
   };
 
-
   const handleGuestSubmit = async (data: any) => {
     try {
-      // Update the guests state with the new data
-      setGuests(prevGuests => {
-        const updatedGuests = [...prevGuests];
-        const index = updatedGuests.findIndex(g => g.id === data.id);
+      // Update the households state with the new data
+      setHouseholds(prevHouseholds => {
+        const updatedHouseholds = [...prevHouseholds];
+        const index = updatedHouseholds.findIndex(h => h.code === data.household.code);
         
         if (index !== -1) {
-          // Update existing guest
-          updatedGuests[index] = {
-            ...updatedGuests[index],
+          // Update existing household
+          updatedHouseholds[index] = {
+            ...updatedHouseholds[index],
             ...data,
-            household: {
-              name: data.household.name,
-              code: data.household.code
-            }
+            guests: [...updatedHouseholds[index].guests.filter(g => g.id !== data.id), data]
           };
         } else {
-          // Add new guest
-          updatedGuests.push({
+          // Add new household
+          updatedHouseholds.push({
             ...data,
-            household: {
-              name: data.household.name,
-              code: data.household.code
-            }
+            guests: [data]
           });
         }
         
-        return updatedGuests;
+        return updatedHouseholds;
       });
 
       setIsGuestFormOpen(false);
@@ -320,25 +430,27 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
         'Custom Responses'
       ].join(',');
 
-      const rows = filteredGuests.map(guest => {
-        const rsvpStatus = guest.isAttending === null ? 'Not Responded' : 
-                          guest.isAttending ? 'Attending' : 'Not Attending';
-        const customResponses = guest.responses?.map(r => 
-          `${r.question.question}: ${r.answer}`
-        ).join('; ') || '';
+      const rows = filteredHouseholds.flatMap(household => 
+        household.guests.map((guest) => {
+          const rsvpStatus = guest.isAttending === null ? 'Not Responded' : 
+                            guest.isAttending ? 'Attending' : 'Not Attending';
+          const customResponses = guest.responses?.map(r => 
+            `${r.question.question}: ${r.answer}`
+          ).join('; ') || '';
 
-        return [
-          `"${guest.name}"`,
-          `"${guest.email || ''}"`,
-          `"${guest.household.name}"`,
-          `"${guest.household.code}"`,
-          `"${rsvpStatus}"`,
-          `"${guest.mealChoice?.name || ''}"`,
-          `"${guest.dessertChoice?.name || ''}"`,
-          `"${guest.dietaryNotes || ''}"`,
-          `"${customResponses}"`
-        ].join(',');
-      });
+          return [
+            `"${guest.name}"`,
+            `"${guest.email || ''}"`,
+            `"${household.name}"`,
+            `"${household.code}"`,
+            `"${rsvpStatus}"`,
+            `"${guest.mealChoice?.name || ''}"`,
+            `"${guest.dessertChoice?.name || ''}"`,
+            `"${guest.dietaryNotes || ''}"`,
+            `"${customResponses}"`
+          ].join(',');
+        })
+      );
 
       const csv = [headers, ...rows].join('\n');
       const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -364,291 +476,227 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
     }
   };
 
-  const handleDeleteAllGuests = async () => {
-    setDeleteAllLoading(true);
-    
-    try {
-      const response = await fetch("/api/admin/guests/delete-all", {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete all guests");
-      }
-
-      // Reset guests list
-      setGuests([]);
-      setFilteredGuests([]);
-      
-      toast({
-        title: "Success",
-        description: "All guests have been deleted successfully",
-      });
-    } catch (error) {
-      console.error("Error deleting all guests:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to delete all guests",
-      });
-    } finally {
-      setDeleteAllLoading(false);
-      setIsDeleteAllDialogOpen(false);
-    }
-  };
-
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-[400px]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gold"></div>
-          <p className="text-gray-500">Loading guest list...</p>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gold"></div>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm">
-        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-          <div className="relative flex-1 sm:flex-none">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+      {/* Search and Filters */}
+      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+        <div className="relative flex-1 w-full sm:max-w-xs">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
-            placeholder="Search guests..."
+            placeholder="Search households or guests..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 w-full sm:w-64 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 focus:border-gold focus:ring-gold dark:text-gray-100"
+            className="pl-10"
           />
-          </div>
-          <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            onClick={() => setIsUploadModalOpen(true)}
-            className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800"
-          >
-            <Upload className="mr-2 h-4 w-4" />
-            Upload CSV
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={handleExport}
-            className="text-gray-700 hover:text-gray-900 hover:bg-gray-50"
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </Button>
-          </div>
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <Button 
-          onClick={handleSendToAll}
-          className="flex-1 sm:flex-none bg-gold hover:bg-[#c19b2f] text-white shadow-sm"
+        <div className="flex gap-2">
+          <Select value={sortField} onValueChange={(value: any) => handleSort(value)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name">Household Name</SelectItem>
+              <SelectItem value="guests">Number of Guests</SelectItem>
+              <SelectItem value="responses">Response Rate</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => handleSort(sortField)}
           >
-          <Mail className="mr-2 h-4 w-4" />
-          Send All Invites
-          </Button>
-          <Button 
-          onClick={() => {
-            setSelectedGuest(null)
-            setIsGuestFormOpen(true)
-          }}
-          className="flex-1 sm:flex-none bg-white text-gray-900 hover:bg-gray-50 shadow-sm"
-          >
-          <UserPlus className="mr-2 h-4 w-4" />
-          Add Guest
-          </Button>
-          <Button 
-            onClick={() => setIsDeleteAllDialogOpen(true)}
-            className="bg-red-600 hover:bg-red-700 text-white"
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete All
+            {sortDirection === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
           </Button>
         </div>
-        </div>
+      </div>
 
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-          <TableHeader>
-            <TableRow className="bg-gray-50 dark:bg-gray-700">
-            <TableHead className="font-semibold text-gray-900 dark:text-gray-100">Name</TableHead>
-            <TableHead className="font-semibold text-gray-900 dark:text-gray-100">Email</TableHead>
-            <TableHead className="font-semibold text-gray-900 dark:text-gray-100">Household</TableHead>
-            <TableHead className="font-semibold text-gray-900 dark:text-gray-100">RSVP Status</TableHead>
-            <TableHead className="font-semibold text-gray-900 dark:text-gray-100">Meal Choice</TableHead>
-            <TableHead className="font-semibold text-gray-900 dark:text-gray-100">Dessert Choice</TableHead>
-            <TableHead className="font-semibold text-gray-900 dark:text-gray-100">Dietary Notes</TableHead>
-            <TableHead className="font-semibold text-gray-900 dark:text-gray-100">Custom Responses</TableHead>
-            <TableHead className="font-semibold text-gray-900 dark:text-gray-100 text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredGuests.map((guest) => (
-            <TableRow key={guest.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-              <TableCell className="font-medium text-gray-900 dark:text-gray-100">{guest.name}</TableCell>
-              <TableCell className="text-gray-600 dark:text-gray-300">{guest.email || "-"}</TableCell>
-              <TableCell>
-              <div className="flex flex-col">
-                <span className="text-gray-900 dark:text-gray-100">{guest.household.name}</span>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                Code: {guest.household.code}
-                </span>
-              </div>
-              </TableCell>
-              <TableCell>
-              <RsvpStatus status={guest.isAttending} />
-              </TableCell>
-                <TableCell className="text-gray-600 dark:text-gray-300">{guest.mealChoice?.name || "-"}</TableCell>
-                <TableCell className="text-gray-600 dark:text-gray-300">{guest.dessertChoice?.name || "-"}</TableCell>
-                <TableCell className="text-gray-600 dark:text-gray-300">{guest.dietaryNotes || "-"}</TableCell>
-              <TableCell>
-              {guest.responses?.map((response) => (
-                <div key={response.questionId} className="mb-1 last:mb-0">
-                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{response.question.question}: </span>
-                <span className="text-sm text-gray-600 dark:text-gray-300">{response.answer}</span>
+      {/* Households List */}
+      <AnimatePresence>
+        {paginatedHouseholds.map((household) => (
+          <motion.div
+            key={household.code}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="mb-4"
+          >
+            <Card>
+              <CardHeader className="cursor-pointer" onClick={() => toggleHousehold(household.code)}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <CardTitle className="text-xl">{household.name}</CardTitle>
+                    <Badge variant="outline" className="flex items-center gap-1">
+                      <Users className="h-3 w-3" />
+                      {household.guests.length}
+                    </Badge>
+                    <Badge 
+                      variant={getResponseBadgeVariant(household)}
+                      className="flex items-center gap-1"
+                    >
+                      {getResponseRate(household)}% Responded
+                    </Badge>
+                  </div>
+                  {expandedHouseholds.has(household.code) ? 
+                    <ChevronUp className="h-5 w-5" /> : 
+                    <ChevronDown className="h-5 w-5" />
+                  }
                 </div>
-              )) || "-"}
-              </TableCell>
-              <TableCell>
-              <div className="flex justify-end gap-1">
-                <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleSendInvite(guest)}
-                disabled={!guest.email}
-                title={guest.email ? "Send Invite" : "No email address"}
-                className="hover:bg-blue-50"
-                >
-                <Mail className="h-4 w-4 text-blue-500" />
-                </Button>
-                <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleEditGuest(guest)}
-                className="hover:bg-amber-50"
-                >
-                <Pencil className="h-4 w-4 text-amber-500" />
-                </Button>
-                <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleDeleteGuest(guest.id)}
-                className="hover:bg-red-50"
-                >
-                <Trash2 className="h-4 w-4 text-red-500" />
-                </Button>
-              </div>
-              </TableCell>
-            </TableRow>
-            ))}
-          </TableBody>
-          </Table>
-        </div>
-        </div>
+                <CardDescription>Code: {household.code}</CardDescription>
+              </CardHeader>
 
+              {expandedHouseholds.has(household.code) && (
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Meal Choice</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {household.guests.map((guest) => (
+                        <TableRow key={guest.id}>
+                          <TableCell>{guest.name}</TableCell>
+                          <TableCell>{guest.email || '-'}</TableCell>
+                          <TableCell>
+                            <RsvpStatus status={guest.isAttending} />
+                          </TableCell>
+                          <TableCell>
+                            {guest.isAttending ? (
+                              guest.mealChoice?.name || 'Not selected'
+                            ) : (
+                              '-'
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEditGuest(guest)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              {guest.email && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleSendInvite(guest)}
+                                >
+                                  <Mail className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteGuest(guest.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              )}
+            </Card>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <Pagination className="mt-6">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious 
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              />
+            </PaginationItem>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <PaginationItem key={page}>
+                <PaginationLink
+                  onClick={() => setCurrentPage(page)}
+                  isActive={currentPage === page}
+                >
+                  {page}
+                </PaginationLink>
+              </PaginationItem>
+            ))}
+            <PaginationItem>
+              <PaginationNext
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
+
+      {/* No Results */}
+      {filteredHouseholds.length === 0 && (
+        <div className="text-center py-8">
+          <p className="text-gray-500">No households found matching your search.</p>
+        </div>
+      )}
+
+      {/* Modals */}
       <CsvUploadModal
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
         onUpload={handleUpload}
       />
 
-        <GuestForm
-          isOpen={isGuestFormOpen}
-          onClose={() => {
+      <GuestForm
+        isOpen={isGuestFormOpen}
+        onClose={() => {
           setIsGuestFormOpen(false)
           setSelectedGuest(null)
-          }}
-          onSubmit={handleGuestSubmit}
-          initialData={selectedGuest ? {
-          id: selectedGuest.id,
-          name: selectedGuest.name,
-          email: selectedGuest.email || "",
-          householdName: selectedGuest.household.name,
-          isAttending: selectedGuest.isAttending,
-          mealChoice: selectedGuest.mealChoice,
-          dessertChoice: selectedGuest.dessertChoice,
-          dietaryNotes: selectedGuest.dietaryNotes || ""
-          } : undefined}
-          mode={selectedGuest ? 'edit' : 'create'}
-        />
+        }}
+        onSubmit={handleGuestSubmit}
+        initialData={selectedGuest || undefined}
+        mode={selectedGuest ? 'edit' : 'create'}
+      />
+    </div>
+  )
+}
 
+// Helper functions
+function getResponseRate(household: Household): number {
+  const totalGuests = household.guests.length
+  const responded = household.guests.filter(g => g.isAttending !== null).length
+  return Math.round((responded / totalGuests) * 100)
+}
 
-        <AlertDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-          <AlertDialogTitle>✉️ Success!</AlertDialogTitle>
-          <AlertDialogDescription>{successMessage}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-          <AlertDialogAction className="bg-gold hover:bg-[#c19b2f] text-white">
-            OK
-          </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-        </AlertDialog>
-
-        <AlertDialog open={isDeleteAllDialogOpen} onOpenChange={setIsDeleteAllDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete All Guests</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete all guests? This action cannot be undone and will 
-                remove all guests, households, and their responses from the database.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setIsDeleteAllDialogOpen(false)}
-                disabled={deleteAllLoading}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDeleteAllGuests}
-                disabled={deleteAllLoading}
-                className="bg-red-600 hover:bg-red-700 text-white"
-              >
-                {deleteAllLoading ? (
-                  <>
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      className="mr-2 h-4 w-4 border-2 border-t-white border-r-white border-b-white border-l-transparent rounded-full"
-                    />
-                    Deleting...
-                  </>
-                ) : (
-                  "Delete All"
-                )}
-              </Button>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
-      )
+function getResponseBadgeVariant(household: Household): "default" | "secondary" | "destructive" {
+  const rate = getResponseRate(household)
+  if (rate === 100) return "default"
+  if (rate > 0) return "secondary"
+  return "destructive"
 }
 
 function RsvpStatus({ status }: { status: boolean | null }) {
   if (status === null) {
-    return (
-        <Badge variant="secondary" className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
-        Not Responded
-      </Badge>
-    )
+    return <Badge variant="secondary">Pending</Badge>
   }
   return status ? (
-    <Badge variant="default" className="bg-green-100 text-green-700">
-      Attending
-    </Badge>
+    <Badge variant="default">Attending</Badge>
   ) : (
-    <Badge variant="destructive" className="bg-red-100 text-red-700">
-      Not Attending
-    </Badge>
+    <Badge variant="destructive">Not Attending</Badge>
   )
 }
 
