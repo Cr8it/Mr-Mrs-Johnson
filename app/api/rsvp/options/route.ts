@@ -3,114 +3,112 @@ import { prisma } from "@/lib/db"
 
 export async function GET() {
 	try {
-		console.log('Fetching meal and dessert options...')
+		console.log("Fetching meal and dessert options...")
 		
-		// First do a raw query to verify the data directly from the database
-		const rawMealOptions = await prisma.$queryRaw`
-			SELECT id, name, "isChildOption" 
-			FROM "MealOption" 
-			WHERE "isActive" = true
-			ORDER BY "createdAt" ASC
-		`
-		console.log('Raw meal options from database:', rawMealOptions)
+		// Use raw queries with explicit boolean casting for more reliable results
+		const [
+			regularMealOptions, 
+			childMealOptions, 
+			regularDessertOptions, 
+			childDessertOptions
+		] = await Promise.all([
+			// Regular meal options - using raw query with explicit boolean casting
+			prisma.$queryRaw`
+				SELECT id, name, "isChildOption"::boolean as "isChildOption" 
+				FROM "MealOption" 
+				WHERE "isActive" = true AND "isChildOption" = false
+				ORDER BY "createdAt" ASC
+			`,
+			// Child meal options - using raw query with explicit boolean casting
+			prisma.$queryRaw`
+				SELECT id, name, "isChildOption"::boolean as "isChildOption" 
+				FROM "MealOption" 
+				WHERE "isActive" = true AND "isChildOption" = true
+				ORDER BY "createdAt" ASC
+			`,
+			// Regular dessert options - using raw query with explicit boolean casting
+			prisma.$queryRaw`
+				SELECT id, name, "isChildOption"::boolean as "isChildOption" 
+				FROM "DessertOption" 
+				WHERE "isActive" = true AND "isChildOption" = false
+				ORDER BY "createdAt" ASC
+			`,
+			// Child dessert options - using raw query with explicit boolean casting
+			prisma.$queryRaw`
+				SELECT id, name, "isChildOption"::boolean as "isChildOption" 
+				FROM "DessertOption" 
+				WHERE "isActive" = true AND "isChildOption" = true
+				ORDER BY "createdAt" ASC
+			`
+		])
 		
-		// Fetch meal options (regular)
-		const regularMealOptions = await prisma.mealOption.findMany({
-			where: { 
-				isActive: true,
-				isChildOption: false
-			},
-			orderBy: { createdAt: 'asc' },
-			select: { id: true, name: true, isChildOption: true }
-		})
-		console.log('Found regular meal options:', regularMealOptions)
-
-		// Fetch meal options (children)
-		const childMealOptions = await prisma.mealOption.findMany({
-			where: { 
-				isActive: true,
-				isChildOption: true
-			},
-			orderBy: { createdAt: 'asc' },
-			select: { id: true, name: true, isChildOption: true }
-		})
-		console.log('Found child meal options:', childMealOptions)
+		// Add detailed logging
+		console.log(`Found ${regularMealOptions.length} regular meal options`)
+		console.log(`Found ${childMealOptions.length} child meal options`)
+		console.log(`Found ${regularDessertOptions.length} regular dessert options`)
+		console.log(`Found ${childDessertOptions.length} child dessert options`)
 		
-		// Verify raw children options from the database
-		const rawChildMealOptions = (rawMealOptions as any[]).filter(o => o.isChildOption === true)
-		console.log(`Raw child meal options (count: ${rawChildMealOptions.length}):`, rawChildMealOptions)
-
-		// Fetch regular dessert options
-		const regularDessertOptions = await prisma.dessertOption.findMany({
-			where: { 
-				isActive: true,
-				isChildOption: false
-			},
-			orderBy: { createdAt: 'asc' },
-			select: { id: true, name: true, isChildOption: true }
-		})
-		console.log('Found regular dessert options:', regularDessertOptions)
-
-		// Fetch child dessert options
-		const childDessertOptions = await prisma.dessertOption.findMany({
-			where: { 
-				isActive: true,
-				isChildOption: true
-			},
-			orderBy: { createdAt: 'asc' },
-			select: { id: true, name: true, isChildOption: true }
-		})
-		console.log('Found child dessert options:', childDessertOptions)
-
-		// Debug each option to verify isChildOption flag
-		regularMealOptions.forEach(option => {
-			console.log(`Regular meal option: ${option.name}, isChildOption=${option.isChildOption}`);
-		});
-		
-		childMealOptions.forEach(option => {
-			console.log(`Child meal option: ${option.name}, isChildOption=${option.isChildOption}`);
-		});
-		
-		regularDessertOptions.forEach(option => {
-			console.log(`Regular dessert option: ${option.name}, isChildOption=${option.isChildOption}`);
-		});
-		
-		childDessertOptions.forEach(option => {
-			console.log(`Child dessert option: ${option.name}, isChildOption=${option.isChildOption}`);
-		});
-
-		// Debug summary
-		console.log(`RSVP Options Summary:
-		- Regular meal options: ${regularMealOptions.length}
-		- Child meal options: ${childMealOptions.length}
-		- Regular dessert options: ${regularDessertOptions.length}
-		- Child dessert options: ${childDessertOptions.length}
-		`);
-
-		// Additional check - see if any child options exist at all
-		if (childMealOptions.length === 0) {
-			console.warn("WARNING: No child meal options found in the database!")
-			// Check directly if any records with isChildOption=true exist
-			const directCheck = await prisma.mealOption.count({
-				where: { isChildOption: true }
-			})
-			console.log(`Direct check for child meal options: ${directCheck} found`)
+		// Log a sample of each for debugging
+		if (regularMealOptions.length > 0) {
+			console.log(`Regular meal option sample:`, regularMealOptions[0])
 		}
-
-		return NextResponse.json({ 
-			mealOptions: regularMealOptions, 
-			childMealOptions: childMealOptions,
-			dessertOptions: regularDessertOptions,
-			childDessertOptions: childDessertOptions,
-			debug: {
-				rawChildMealOptions: rawChildMealOptions
+		
+		if (childMealOptions.length > 0) {
+			console.log(`Child meal option sample:`, childMealOptions[0])
+		} else {
+			console.log(`WARNING: No child meal options found! This might be a problem for child guests.`)
+			// Check if any exist at all, even inactive
+			const anyChildMeals = await prisma.mealOption.findFirst({
+				where: { isChildOption: true },
+				select: { id: true, name: true, isActive: true, isChildOption: true }
+			})
+			console.log(`Any child meals exist in database?`, anyChildMeals)
+		}
+		
+		// Regular Prisma queries as backup
+		const prismaChildMealOptions = await prisma.mealOption.findMany({
+			where: { 
+				isActive: true,
+				isChildOption: true 
+			},
+			select: { 
+				id: true, 
+				name: true, 
+				isChildOption: true 
 			}
 		})
+		
+		console.log(`Prisma child meal options count: ${prismaChildMealOptions.length}`)
+		console.log(`Prisma child meal options:`, prismaChildMealOptions)
+		
+		return NextResponse.json(
+			{
+				mealOptions: regularMealOptions,
+				childMealOptions: childMealOptions,
+				dessertOptions: regularDessertOptions,
+				childDessertOptions: childDessertOptions,
+				debugBackup: {
+					prismaChildMealOptions
+				}
+			},
+			{
+				headers: {
+					'Cache-Control': 'no-store, max-age=0',
+					'Surrogate-Control': 'no-store' 
+				}
+			}
+		)
 	} catch (error) {
-		console.error("GET options error:", error)
+		console.error("Error fetching options:", error)
 		return NextResponse.json(
 			{ error: "Failed to fetch options" },
-			{ status: 500 }
+			{ 
+				status: 500,
+				headers: {
+					'Cache-Control': 'no-store, max-age=0',
+					'Surrogate-Control': 'no-store'
+				}
+			}
 		)
 	}
 }
