@@ -112,9 +112,9 @@ export default function DreamTeam() {
             </div>
           )}
           
-          {/* Remaining members in a grid */}
+          {/* Remaining members in a 4-column grid */}
           {sortedMembers.length > 6 && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 max-w-6xl mx-auto">
               {sortedMembers.slice(6).map((member, index) => renderTeamMember(member, index + 6))}
             </div>
           )}

@@ -351,6 +351,9 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
         <h2 className="text-5xl font-cormorant font-bold text-center text-white mb-4">
           RSVP
         </h2>
+        <p className="text-center text-gold font-montserrat text-lg mb-8">
+          Please respond by Sunday 22nd June
+        </p>
 
         {showSuccess ? (
             <MotionDiv
