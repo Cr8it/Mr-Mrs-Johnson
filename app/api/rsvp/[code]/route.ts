@@ -54,16 +54,13 @@ export async function GET(
       orderBy: { order: 'asc' }
     })
 
-    // Debug specific guest for Niyah Dublin
-    const niyahGuest = household.guests.find(g => g.name.toLowerCase().includes('niyah'));
-    if (niyahGuest) {
-      console.log("========================== NIYAH DEBUG ==========================");
-      console.log(`FOUND NIYAH: Name=${niyahGuest.name}, ID=${niyahGuest.id}`);
-      console.log(`Raw isChild value in database: ${niyahGuest.isChild} (${typeof niyahGuest.isChild})`);
-      console.log(`isChild === true: ${niyahGuest.isChild === true}`);
-      console.log(`Boolean(isChild): ${Boolean(niyahGuest.isChild)}`);
-      console.log("=================================================================");
-    }
+    // IMPORTANT: Add explicit logs for each guest's child status
+    console.log("CHILD STATUS CHECK FOR EACH GUEST:");
+    household.guests.forEach(guest => {
+      // Force type to boolean for clarity
+      const isChildValue = guest.isChild === true;
+      console.log(`- ${guest.name}: raw isChild=${guest.isChild} (${typeof guest.isChild}), processed isChild=${isChildValue}`);
+    });
 
     // Transform the data to include existing choices - paying special attention to isChild
     const transformedHousehold = {
@@ -90,6 +87,8 @@ export async function GET(
           dessertChoice: guest.dessertChoice?.id || null,
           // Use strict equality check for boolean conversion
           isChild: isChildValue,
+          // ADDED: Extra property for debugging
+          isChildExplicit: isChildValue,
           responses: guest.responses.map(response => ({
             questionId: response.questionId,
             answer: response.answer

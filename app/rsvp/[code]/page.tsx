@@ -59,10 +59,12 @@ export default function RSVPForm() {
   const [childMealOptions, setChildMealOptions] = useState<Option[]>([])
   const [dessertOptions, setDessertOptions] = useState<Option[]>([])
   const [childDessertOptions, setChildDessertOptions] = useState<Option[]>([])
+  const [optionsLoaded, setOptionsLoaded] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
+        console.log('Fetching RSVP form data...')
         const [householdResponse, optionsResponse] = await Promise.all([
           fetch(`/api/rsvp/${params.code}`),
           fetch('/api/rsvp/options')
@@ -75,6 +77,20 @@ export default function RSVPForm() {
         if (!householdData.household || !Array.isArray(householdData.household.guests)) {
           throw new Error("Invalid response format from server");
         }
+        
+        // Log all the options data for debugging
+        console.log("Options data received:", {
+          regularMealOptions: optionsData.mealOptions?.length || 0,
+          childMealOptions: optionsData.childMealOptions?.length || 0,
+          regularDessertOptions: optionsData.dessertOptions?.length || 0,
+          childDessertOptions: optionsData.childDessertOptions?.length || 0
+        });
+        
+        // Force childMealOptions and childDessertOptions to be arrays
+        const safeMealOptions = optionsData.mealOptions || [];
+        const safeChildMealOptions = optionsData.childMealOptions || [];
+        const safeDessertOptions = optionsData.dessertOptions || [];
+        const safeChildDessertOptions = optionsData.childDessertOptions || [];
         
         // Log the raw household data to debug isChild values
         console.log("Raw household data received:", JSON.stringify(householdData.household.guests.map((g: GuestResponse) => ({
@@ -114,16 +130,25 @@ export default function RSVPForm() {
           isChildType: typeof g.isChild
         })));
         
+        // Set options first, then household data to avoid race conditions
+        setMealOptions(safeMealOptions);
+        setChildMealOptions(safeChildMealOptions);
+        setDessertOptions(safeDessertOptions);
+        setChildDessertOptions(safeChildDessertOptions);
+        
+        // Mark options as loaded
+        setOptionsLoaded(true);
+        
+        // Then set household data
         setHousehold({
           name: householdData.household.name,
           guests: processedGuests
         });
         
-        setQuestions(householdData.questions)
-        setMealOptions(optionsData.mealOptions)
-        setChildMealOptions(optionsData.childMealOptions || [])
-        setDessertOptions(optionsData.dessertOptions)
-        setChildDessertOptions(optionsData.childDessertOptions || [])
+        setQuestions(householdData.questions || []);
+        
+        // Log success message
+        console.log("Successfully loaded all RSVP form data");
       } catch (error) {
         console.error("Error fetching RSVP data:", error);
         toast({
@@ -136,6 +161,16 @@ export default function RSVPForm() {
 
     fetchData()
   }, [params.code, toast])
+
+  // Extra debug effect to log changes in child options
+  useEffect(() => {
+    if (optionsLoaded) {
+      console.log("Child options loaded:", {
+        childMealOptions: childMealOptions.map(o => o.name),
+        childDessertOptions: childDessertOptions.map(o => o.name),
+      });
+    }
+  }, [optionsLoaded, childMealOptions, childDessertOptions]);
 
   // Debug effect to log state after it's been set
   useEffect(() => {
@@ -284,10 +319,18 @@ export default function RSVPForm() {
                             availableRegularOptions: mealOptions.length
                           });
                           
-                          const options = isChildGuest ? childMealOptions : mealOptions;
+                          // FIXED: Ensure we're using the right options array
+                          let options;
+                          if (isChildGuest && childMealOptions.length > 0) {
+                            options = childMealOptions;
+                            console.log(`Using child meal options for ${guest.name}`);
+                          } else {
+                            options = mealOptions;
+                            console.log(`Using regular meal options for ${guest.name}`);
+                          }
                           
                           // Check if we have options to display
-                          if (options.length === 0) {
+                          if (!options || options.length === 0) {
                             console.error(`No meal options available for ${guest.name} (${isChildGuest ? "child" : "adult"})`);
                             return <SelectItem value="no-options" disabled>No options available</SelectItem>;
                           }
@@ -346,10 +389,18 @@ export default function RSVPForm() {
                             availableRegularOptions: dessertOptions.length
                           });
                           
-                          const options = isChildGuest ? childDessertOptions : dessertOptions;
+                          // FIXED: Ensure we're using the right options array
+                          let options;
+                          if (isChildGuest && childDessertOptions.length > 0) {
+                            options = childDessertOptions;
+                            console.log(`Using child dessert options for ${guest.name}`);
+                          } else {
+                            options = dessertOptions;
+                            console.log(`Using regular dessert options for ${guest.name}`);
+                          }
                           
                           // Check if we have options to display
-                          if (options.length === 0) {
+                          if (!options || options.length === 0) {
                             console.error(`No dessert options available for ${guest.name} (${isChildGuest ? "child" : "adult"})`);
                             return <SelectItem value="no-options" disabled>No options available</SelectItem>;
                           }
