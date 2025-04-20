@@ -84,14 +84,32 @@ export default function RSVPForm() {
           isChildType: typeof g.isChild
         })), null, 2));
         
-        // Ensure isChild is properly converted to boolean before setting state
-        const processedGuests = householdData.household.guests.map((guest: GuestResponse): LocalGuest => ({
-          id: guest.id,
-          name: guest.name,
-          mealOptionId: guest.mealChoice || undefined,
-          dessertOptionId: guest.dessertChoice || undefined,
-          isChild: guest.isChild === true
-        }));
+        // ENHANCED: Perform a stronger check to ensure isChild is processed correctly
+        const processedGuests = householdData.household.guests.map((guest: GuestResponse): LocalGuest => {
+          // Always use explicit boolean conversion to ensure consistent behavior
+          const isChildValue = guest.isChild === true;
+          
+          console.log(`Guest ${guest.name} (${guest.id}):`);
+          console.log(`- Raw isChild value: ${guest.isChild}, type: ${typeof guest.isChild}`);
+          console.log(`- After strict equality: isChildValue = ${isChildValue}`);
+          console.log(`- Meal choice options: Will use ${isChildValue ? 'CHILD' : 'ADULT'} options`);
+          
+          // Check if meal/dessert options are missing
+          if (isChildValue && optionsData.childMealOptions.length === 0) {
+            console.warn(`WARNING: Child guest ${guest.name} has no child meal options available!`);
+          }
+          if (isChildValue && optionsData.childDessertOptions.length === 0) {
+            console.warn(`WARNING: Child guest ${guest.name} has no child dessert options available!`);
+          }
+          
+          return {
+            id: guest.id,
+            name: guest.name,
+            mealOptionId: guest.mealChoice || undefined,
+            dessertOptionId: guest.dessertChoice || undefined,
+            isChild: isChildValue
+          };
+        });
         
         // Log the processed guests for debugging
         console.log("Processed guests after strict equality check:", processedGuests.map(g => ({
@@ -106,6 +124,28 @@ export default function RSVPForm() {
         });
         
         setQuestions(householdData.questions)
+        
+        // ENHANCED: Check if meal and dessert options are available
+        if (optionsData.mealOptions.length === 0) {
+          console.warn("WARNING: No regular meal options available!");
+        }
+        if (optionsData.childMealOptions.length === 0) {
+          console.warn("WARNING: No child meal options available!");
+        }
+        if (optionsData.dessertOptions.length === 0) {
+          console.warn("WARNING: No regular dessert options available!");
+        }
+        if (optionsData.childDessertOptions.length === 0) {
+          console.warn("WARNING: No child dessert options available!");
+        }
+        
+        console.log("Setting meal options:", {
+          regular: optionsData.mealOptions.length,
+          child: optionsData.childMealOptions.length,
+          regularDessert: optionsData.dessertOptions.length,
+          childDessert: optionsData.childDessertOptions.length
+        });
+        
         setMealOptions(optionsData.mealOptions)
         setChildMealOptions(optionsData.childMealOptions || [])
         setDessertOptions(optionsData.dessertOptions)

@@ -49,6 +49,34 @@ export async function GET(
       return NextResponse.json({ error: "Household not found" }, { status: 404 })
     }
 
+    // ENHANCEMENT: Double check and correct any child status issues in the database
+    // This ensures the database has the correct values before proceeding
+    for (const guest of household.guests) {
+      const rawDbValue = rawGuests.find(g => g.id === guest.id)?.isChild;
+      
+      // Check if there's a mismatch between the database values
+      if ((rawDbValue === true && guest.isChild !== true) || 
+          (rawDbValue !== true && guest.isChild === true)) {
+        
+        console.log(`⚠️ Found mismatch in child status for ${guest.name}. Fixing in database...`);
+        console.log(`   - Raw DB value: ${rawDbValue} (${typeof rawDbValue})`);
+        console.log(`   - Current value: ${guest.isChild} (${typeof guest.isChild})`);
+        
+        // Update the database to ensure consistency
+        await prisma.guest.update({
+          where: { id: guest.id },
+          data: { 
+            isChild: rawDbValue === true  // Force it to be a boolean
+          }
+        });
+        
+        console.log(`✅ Fixed child status for ${guest.name} to ${rawDbValue === true}`);
+        
+        // Also update our local guest object to match
+        guest.isChild = rawDbValue === true;
+      }
+    }
+
     const questions = await prisma.question.findMany({
       where: { isActive: true },
       orderBy: { order: 'asc' }
@@ -132,6 +160,26 @@ export async function POST(request: Request, { params }: { params: { code: strin
   try {
     console.log(`Processing RSVP submission for household code: ${params.code}`)
     const { responses } = await request.json()
+    
+    // First get raw guest data to ensure we have the correct isChild values
+    const rawGuests = await prisma.guest.findMany({
+      where: {
+        household: {
+          code: params.code
+        }
+      },
+      select: {
+        id: true,
+        name: true,
+        isChild: true
+      }
+    });
+    
+    console.log("RAW GUEST DATA FOR RSVP SUBMISSION:");
+    rawGuests.forEach(g => {
+      console.log(`DB RAW: Guest ${g.name} (${g.id}): isChild=${g.isChild} (${typeof g.isChild})`);
+    });
+    
     const household = await prisma.household.findFirst({
       where: {
         code: params.code,
@@ -159,13 +207,17 @@ export async function POST(request: Request, { params }: { params: { code: strin
       const mealOptionId = responses[`meal-${guest.id}`]
       const dessertOptionId = responses[`dessert-${guest.id}`]
       
-      console.log(`Guest ${guest.name}: Attending=${isAttending}, Meal=${mealOptionId}, Dessert=${dessertOptionId}, isChild=${guest.isChild === true}`);
+      // Get the correct isChild status from raw data
+      const rawDbValue = rawGuests.find(g => g.id === guest.id)?.isChild;
+      const isChildValue = rawDbValue === true;
+      
+      console.log(`Guest ${guest.name}: Attending=${isAttending}, Meal=${mealOptionId}, Dessert=${dessertOptionId}, isChild=${isChildValue}`);
 
       // Track changes for logging
       const mealChanged = guest.mealOptionId !== mealOptionId
       const dessertChanged = guest.dessertOptionId !== dessertOptionId
       
-      // Update the guest record, explicitly preserving the isChild status
+      // Update the guest record, explicitly ensuring the isChild status is correct
       await prisma.guest.update({
         where: {
           id: guest.id,
@@ -174,7 +226,8 @@ export async function POST(request: Request, { params }: { params: { code: strin
           isAttending,
           mealOptionId: isAttending ? mealOptionId : null,
           dessertOptionId: isAttending ? dessertOptionId : null,
-          // We're not modifying isChild - it stays as set in the database
+          // Ensure isChild is set correctly using our validated value
+          isChild: isChildValue
         },
       })
 
