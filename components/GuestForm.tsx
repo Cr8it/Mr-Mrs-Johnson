@@ -22,9 +22,10 @@ interface GuestFormProps {
   }
   onBack: () => void
   onSuccess: (guests: Guest[]) => void
+  parentOnClose?: () => void
 }
 
-export default function GuestForm({ household, onBack, onSuccess }: GuestFormProps) {
+export default function GuestForm({ household, onBack, onSuccess, parentOnClose }: GuestFormProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [regularMealOptions, setRegularMealOptions] = useState<{ id: string; name: string }[]>([])
@@ -480,6 +481,14 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
         description: "Your RSVP has been submitted successfully.",
       });
 
+      // Store the parentOnClose in localStorage to retrieve it later
+      if (parentOnClose) {
+        console.log("Storing parentOnClose reference");
+        localStorage.setItem('rsvp-has-parent-close', 'true');
+      } else {
+        console.log("No parentOnClose function to store");
+      }
+      
       // Call onSuccess with the guests data
       onSuccess(guests);
     } catch (error) {

@@ -49,6 +49,45 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
   const { toast } = useToast()
   const [tab, setTab] = useState('search')
 
+  // Create a state to store the onClose function
+  const [storedOnClose, setStoredOnClose] = useState<(() => void) | undefined>(onClose);
+
+  // Update the stored function when the prop changes
+  useEffect(() => {
+    console.log("onClose prop changed:", !!onClose);
+    if (onClose) {
+      setStoredOnClose(() => onClose);
+    }
+  }, [onClose]);
+
+  // This ensures we always have access to the latest onClose function
+  const handleCloseModal = () => {
+    console.log("Handling close modal request...");
+    
+    // First try the stored function
+    if (storedOnClose) {
+      console.log("Using stored onClose function");
+      storedOnClose();
+      return;
+    }
+    
+    // Then try the prop directly
+    if (onClose) {
+      console.log("Using direct onClose prop");
+      onClose();
+      return;
+    }
+    
+    // If nothing works, check localStorage for a flag
+    const hasParentClose = localStorage.getItem('rsvp-has-parent-close');
+    if (hasParentClose === 'true') {
+      console.log("Parent close function exists but can't be accessed directly. Forcing page reload.");
+      window.location.href = '/';
+    } else {
+      console.error("No close function available!");
+    }
+  };
+
   useEffect(() => {
     const storedCode = localStorage.getItem('rsvp-code')
     if (storedCode) {
@@ -321,7 +360,7 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
     // Set success state
     setShowSuccess(true);
     
-    console.log(`RSVP Success - All not attending: ${notAttending}`);
+    console.log(`RSVP Success - All not attending: ${notAttending}, onClose available: ${!!storedOnClose || !!onClose}`);
   };
 
 
@@ -435,14 +474,13 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
                       showSuccess, 
                       allNotAttending,
                       onCloseType: typeof onClose,
-                      hasOnClose: !!onClose 
+                      storedOnCloseType: typeof storedOnClose,
+                      hasOnClose: !!onClose,
+                      hasStoredOnClose: !!storedOnClose 
                     });
-                    if (onClose) {
-                      console.log("Calling onClose function");
-                      onClose();
-                    } else {
-                      console.error("onClose function is not defined!");
-                    }
+                    
+                    // Use our reliable close handler
+                    handleCloseModal();
                   }}
                   className="w-full bg-green-600 text-white hover:bg-green-700"
                 >
@@ -514,14 +552,13 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
                               showSuccess, 
                               allNotAttending,
                               onCloseType: typeof onClose,
-                              hasOnClose: !!onClose 
+                              storedOnCloseType: typeof storedOnClose,
+                              hasOnClose: !!onClose,
+                              hasStoredOnClose: !!storedOnClose 
                             });
-                            if (onClose) {
-                              console.log("Calling onClose function");
-                              onClose();
-                            } else {
-                              console.error("onClose function is not defined!");
-                            }
+                            
+                            // Use our reliable close handler
+                            handleCloseModal();
                           }}
                           className="w-full bg-green-600 text-white hover:bg-green-700"
                         >
@@ -537,6 +574,7 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
                     household={household}
                     onBack={handleBackToSearch}
                     onSuccess={handleRsvpSuccess}
+                    parentOnClose={storedOnClose || onClose}
                   />
                   
                   {/* Add debugging info */}

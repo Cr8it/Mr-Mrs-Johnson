@@ -69,11 +69,15 @@ export default function RsvpPage() {
     // 2. Admin has forced close (not implemented here but could be added)
     if (hasRSVPed && !allNotAttending) {
       console.log("Close conditions met - CLOSING MODAL");
-      setIsOpen(false)
+      // Force close more directly
+      setIsOpen(false);
+      document.body.style.overflow = 'unset'; // Ensure body scroll is restored
+      
+      // Use a very short timeout to ensure the state updates
       setTimeout(() => {
         console.log("Timeout complete - navigating to home page");
-        router.push("/")
-      }, 300)
+        router.push("/");
+      }, 100);
     } else {
       console.log('Cannot close modal - conditions not met:', {
         hasRSVPed,
