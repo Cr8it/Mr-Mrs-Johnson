@@ -355,6 +355,8 @@ export default function BridalPartyAdmin() {
 									required
 								>
 									<option value="">Select Role</option>
+									<option value="Maid of Honour">VIP (Very Important Petal-Princess)</option>
+									<option value="Maid of Honour">C.E.O. – Chief Eye-Roller Officer</option>
 									<option value="Maid of Honour">Maid of Honor</option>
 									<option value="Matron of Honor">Matron of Honor</option>
 									<option value="Bridesmaid">Bridesmaid</option>									
