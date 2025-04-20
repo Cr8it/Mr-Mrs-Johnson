@@ -86,7 +86,7 @@ export default function AudioPlayer() {
     <motion.div
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="fixed top-4 right-4 z-[999999] bg-black/80 backdrop-blur-sm rounded-full p-3 flex items-center gap-2"
+      className="fixed top-16 right-4 z-[999999] bg-black/80 backdrop-blur-sm rounded-full p-3 flex items-center gap-2"
     >
       <button
         onClick={togglePlay}
