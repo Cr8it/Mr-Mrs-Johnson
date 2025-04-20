@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 
+// Define an interface for the raw guest data from the database
+interface RawGuestData {
+  id: string;
+  name: string;
+  isChild: boolean | null;
+}
+
 export async function POST(request: Request) {
   try {
     const { code } = await request.json()
@@ -15,7 +22,7 @@ export async function POST(request: Request) {
     console.log(`Verifying household with code: ${code}`)
 
     // First get raw data to validate isChild values
-    const rawGuests = await prisma.$queryRaw`
+    const rawGuests = await prisma.$queryRaw<RawGuestData[]>`
       SELECT id, name, "isChild" 
       FROM "Guest" 
       WHERE "householdId" IN (
@@ -67,7 +74,7 @@ export async function POST(request: Request) {
     // Process guests with enhanced debugging and matching
     const processedGuests = household.guests.map(guest => {
       // Find the raw data for this guest
-      const rawGuest = rawGuests.find((g: any) => g.id === guest.id)
+      const rawGuest = rawGuests.find(g => g.id === guest.id)
       
       // Use the raw database value if possible
       let isChildValue = rawGuest ? Boolean(rawGuest.isChild) : (guest.isChild === true)
