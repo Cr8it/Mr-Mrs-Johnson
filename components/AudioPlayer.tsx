@@ -1,16 +1,22 @@
 import { useState, useEffect, useRef } from 'react'
-import { Play, Pause, X } from 'lucide-react'
+import { Play, Pause } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 export default function AudioPlayer() {
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [isVisible, setIsVisible] = useState(true)
+  const [isPlaying, setIsPlaying] = useState(true)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     // Create audio element
     audioRef.current = new Audio('/background-music.mp3')
     audioRef.current.loop = true
+    audioRef.current.volume = 0.6
+    
+    // Start playing automatically
+    audioRef.current.play().catch(error => {
+      console.log('Auto-play prevented:', error)
+      setIsPlaying(false)
+    })
 
     return () => {
       if (audioRef.current) {
@@ -31,15 +37,6 @@ export default function AudioPlayer() {
     }
   }
 
-  const handleClose = () => {
-    if (audioRef.current) {
-      audioRef.current.pause()
-    }
-    setIsVisible(false)
-  }
-
-  if (!isVisible) return null
-
   return (
     <motion.div
       initial={{ opacity: 0, y: -20 }}
@@ -52,13 +49,6 @@ export default function AudioPlayer() {
         aria-label={isPlaying ? 'Pause music' : 'Play music'}
       >
         {isPlaying ? <Pause size={20} /> : <Play size={20} />}
-      </button>
-      <button
-        onClick={handleClose}
-        className="w-8 h-8 flex items-center justify-center text-white hover:text-gold transition-colors"
-        aria-label="Close music player"
-      >
-        <X size={20} />
       </button>
     </motion.div>
   )
