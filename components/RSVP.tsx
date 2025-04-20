@@ -145,15 +145,52 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
       }
 
       const data = await nameResponse.json()
-        if (data.households.length > 0) {
+      if (data.households.length > 0) {
         // Store the code for later use
-        localStorage.setItem('rsvp-code', data.households[0].code)
-        setHousehold(data.households[0])
-        setShowForm(true)
+        const selectedHousehold = data.households[0];
+        localStorage.setItem('rsvp-code', selectedHousehold.code);
+        
+        // Validate the household data for search results
+        console.log("Processing search results for household:", selectedHousehold.name);
+        
+        // Ensure isChild is a boolean for each guest
+        if (selectedHousehold.guests) {
+          console.log("Search results - Raw guest data:", selectedHousehold.guests.map((g: any) => ({
+            name: g.name,
+            isChild: g.isChild,
+            type: typeof g.isChild
+          })));
+          
+          selectedHousehold.guests = selectedHousehold.guests.map((guest: any) => {
+            // Ensure isChild is explicitly a boolean using strict equality
+            const isChildValue = guest.isChild === true;
+            
+            console.log(`Search results - Processing guest ${guest.name}:`, {
+              rawIsChild: guest.isChild,
+              type: typeof guest.isChild,
+              processedIsChild: isChildValue,
+              type2: typeof isChildValue
+            });
+            
+            return {
+              ...guest,
+              isChild: isChildValue // Force proper boolean
+            };
+          });
+          
+          console.log("Search results - Processed guests:", selectedHousehold.guests.map((g: any) => ({
+            name: g.name,
+            isChild: g.isChild,
+            type: typeof g.isChild
+          })));
+        }
+        
+        setHousehold(selectedHousehold);
+        setShowForm(true);
         toast({
           title: "Found your invitation!",
-          description: `Welcome ${data.households[0].name}`,
-        })
+          description: `Welcome ${selectedHousehold.name}`,
+        });
       } else {
         throw new Error("No household found for that name or code")
       }
