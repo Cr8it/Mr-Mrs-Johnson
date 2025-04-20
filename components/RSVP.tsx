@@ -298,20 +298,30 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
       dessertChoice: g.dessertChoice
     })));
     
+    // Check if ALL guests are not attending
     const notAttending = guests.every(guest => guest.isAttending === false);
+    
+    // Update state and localStorage
     setAllNotAttending(notAttending);
     localStorage.setItem('rsvp-attendance', JSON.stringify({ allNotAttending: notAttending }));
+    
+    // Notify parent components about attendance status
     if (onRSVPStatus) {
       onRSVPStatus(notAttending);
     }
+    
+    // Store code and notify parent about completion
     if (household?.code) {
       localStorage.setItem('rsvp-code', household.code);
       if (onComplete) {
         onComplete(household.code);
       }
     }
-    // Only set success state, don't hide form
+    
+    // Set success state
     setShowSuccess(true);
+    
+    console.log(`RSVP Success - All not attending: ${notAttending}`);
   };
 
 
@@ -419,7 +429,7 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
               </Button>
               {!allNotAttending && (
                 <Button 
-                  onClick={handleModalClose}
+                  onClick={() => onClose && onClose()}
                   className="w-full bg-green-600 text-white hover:bg-green-700"
                 >
                   Close and View Wedding Details
@@ -484,7 +494,7 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
                       </Button>
                       {!allNotAttending && (
                         <Button 
-                          onClick={handleModalClose}
+                          onClick={() => onClose && onClose()}
                           className="w-full bg-green-600 text-white hover:bg-green-700"
                         >
                           Close and View Wedding Details
