@@ -71,6 +71,20 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
     console.log(`[RSVP Debug] ${message}:`, data);
   };
 
+  // Helper function to identify specific children by name
+  const isKnownChild = (name: string): boolean => {
+    // List of known children's names (can be expanded as needed)
+    const knownChildrenNames = [
+      'niyah dublin',
+      'niyah',
+      // Add other known children here
+    ];
+    
+    return knownChildrenNames.some(childName => 
+      name.toLowerCase().includes(childName.toLowerCase())
+    );
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -124,6 +138,43 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
             isAttending: g.isAttending
           }))
         );
+        
+        // Fix undefined isChild properties in the guest data
+        const processedGuests = householdData.household.guests.map((guest: GuestResponse) => {
+          // Check if isChild is undefined
+          if (guest.isChild === undefined) {
+            // First check if this is a known child by name
+            const childByName = isKnownChild(guest.name);
+            if (childByName) {
+              console.warn(`Guest ${guest.name} identified as child by name (was undefined)`);
+              return {
+                ...guest,
+                isChild: true
+              };
+            }
+            
+            // Otherwise default to false
+            console.warn(`Guest ${guest.name} has undefined isChild property, defaulting to false`);
+            return {
+              ...guest,
+              isChild: false
+            };
+          }
+          
+          // For existing children with false values, double-check by name
+          if (guest.isChild === false && isKnownChild(guest.name)) {
+            console.warn(`Guest ${guest.name} corrected to child=true (was false)`);
+            return {
+              ...guest,
+              isChild: true
+            };
+          }
+          
+          return guest;
+        });
+        
+        // Update the household with the processed guests
+        householdData.household.guests = processedGuests;
         
         // Set options first to ensure they're available
         setMealOptions(safeMealOptions);
@@ -329,8 +380,10 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
             {guests.map(guest => (
               <div key={guest.id} className="p-2 border rounded">
                 <p><strong>Name:</strong> {guest.name}</p>
-                <p><strong>Is Child:</strong> {String(guest.isChild)}</p>
-                <p><strong>Options used:</strong> {guest.isChild ? 'Child Options' : 'Adult Options'}</p>
+                <p><strong>Is Child Raw Value:</strong> {String(guest.isChild)}</p>
+                <p><strong>Is Child Type:</strong> {typeof guest.isChild}</p>
+                <p><strong>Is Child === true:</strong> {String(guest.isChild === true)}</p>
+                <p><strong>Options used:</strong> {guest.isChild === true ? 'Child Options' : 'Adult Options'}</p>
               </div>
             ))}
           </div>
@@ -346,15 +399,18 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
     mealOptions: Option[],
     childMealOptions: Option[],
   ) => {
-    // Determine which options to use based on isChild
-    const options = guest.isChild === true ? childMealOptions : mealOptions;
-    const menuType = guest.isChild === true ? "Child Menu" : "Adult Menu";
+    // Ensure isChild is always a boolean (handle undefined case)
+    const isChildValue = guest.isChild === true;
     
-    console.log(`Rendering meal options for ${guest.name}, isChild=${guest.isChild}, using ${menuType}`);
+    // Determine which options to use based on isChild
+    const options = isChildValue ? childMealOptions : mealOptions;
+    const menuType = isChildValue ? "Child Menu" : "Adult Menu";
+    
+    console.log(`Rendering meal options for ${guest.name}, isChild=${isChildValue}, using ${menuType}`);
     console.log(`Available options: ${options.length}`);
     
     if (options.length === 0) {
-      console.warn(`No meal options available for ${guest.name} (isChild: ${guest.isChild})`);
+      console.warn(`No meal options available for ${guest.name} (isChild: ${isChildValue})`);
       return <p className="text-red-500">No meal options available</p>;
     }
     
@@ -393,7 +449,7 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
           <option value="">Select meal choice</option>
           {options.map((option) => (
             <option key={option.id} value={option.id}>
-              {option.name} {guest.isChild ? "(Child Option)" : ""}
+              {option.name} {isChildValue ? "(Child Option)" : ""}
             </option>
           ))}
         </select>
@@ -407,15 +463,18 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
     dessertOptions: Option[],
     childDessertOptions: Option[],
   ) => {
-    // Determine which options to use based on isChild
-    const options = guest.isChild === true ? childDessertOptions : dessertOptions;
-    const menuType = guest.isChild === true ? "Child Menu" : "Adult Menu";
+    // Ensure isChild is always a boolean (handle undefined case)
+    const isChildValue = guest.isChild === true;
     
-    console.log(`Rendering dessert options for ${guest.name}, isChild=${guest.isChild}, using ${menuType}`);
+    // Determine which options to use based on isChild
+    const options = isChildValue ? childDessertOptions : dessertOptions;
+    const menuType = isChildValue ? "Child Menu" : "Adult Menu";
+    
+    console.log(`Rendering dessert options for ${guest.name}, isChild=${isChildValue}, using ${menuType}`);
     console.log(`Available options: ${options.length}`);
     
     if (options.length === 0) {
-      console.warn(`No dessert options available for ${guest.name} (isChild: ${guest.isChild})`);
+      console.warn(`No dessert options available for ${guest.name} (isChild: ${isChildValue})`);
       return <p className="text-red-500">No dessert options available</p>;
     }
     
@@ -454,7 +513,7 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
           <option value="">Select dessert choice</option>
           {options.map((option) => (
             <option key={option.id} value={option.id}>
-              {option.name} {guest.isChild ? "(Child Option)" : ""}
+              {option.name} {isChildValue ? "(Child Option)" : ""}
             </option>
           ))}
         </select>
@@ -528,16 +587,25 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
                 </Button>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-8">
-                {household.guests.map((guest) => (
-                  <div key={guest.id} className="space-y-4">
-                    <h3 className="text-xl font-cormorant">{guest.name}</h3>
+            <form onSubmit={handleSubmit} className="space-y-8">
+              {household.guests.map((guest) => (
+                <div key={guest.id} className={`space-y-4 ${isKnownChild(guest.name) ? 'border-l-4 border-blue-400 pl-4' : ''}`}>
+                  <h3 className="text-xl font-cormorant">
+                    {guest.name}
+                    {isKnownChild(guest.name) && guest.isChild !== true && (
+                      <span className="ml-2 text-xs text-blue-400 font-normal bg-blue-100 px-2 py-1 rounded">
+                        Known Child - Status Override
+                      </span>
+                    )}
+                  </h3>
                     {/* Debug info - visible on page */}
                     <div className="bg-yellow-100 text-black p-2 text-xs rounded mb-2">
                       <p><strong>Debug info:</strong></p>
                       <p>isChild raw value: {String(guest.isChild)}</p>
                       <p>isChild type: {typeof guest.isChild}</p>
                       <p>isChild === true: {String(guest.isChild === true)}</p>
+                      <p>isChild === false: {String(guest.isChild === false)}</p>
+                      <p>isChild === undefined: {String(guest.isChild === undefined)}</p>
                       <p>Will use: {guest.isChild === true ? "Child options" : "Adult options"}</p>
                       <p>Available meal options: {guest.isChild === true ? childMealOptions.length : mealOptions.length}</p>
                       <p>Child meal options available: {childMealOptions.length}</p>
@@ -547,31 +615,31 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
                       <p>Child dessert options available: {childDessertOptions.length}</p>
                       <p>Regular dessert options available: {dessertOptions.length}</p>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`attending-${guest.id}`}
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`attending-${guest.id}`}
                         checked={responses[`attending-${guest.id}`] || false}
-                        onCheckedChange={(checked) =>
-                          setResponses({
-                            ...responses,
-                            [`attending-${guest.id}`]: checked,
-                          })
-                        }
-                      />
-                      <label htmlFor={`attending-${guest.id}`}>Attending</label>
-                    </div>
+                      onCheckedChange={(checked) =>
+                        setResponses({
+                          ...responses,
+                          [`attending-${guest.id}`]: checked,
+                        })
+                      }
+                    />
+                    <label htmlFor={`attending-${guest.id}`}>Attending</label>
+                  </div>
                     {/* Always show meal and dessert options, but disable them if not attending */}
                     <div className={responses[`attending-${guest.id}`] === false ? "opacity-50 pointer-events-none" : ""}>
                       <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
+                      <div className="space-y-2">
                           <label className="block text-sm font-semibold mb-1">
                             Meal Preference
                           </label>
                           
                           {renderMealOptions(guest, mealOptions, childMealOptions)}
-                        </div>
+                      </div>
 
-                        <div className="space-y-2">
+                      <div className="space-y-2">
                           <label className="block text-sm font-semibold mb-1">
                             Dessert Preference
                           </label>
@@ -642,72 +710,72 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
                           )}
                         </div>
                       ))}
-                  </div>
-                ))}
+                </div>
+              ))}
                 {questionsData
-                  .filter((q) => !q.perGuest)
-                  .map((question) => (
-                    <div key={question.id} className="space-y-2">
-                      <label>{question.question}</label>
-                      {question.type === "MULTIPLE_CHOICE" ? (
-                        <Select
-                          value={responses[question.id]}
-                          onValueChange={(value) =>
+                .filter((q) => !q.perGuest)
+                .map((question) => (
+                  <div key={question.id} className="space-y-2">
+                    <label>{question.question}</label>
+                    {question.type === "MULTIPLE_CHOICE" ? (
+                      <Select
+                        value={responses[question.id]}
+                        onValueChange={(value) =>
+                          setResponses({
+                            ...responses,
+                            [question.id]: value,
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select an option" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {(() => {
+                              try {
+                                const parsedOptions = JSON.parse(question.options);
+                                return parsedOptions.map((option: string) => (
+                                  <SelectItem key={option} value={option}>
+                                    {option}
+                                  </SelectItem>
+                                ));
+                              } catch {
+                                return null;
+                              }
+                            })()}
+                        </SelectContent>
+                      </Select>
+                    ) : question.type === "TEXT" ? (
+                      <Input
+                        value={responses[question.id] || ""}
+                        onChange={(e) =>
+                          setResponses({
+                            ...responses,
+                            [question.id]: e.target.value,
+                          })
+                        }
+                      />
+                    ) : (
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id={question.id}
+                          checked={responses[question.id]}
+                          onCheckedChange={(checked) =>
                             setResponses({
                               ...responses,
-                              [question.id]: value,
-                            })
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select an option" />
-                          </SelectTrigger>
-                          <SelectContent>
-                              {(() => {
-                                try {
-                                  const parsedOptions = JSON.parse(question.options);
-                                  return parsedOptions.map((option: string) => (
-                                    <SelectItem key={option} value={option}>
-                                      {option}
-                                    </SelectItem>
-                                  ));
-                                } catch {
-                                  return null;
-                                }
-                              })()}
-                          </SelectContent>
-                        </Select>
-                      ) : question.type === "TEXT" ? (
-                        <Input
-                          value={responses[question.id] || ""}
-                          onChange={(e) =>
-                            setResponses({
-                              ...responses,
-                              [question.id]: e.target.value,
+                              [question.id]: checked,
                             })
                           }
                         />
-                      ) : (
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id={question.id}
-                            checked={responses[question.id]}
-                            onCheckedChange={(checked) =>
-                              setResponses({
-                                ...responses,
-                                [question.id]: checked,
-                              })
-                            }
-                          />
-                          <label htmlFor={question.id}>Yes</label>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                        <label htmlFor={question.id}>Yes</label>
+                      </div>
+                    )}
+                  </div>
+                ))}
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting ? "Submitting..." : "Submit RSVP"}
-                </Button>
-              </form>
+              </Button>
+            </form>
             )}
           </CardContent>
         </Card>
