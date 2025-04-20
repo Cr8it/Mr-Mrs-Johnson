@@ -1,209 +1,175 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 
-// Define an interface for the raw guest data from the database
-interface RawGuestData {
-  id: string;
-  name: string;
-  isChild: boolean | null;
-}
-
-// Helper function to handle both GET and POST requests
-async function processRequest(code: string) {
-  try {
-    if (!code) {
-      return NextResponse.json(
-        { error: "Household code is required" },
-        { status: 400 }
-      )
-    }
-
-    console.log(`Verifying household with code: ${code}`)
-
-    // First get raw data to validate isChild values using explicit boolean casting
-    const rawGuests = await prisma.$queryRaw<RawGuestData[]>`
-      SELECT id, name, "isChild"::boolean as "isChild" 
-      FROM "Guest" 
-      WHERE "householdId" IN (
-        SELECT id FROM "Household" WHERE code = ${code}
-      )
-    `
-    
-    console.log("Raw database values for isChild:")
-    console.log(JSON.stringify(rawGuests, null, 2))
-
-    const household = await prisma.household.findUnique({
-      where: { code },
-      include: {
-        guests: {
-          include: {
-            mealChoice: true,
-            dessertChoice: true,
-            responses: {
-              include: {
-                question: true
-              }
-            }
-          }
-        }
-      }
-    })
-
-    if (!household) {
-      return NextResponse.json(
-        { error: "Household not found" },
-        { 
-          status: 404,
-          headers: {
-            'Cache-Control': 'no-store, max-age=0',
-            'Surrogate-Control': 'no-store'
-          }
-        }
-      )
-    }
-
-    // Log raw data from Prisma
-    console.log("Raw Prisma values for isChild:")
-    household.guests.forEach(g => {
-      console.log(`- ${g.name}: isChild=${g.isChild}, type=${typeof g.isChild}, value stringified=${JSON.stringify(g.isChild)}`)
-    })
-
-    // Fetch any active questions
-    const questions = await prisma.question.findMany({
-      where: { isActive: true },
-      orderBy: { order: 'asc' }
-    })
-
-    console.log(`Found household "${household.name}" with ${household.guests.length} guests`)
-    
-    // Process guests with enhanced debugging and matching
-    const processedGuests = household.guests.map(guest => {
-      // Find the raw data for this guest
-      const rawGuest = rawGuests.find(g => g.id === guest.id)
-      
-      // Enhanced debugging for the isChild field
-      console.log(`[${guest.name}] Raw DB isChild:`, rawGuest ? {
-        value: rawGuest.isChild,
-        type: typeof rawGuest.isChild,
-        valueWhenCastToBoolean: Boolean(rawGuest.isChild)
-      } : 'not found')
-      
-      console.log(`[${guest.name}] Prisma isChild:`, {
-        value: guest.isChild,
-        type: typeof guest.isChild,
-        valueWhenCastToBoolean: Boolean(guest.isChild),
-        valueWhenComparedToTrue: guest.isChild === true
-      })
-      
-      // Use the raw database value if possible, with explicit boolean conversion
-      let isChildValue = false
-      
-      if (rawGuest && rawGuest.isChild !== null) {
-        isChildValue = rawGuest.isChild === true
-      } else if (guest.isChild !== null) {
-        isChildValue = guest.isChild === true
-      }
-      
-      // Special case for Niyah
-      if (guest.name.toLowerCase().includes('niyah')) {
-        console.log(`Special case: Found Niyah in guests. Setting isChild=true explicitly.`)
-        isChildValue = true
-        
-        // Also try to fix in the database immediately
-        try {
-          console.log(`Auto-fixing Niyah's isChild value in database...`)
-          prisma.$executeRaw`
-            UPDATE "Guest" 
-            SET "isChild" = true::boolean 
-            WHERE id = ${guest.id}
-          `.then(() => console.log(`Niyah fixed in database!`))
-            .catch(e => console.error(`Failed to auto-fix Niyah:`, e))
-        } catch (e) {
-          console.error(`Error during auto-fix attempt:`, e)
-        }
-      }
-      
-      console.log(`Processing ${guest.name}: Final isChild value=${isChildValue}`)
-      
-      return {
-        id: guest.id,
-        name: guest.name,
-        isAttending: guest.isAttending,
-        mealChoice: guest.mealChoice?.id,
-        dessertChoice: guest.dessertChoice?.id,
-        dietaryNotes: guest.dietaryNotes,
-        responses: guest.responses,
-        isChild: isChildValue
-      }
-    })
-    
-    // Return response with no-cache headers
-    return NextResponse.json(
-      { 
-        household: {
-          ...household,
-          guests: processedGuests
-        },
-        questions,
-        debug: {
-          rawDbValues: rawGuests
-        }
-      },
-      {
-        headers: {
-          'Cache-Control': 'no-store, max-age=0',
-          'Surrogate-Control': 'no-store'
-        }
-      }
-    )
-  } catch (error) {
-    console.error("Verify error:", error)
-    return NextResponse.json(
-      { error: "Failed to verify household" },
-      { 
-        status: 500,
-        headers: {
-          'Cache-Control': 'no-store, max-age=0',
-          'Surrogate-Control': 'no-store'
-        }
-      }
-    )
-  }
-}
-
-// Handle POST requests
 export async function POST(request: Request) {
   try {
-    const { code } = await request.json()
-    return processRequest(code)
-  } catch (error) {
-    console.error("POST processing error:", error)
-    return NextResponse.json(
-      { error: "Invalid request format" },
-      { status: 400 }
-    )
-  }
-}
-
-// Handle GET requests - use URL search params
-export async function GET(request: Request) {
-  try {
-    const url = new URL(request.url)
-    const code = url.searchParams.get('code')
+    const body = await request.json()
+    console.log("Request body:", body)
     
-    if (!code) {
+    if (!body.code) {
       return NextResponse.json(
-        { error: "Household code is required (use ?code=YOUR_CODE)" },
+        { error: "Code is required" },
         { status: 400 }
       )
     }
+
+    const { code } = body
+    console.log("Verifying code:", code)
+
+    // Normalize the code (uppercase and remove spaces)
+    const normalizedCode = code.toUpperCase().replace(/\s+/g, '')
+
+    // First get raw data to validate isChild values
+    const rawGuests = await prisma.guest.findMany({
+      where: {
+        household: {
+          code: normalizedCode
+        }
+      },
+      select: {
+        id: true,
+        name: true,
+        isChild: true
+      }
+    });
     
-    return processRequest(code)
+    console.log("Raw guest data for isChild validation:");
+    rawGuests.forEach(g => {
+      console.log(`- Guest ${g.name} (${g.id}): raw isChild=${g.isChild}, type=${typeof g.isChild}`);
+    });
+
+    const [household, questions] = await Promise.all([
+      prisma.household.findFirst({
+      where: {
+        code: normalizedCode
+      },
+      select: {
+        name: true,
+        code: true,
+        guests: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          isAttending: true,
+          isChild: true, // Explicitly request isChild field
+          mealChoice: true, // Include full meal choice data
+          dessertChoice: true, // Include full dessert choice data
+          dietaryNotes: true,
+          responses: {
+          select: {
+            questionId: true,
+            answer: true,
+            question: {
+            select: {
+              question: true,
+              type: true,
+              options: true,
+              isRequired: true
+            }
+            }
+          }
+          }
+        }
+        }
+      }
+      }),
+      prisma.question.findMany({
+      where: { isActive: true },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        question: true,
+        type: true,
+        options: true,
+        isRequired: true
+      }
+      })
+    ])
+
+    if (!household) {
+      console.log("No household found for code:", normalizedCode)
+      return NextResponse.json(
+      { error: "Invalid code. Please check and try again." },
+      { status: 404 }
+      )
+    }
+
+    console.log("Found household:", household.name)
+
+    // Transform questions to parse options for multiple choice questions
+    const transformedQuestions = questions.map(question => ({
+      ...question,
+      options: question.type === "MULTIPLE_CHOICE" ? 
+      (() => {
+        try {
+        return JSON.parse(question.options)
+        } catch {
+        return []
+        }
+      })() : 
+      []
+    }))
+
+    // Transform the household data to parse options in responses and ensure isChild is a boolean
+    const transformedHousehold = {
+      ...household,
+      guests: household?.guests.map(guest => {
+        // Ensure isChild is a proper boolean using the raw data
+        const rawGuest = rawGuests.find(g => g.id === guest.id);
+        const isChildValue = rawGuest?.isChild === true;
+        
+        console.log(`Processing guest ${guest.name} for response:`);
+        console.log(`- Raw isChild: ${rawGuest?.isChild} (${typeof rawGuest?.isChild})`);
+        console.log(`- Setting isChild to: ${isChildValue} (${typeof isChildValue})`);
+        
+        return {
+          ...guest,
+          // Ensure isChild is a boolean
+          isChild: isChildValue,
+          responses: guest.responses.map(response => ({
+            ...response,
+            question: {
+              ...response.question,
+              options: response.question.type === "MULTIPLE_CHOICE" ? 
+                (() => {
+                  try {
+                    return JSON.parse(response.question.options)
+                  } catch {
+                    return []
+                  }
+                })() : 
+                []
+            }
+          }))
+        };
+      })
+    }
+
+    // Log the final guest data being sent to the client
+    console.log("Final guest data being sent to client:");
+    transformedHousehold.guests.forEach(guest => {
+      console.log(`- Guest ${guest.name}: isChild=${guest.isChild}, type=${typeof guest.isChild}`);
+    });
+
+    return NextResponse.json({
+      success: true,
+      household: {
+      ...transformedHousehold,
+      questions: transformedQuestions
+      }
+    })
   } catch (error) {
-    console.error("GET processing error:", error)
+    console.error("RSVP verification error:", error)
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 500 }
+      )
+    }
     return NextResponse.json(
-      { error: "Invalid request" },
-      { status: 400 }
+      { error: "Failed to verify RSVP code" },
+      { status: 500 }
     )
   }
 }
