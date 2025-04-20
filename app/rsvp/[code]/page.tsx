@@ -192,6 +192,7 @@ export default function RSVPForm() {
         <Card>
           <CardHeader>
             <CardTitle className="text-3xl font-cormorant text-center">RSVP - {household.name}</CardTitle>
+            <p className="text-center text-muted-foreground mt-2">Please respond by Sunday 22nd June</p>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-8">
