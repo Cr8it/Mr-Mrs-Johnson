@@ -58,23 +58,17 @@ export async function GET(
 
     // Process guests to ensure proper typing
     const processedGuests = household.guests.map(guest => {
-      // Force isChild to be a proper boolean
+      // Ensure isChild is a boolean
       const isChildValue = guest.isChild === true;
       
-      console.log(`Processing guest ${guest.name}:`, {
-        id: guest.id,
-        originalIsChild: guest.isChild,
-        originalType: typeof guest.isChild,
-        processedIsChild: isChildValue,
-        processedType: typeof isChildValue
-      });
+      console.log(`Processing guest ${guest.name}, isChild=${isChildValue}`);
       
       return {
         ...guest,
         isChild: isChildValue,
         // Also convert other nullable fields to a proper format
-        mealChoice: guest.mealChoiceId || guest.mealChoice?.id,
-        dessertChoice: guest.dessertChoiceId || guest.dessertChoice?.id,
+        mealChoice: guest.mealChoice?.id || null,
+        dessertChoice: guest.dessertChoice?.id || null,
         isAttending: guest.isAttending
       };
     });
@@ -151,8 +145,8 @@ export async function POST(request: Request, { params }: { params: { code: strin
       console.log(`Guest ${guest.name}: Attending=${isAttending}, Meal=${mealOptionId}, Dessert=${dessertOptionId}, isChild=${isChildValue}`);
 
       // Track changes for logging
-      const mealChanged = guest.mealChoiceId !== mealOptionId
-      const dessertChanged = guest.dessertChoiceId !== dessertOptionId
+      const mealChanged = guest.mealChoice?.id !== mealOptionId
+      const dessertChanged = guest.dessertChoice?.id !== dessertOptionId
       
       try {
         // Update the guest record, explicitly preserving the isChild status
@@ -162,8 +156,8 @@ export async function POST(request: Request, { params }: { params: { code: strin
           },
           data: {
             isAttending,
-            mealChoiceId: isAttending ? mealOptionId : null,
-            dessertChoiceId: isAttending ? dessertOptionId : null,
+            mealChoice: isAttending && mealOptionId ? { connect: { id: mealOptionId } } : { disconnect: true },
+            dessertChoice: isAttending && dessertOptionId ? { connect: { id: dessertOptionId } } : { disconnect: true },
             // We're not modifying isChild - it stays as set in the database
           },
         })
