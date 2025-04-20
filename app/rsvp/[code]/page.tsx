@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -50,17 +50,21 @@ interface OptionsResponse {
   childDessertOptions: Option[]
 }
 
-export default function RSVPForm() {
-  const params = useParams()
+export default function RSVPForm({ params }: { params: { code: string | string[] } }) {
   const { toast } = useToast()
-  const [household, setHousehold] = useState<{ name: string; guests: LocalGuest[] } | null>(null)
-  const [questions, setQuestions] = useState<Question[]>([])
-  const [responses, setResponses] = useState<Record<string, any>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [household, setHousehold] = useState<HouseholdResponse | null>(null)
   const [mealOptions, setMealOptions] = useState<Option[]>([])
   const [childMealOptions, setChildMealOptions] = useState<Option[]>([])
   const [dessertOptions, setDessertOptions] = useState<Option[]>([])
   const [childDessertOptions, setChildDessertOptions] = useState<Option[]>([])
-  const [optionsLoaded, setOptionsLoaded] = useState(false)
+  const [guests, setGuests] = useState<LocalGuest[]>([])
+  const [questionsData, setQuestionsData] = useState<Question[]>([])
+  const [hasLoadedOptions, setHasLoadedOptions] = useState(false)
+  const [error, setError] = useState("")
+  const [successMessage, setSuccessMessage] = useState("")
+  const [responses, setResponses] = useState<Record<string, any>>({})
+  const router = useRouter()
 
   useEffect(() => {
     const fetchData = async () => {
@@ -138,15 +142,35 @@ export default function RSVPForm() {
         setChildDessertOptions(safeChildDessertOptions);
         
         // Mark options as loaded
-        setOptionsLoaded(true);
+        setHasLoadedOptions(true);
         
         // Then set household data
-        setHousehold({
-          name: householdData.household.name,
-          guests: processedGuests
+        setHousehold(householdData.household);
+        
+        setQuestionsData(householdData.questions || []);
+        
+        // Initialize responses with existing data
+        const initialResponses: Record<string, any> = {};
+        
+        // Set initial response values based on existing data for each guest
+        householdData.household.guests.forEach((guest: GuestResponse) => {
+          // If the guest already has an attendance value, initialize it
+          if (guest.isAttending !== undefined && guest.isAttending !== null) {
+            initialResponses[`attending-${guest.id}`] = guest.isAttending;
+          }
+          
+          // If the guest already has meal/dessert choices, initialize them
+          if (guest.mealChoice) {
+            initialResponses[`meal-${guest.id}`] = guest.mealChoice;
+          }
+          
+          if (guest.dessertChoice) {
+            initialResponses[`dessert-${guest.id}`] = guest.dessertChoice;
+          }
         });
         
-        setQuestions(householdData.questions || []);
+        // Set the initial responses
+        setResponses(initialResponses);
         
         // Log success message
         console.log("Successfully loaded all RSVP form data");
@@ -165,19 +189,19 @@ export default function RSVPForm() {
 
   // Extra debug effect to log changes in child options
   useEffect(() => {
-    if (optionsLoaded) {
+    if (hasLoadedOptions) {
       console.log("Child options loaded:", {
         childMealOptions: childMealOptions.map(o => o.name),
         childDessertOptions: childDessertOptions.map(o => o.name),
       });
     }
-  }, [optionsLoaded, childMealOptions, childDessertOptions]);
+  }, [hasLoadedOptions, childMealOptions, childDessertOptions]);
 
   // Debug effect to log state after it's been set
   useEffect(() => {
     if (household) {
       console.log("RSVP Component State - Guests with isChild status:");
-      household.guests.forEach((guest: LocalGuest) => {
+      household.guests.forEach((guest: GuestResponse) => {
         console.log(`${guest.name}: isChild=${guest.isChild} (${typeof guest.isChild})`);
       });
     }
@@ -185,9 +209,10 @@ export default function RSVPForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSubmitting(true);
 
     // Validate required fields for attending guests
-    const hasInvalidResponses = household?.guests.some((guest: LocalGuest) => {
+    const hasInvalidResponses = household?.guests.some((guest: GuestResponse) => {
       if (responses[`attending-${guest.id}`]) {
         if (!responses[`meal-${guest.id}`] || !responses[`dessert-${guest.id}`]) {
           return true
@@ -202,8 +227,10 @@ export default function RSVPForm() {
         description: "Please select meal and dessert preferences for all attending guests",
         variant: "destructive",
       })
+      setIsSubmitting(false);
       return
     }
+
     try {
       const response = await fetch(`/api/rsvp/${params.code}`, {
         method: "POST",
@@ -219,6 +246,7 @@ export default function RSVPForm() {
         title: "Success",
         description: "Your RSVP has been submitted successfully",
       })
+      setSuccessMessage("Your RSVP has been successfully submitted. Thank you!");
     } catch (error) {
       console.error("Error submitting RSVP:", error);
       toast({
@@ -226,6 +254,8 @@ export default function RSVPForm() {
         description: "Failed to submit RSVP",
         variant: "destructive",
       })
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -349,7 +379,7 @@ export default function RSVPForm() {
         transition={{ duration: 0.5 }}
         className="max-w-2xl mx-auto"
       >
-        <ChildOptionsDebug householdCode={params.code} />
+        <ChildOptionsDebug householdCode={typeof params.code === 'string' ? params.code : params.code[0]} />
         
         <Card>
           <CardHeader>
@@ -357,46 +387,55 @@ export default function RSVPForm() {
             <p className="text-center text-muted-foreground mt-2">Please respond by Sunday 22nd June</p>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-8">
-              {household.guests.map((guest) => (
-                <div key={guest.id} className="space-y-4">
-                  <h3 className="text-xl font-cormorant">{guest.name}</h3>
-                  {/* Debug info - visible on page */}
-                  <div className="bg-yellow-100 text-black p-2 text-xs rounded mb-2">
-                    <p><strong>Debug info:</strong></p>
-                    <p>isChild raw value: {String(guest.isChild)}</p>
-                    <p>isChild type: {typeof guest.isChild}</p>
-                    <p>isChild === true: {String(guest.isChild === true)}</p>
-                    <p>Will use: {guest.isChild === true ? "Child options" : "Adult options"}</p>
-                    <p>Available meal options: {guest.isChild === true ? childMealOptions.length : mealOptions.length}</p>
-                    <p>Child meal options available: {childMealOptions.length}</p>
-                    <p>Regular meal options available: {mealOptions.length}</p>
-                    <hr className="my-1" />
-                    <p>Available dessert options: {guest.isChild === true ? childDessertOptions.length : dessertOptions.length}</p>
-                    <p>Child dessert options available: {childDessertOptions.length}</p>
-                    <p>Regular dessert options available: {dessertOptions.length}</p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`attending-${guest.id}`}
-                      checked={responses[`attending-${guest.id}`]}
-                      onCheckedChange={(checked) =>
-                        setResponses({
-                          ...responses,
-                          [`attending-${guest.id}`]: checked,
-                        })
-                      }
-                    />
-                    <label htmlFor={`attending-${guest.id}`}>Attending</label>
-                  </div>
-                    {responses[`attending-${guest.id}`] && (
-                    <>
+            {successMessage ? (
+              <div className="text-center p-6">
+                <h3 className="text-2xl font-bold text-green-500 mb-4">{successMessage}</h3>
+                <p className="mb-6">We look forward to celebrating with you!</p>
+                <Button onClick={() => router.push('/')} className="mt-4">
+                  Return to Home
+                </Button>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-8">
+                {household.guests.map((guest) => (
+                  <div key={guest.id} className="space-y-4">
+                    <h3 className="text-xl font-cormorant">{guest.name}</h3>
+                    {/* Debug info - visible on page */}
+                    <div className="bg-yellow-100 text-black p-2 text-xs rounded mb-2">
+                      <p><strong>Debug info:</strong></p>
+                      <p>isChild raw value: {String(guest.isChild)}</p>
+                      <p>isChild type: {typeof guest.isChild}</p>
+                      <p>isChild === true: {String(guest.isChild === true)}</p>
+                      <p>Will use: {guest.isChild === true ? "Child options" : "Adult options"}</p>
+                      <p>Available meal options: {guest.isChild === true ? childMealOptions.length : mealOptions.length}</p>
+                      <p>Child meal options available: {childMealOptions.length}</p>
+                      <p>Regular meal options available: {mealOptions.length}</p>
+                      <hr className="my-1" />
+                      <p>Available dessert options: {guest.isChild === true ? childDessertOptions.length : dessertOptions.length}</p>
+                      <p>Child dessert options available: {childDessertOptions.length}</p>
+                      <p>Regular dessert options available: {dessertOptions.length}</p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`attending-${guest.id}`}
+                        checked={responses[`attending-${guest.id}`] || false}
+                        onCheckedChange={(checked) =>
+                          setResponses({
+                            ...responses,
+                            [`attending-${guest.id}`]: checked,
+                          })
+                        }
+                      />
+                      <label htmlFor={`attending-${guest.id}`}>Attending</label>
+                    </div>
+                    {/* Always show meal and dessert options, but disable them if not attending */}
+                    <div className={responses[`attending-${guest.id}`] === false ? "opacity-50 pointer-events-none" : ""}>
                       {renderMealOptions(guest)}
                       {renderDessertOptions(guest)}
-                    </>
-                    )}
+                    </div>
+                    
                     {responses[`attending-${guest.id}`] &&
-                    questions
+                    questionsData
                       .filter((q) => q.perGuest)
                       .map((question) => (
                         <div key={question.id} className="space-y-2">
@@ -456,72 +495,73 @@ export default function RSVPForm() {
                           )}
                         </div>
                       ))}
-                </div>
-              ))}
-              {questions
-                .filter((q) => !q.perGuest)
-                .map((question) => (
-                  <div key={question.id} className="space-y-2">
-                    <label>{question.question}</label>
-                    {question.type === "MULTIPLE_CHOICE" ? (
-                      <Select
-                        value={responses[question.id]}
-                        onValueChange={(value) =>
-                          setResponses({
-                            ...responses,
-                            [question.id]: value,
-                          })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select an option" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {(() => {
-                              try {
-                                const parsedOptions = JSON.parse(question.options);
-                                return parsedOptions.map((option: string) => (
-                                  <SelectItem key={option} value={option}>
-                                    {option}
-                                  </SelectItem>
-                                ));
-                              } catch {
-                                return null;
-                              }
-                            })()}
-                        </SelectContent>
-                      </Select>
-                    ) : question.type === "TEXT" ? (
-                      <Input
-                        value={responses[question.id] || ""}
-                        onChange={(e) =>
-                          setResponses({
-                            ...responses,
-                            [question.id]: e.target.value,
-                          })
-                        }
-                      />
-                    ) : (
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id={question.id}
-                          checked={responses[question.id]}
-                          onCheckedChange={(checked) =>
+                  </div>
+                ))}
+                {questionsData
+                  .filter((q) => !q.perGuest)
+                  .map((question) => (
+                    <div key={question.id} className="space-y-2">
+                      <label>{question.question}</label>
+                      {question.type === "MULTIPLE_CHOICE" ? (
+                        <Select
+                          value={responses[question.id]}
+                          onValueChange={(value) =>
                             setResponses({
                               ...responses,
-                              [question.id]: checked,
+                              [question.id]: value,
+                            })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select an option" />
+                          </SelectTrigger>
+                          <SelectContent>
+                              {(() => {
+                                try {
+                                  const parsedOptions = JSON.parse(question.options);
+                                  return parsedOptions.map((option: string) => (
+                                    <SelectItem key={option} value={option}>
+                                      {option}
+                                    </SelectItem>
+                                  ));
+                                } catch {
+                                  return null;
+                                }
+                              })()}
+                          </SelectContent>
+                        </Select>
+                      ) : question.type === "TEXT" ? (
+                        <Input
+                          value={responses[question.id] || ""}
+                          onChange={(e) =>
+                            setResponses({
+                              ...responses,
+                              [question.id]: e.target.value,
                             })
                           }
                         />
-                        <label htmlFor={question.id}>Yes</label>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              <Button type="submit" className="w-full">
-                Submit RSVP
-              </Button>
-            </form>
+                      ) : (
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id={question.id}
+                            checked={responses[question.id]}
+                            onCheckedChange={(checked) =>
+                              setResponses({
+                                ...responses,
+                                [question.id]: checked,
+                              })
+                            }
+                          />
+                          <label htmlFor={question.id}>Yes</label>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? "Submitting..." : "Submit RSVP"}
+                </Button>
+              </form>
+            )}
           </CardContent>
         </Card>
       </motion.div>
