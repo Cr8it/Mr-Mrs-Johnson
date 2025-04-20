@@ -85,13 +85,27 @@ export default function RSVPForm() {
         })), null, 2));
         
         // Ensure isChild is properly converted to boolean before setting state
-        const processedGuests = householdData.household.guests.map((guest: GuestResponse): LocalGuest => ({
-          id: guest.id,
-          name: guest.name,
-          mealOptionId: guest.mealChoice || undefined,
-          dessertOptionId: guest.dessertChoice || undefined,
-          isChild: guest.isChild === true
-        }));
+        const processedGuests = householdData.household.guests.map((guest: GuestResponse): LocalGuest => {
+          // Get the raw isChild value
+          const rawIsChild = guest.isChild;
+          // Force it to be a boolean using strict equality
+          const isChildValue = rawIsChild === true;
+          
+          console.log(`Processing ${guest.name}:`, {
+            rawIsChild,
+            rawIsChildType: typeof rawIsChild,
+            isChildValue,
+            isChildValueType: typeof isChildValue
+          });
+          
+          return {
+            id: guest.id,
+            name: guest.name,
+            mealOptionId: guest.mealChoice || undefined,
+            dessertOptionId: guest.dessertChoice || undefined,
+            isChild: isChildValue
+          };
+        });
         
         // Log the processed guests for debugging
         console.log("Processed guests after strict equality check:", processedGuests.map(g => ({
@@ -261,8 +275,15 @@ export default function RSVPForm() {
                         </SelectTrigger>
                         <SelectContent>
                         {(() => {
-                          // Use strict boolean comparison
+                          // Use strict boolean comparison and log the value
                           const isChildGuest = guest.isChild === true;
+                          console.log(`Selecting options for ${guest.name}:`, {
+                            rawIsChild: guest.isChild,
+                            isChildGuest,
+                            availableChildOptions: childMealOptions.length,
+                            availableRegularOptions: mealOptions.length
+                          });
+                          
                           const options = isChildGuest ? childMealOptions : mealOptions;
                           
                           // Check if we have options to display
@@ -316,8 +337,15 @@ export default function RSVPForm() {
                         </SelectTrigger>
                         <SelectContent>
                         {(() => {
-                          // Use strict boolean comparison
+                          // Use strict boolean comparison and log the value
                           const isChildGuest = guest.isChild === true;
+                          console.log(`Selecting dessert options for ${guest.name}:`, {
+                            rawIsChild: guest.isChild,
+                            isChildGuest,
+                            availableChildOptions: childDessertOptions.length,
+                            availableRegularOptions: dessertOptions.length
+                          });
+                          
                           const options = isChildGuest ? childDessertOptions : dessertOptions;
                           
                           // Check if we have options to display
