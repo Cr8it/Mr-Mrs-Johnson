@@ -272,115 +272,165 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
     }
   }
 
-  // Add a function to render meal options for a guest
-  const renderMealOptions = (guest: GuestResponse) => {
-    // Force the isChild value to be a proper boolean
-    const isChildGuest = guest.isChild === true;
-    
-    logDebugInfo(`Rendering meal options for ${guest.name}`, {
-      isChild: guest.isChild,
-      isChildType: typeof guest.isChild,
-      isChildGuest,
-      childOptionsLength: childMealOptions.length,
-      regularOptionsLength: mealOptions.length
-    });
-    
-    // Explicitly select the options array based on guest type
-    const optionsToUse = isChildGuest ? childMealOptions : mealOptions;
-    
-    if (!optionsToUse || optionsToUse.length === 0) {
-      return (
-        <div className="space-y-2">
-          <label>Meal Preference ({isChildGuest ? 'Child Menu' : 'Adult Menu'})</label>
-          <p className="text-red-500">No meal options available</p>
-        </div>
-      );
-    }
-    
+  // Add a debug component to help visualize available options and what's being shown to each guest
+  const ChildOptionsDebug = ({ 
+    guests, 
+    mealOptions, 
+    childMealOptions, 
+    dessertOptions, 
+    childDessertOptions 
+  }: { 
+    guests: LocalGuest[], 
+    mealOptions: Option[], 
+    childMealOptions: Option[], 
+    dessertOptions: Option[], 
+    childDessertOptions: Option[] 
+  }) => {
     return (
-      <div className="space-y-2">
-        <label>Meal Preference ({isChildGuest ? 'Child Menu' : 'Adult Menu'})</label>
-        <Select
-          value={responses[`meal-${guest.id}`]}
-          onValueChange={(value) => {
-            logDebugInfo(`Selected meal for ${guest.name}`, {
-              value, 
-              isChild: isChildGuest
-            });
-            setResponses({
-              ...responses,
-              [`meal-${guest.id}`]: value,
-            });
-          }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select a meal" />
-          </SelectTrigger>
-          <SelectContent>
-            {optionsToUse.map((option: Option) => (
-              <SelectItem key={option.id} value={option.id}>
-                {option.name} {option.isChildOption && '(Child Option)'}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="bg-gray-100 p-4 mb-8 rounded-lg text-xs">
+        <h3 className="font-bold mb-2">Debug: Meal &amp; Dessert Options</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <h4 className="font-semibold">Adult Meal Options ({mealOptions.length})</h4>
+            <ul className="list-disc pl-4">
+              {mealOptions.map(o => <li key={o.id}>{o.name}</li>)}
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-semibold">Child Meal Options ({childMealOptions.length})</h4>
+            <ul className="list-disc pl-4">
+              {childMealOptions.map(o => <li key={o.id}>{o.name}</li>)}
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-semibold">Adult Dessert Options ({dessertOptions.length})</h4>
+            <ul className="list-disc pl-4">
+              {dessertOptions.map(o => <li key={o.id}>{o.name}</li>)}
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-semibold">Child Dessert Options ({childDessertOptions.length})</h4>
+            <ul className="list-disc pl-4">
+              {childDessertOptions.map(o => <li key={o.id}>{o.name}</li>)}
+            </ul>
+          </div>
+        </div>
+        
+        <h4 className="font-semibold mt-4 mb-2">Guest Options</h4>
+        <div className="space-y-2">
+          {guests.map(guest => (
+            <div key={guest.id} className="border border-gray-300 p-2 rounded">
+              <p>
+                <strong>{guest.name}</strong> - {guest.isChild ? "Child" : "Adult"}
+              </p>
+              <p>
+                Meal options shown: {guest.isChild ? childMealOptions.length : mealOptions.length} options
+                ({guest.isChild ? "Child Menu" : "Adult Menu"})
+              </p>
+              <p>
+                Dessert options shown: {guest.isChild ? childDessertOptions.length : dessertOptions.length} options
+                ({guest.isChild ? "Child Menu" : "Adult Menu"})
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
     );
   };
-  
-  // Add a function to render dessert options for a guest
-  const renderDessertOptions = (guest: GuestResponse) => {
-    // Force the isChild value to be a proper boolean
-    const isChildGuest = guest.isChild === true;
+
+  // Helper function to render meal options based on whether guest is a child
+  const renderMealOptions = (
+    guest: LocalGuest,
+    mealOptions: Option[],
+    childMealOptions: Option[],
+  ) => {
+    const options = guest.isChild ? childMealOptions : mealOptions;
+    const menuType = guest.isChild ? "Child Menu" : "Adult Menu";
     
-    logDebugInfo(`Rendering dessert options for ${guest.name}`, {
-      isChild: guest.isChild,
-      isChildType: typeof guest.isChild,
-      isChildGuest,
-      childOptionsLength: childDessertOptions.length,
-      regularOptionsLength: dessertOptions.length
-    });
+    console.log(`Rendering meal options for ${guest.name} (isChild: ${guest.isChild}):`, 
+      { availableOptions: options.map(o => o.name) });
     
-    // Explicitly select the options array based on guest type
-    const optionsToUse = isChildGuest ? childDessertOptions : dessertOptions;
-    
-    if (!optionsToUse || optionsToUse.length === 0) {
-      return (
-        <div className="space-y-2">
-          <label>Dessert Choice ({isChildGuest ? 'Child Menu' : 'Adult Menu'})</label>
-          <p className="text-red-500">No dessert options available</p>
-        </div>
-      );
+    if (options.length === 0) {
+      console.warn(`No meal options available for ${guest.name} (isChild: ${guest.isChild})`);
+      return <p className="text-red-500">No meal options available</p>;
     }
     
     return (
-      <div className="space-y-2">
-        <label>Dessert Choice ({isChildGuest ? 'Child Menu' : 'Adult Menu'})</label>
-        <Select
-          value={responses[`dessert-${guest.id}`]}
-          onValueChange={(value) => {
-            logDebugInfo(`Selected dessert for ${guest.name}`, {
-              value, 
-              isChild: isChildGuest
-            });
-            setResponses({
-              ...responses,
-              [`dessert-${guest.id}`]: value,
+      <>
+        <p className="text-sm text-gray-500 mb-1">{menuType}</p>
+        <select
+          className="w-full p-2 border border-gray-300 rounded"
+          value={guest.mealOptionId || ""}
+          onChange={(e) => {
+            const updatedGuests = [...household!.guests];
+            const index = updatedGuests.findIndex((g) => g.id === guest.id);
+            updatedGuests[index] = {
+              ...updatedGuests[index],
+              mealOptionId: e.target.value,
+            };
+            setHousehold({
+              ...household!,
+              guests: updatedGuests,
             });
           }}
+          required={guest.isAttending}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Select a dessert" />
-          </SelectTrigger>
-          <SelectContent>
-            {optionsToUse.map((option: Option) => (
-              <SelectItem key={option.id} value={option.id}>
-                {option.name} {option.isChildOption && '(Child Option)'}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+          <option value="">Select meal choice</option>
+          {options.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.name} {guest.isChild ? "(Child Option)" : ""}
+            </option>
+          ))}
+        </select>
+      </>
+    );
+  };
+
+  // Helper function to render dessert options based on whether guest is a child
+  const renderDessertOptions = (
+    guest: LocalGuest,
+    dessertOptions: Option[],
+    childDessertOptions: Option[],
+  ) => {
+    const options = guest.isChild ? childDessertOptions : dessertOptions;
+    const menuType = guest.isChild ? "Child Menu" : "Adult Menu";
+    
+    console.log(`Rendering dessert options for ${guest.name} (isChild: ${guest.isChild}):`, 
+      { availableOptions: options.map(o => o.name) });
+    
+    if (options.length === 0) {
+      console.warn(`No dessert options available for ${guest.name} (isChild: ${guest.isChild})`);
+      return <p className="text-red-500">No dessert options available</p>;
+    }
+    
+    return (
+      <>
+        <p className="text-sm text-gray-500 mb-1">{menuType}</p>
+        <select
+          className="w-full p-2 border border-gray-300 rounded"
+          value={guest.dessertOptionId || ""}
+          onChange={(e) => {
+            const updatedGuests = [...household!.guests];
+            const index = updatedGuests.findIndex((g) => g.id === guest.id);
+            updatedGuests[index] = {
+              ...updatedGuests[index],
+              dessertOptionId: e.target.value,
+            };
+            setHousehold({
+              ...household!,
+              guests: updatedGuests,
+            });
+          }}
+          required={guest.isAttending}
+        >
+          <option value="">Select dessert choice</option>
+          {options.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.name} {guest.isChild ? "(Child Option)" : ""}
+            </option>
+          ))}
+        </select>
+      </>
     );
   };
 
@@ -427,7 +477,13 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
         transition={{ duration: 0.5 }}
         className="max-w-2xl mx-auto"
       >
-        <ChildOptionsDebug householdCode={typeof params.code === 'string' ? params.code : params.code[0]} />
+        <ChildOptionsDebug 
+          guests={household.guests}
+          mealOptions={mealOptions}
+          childMealOptions={childMealOptions}
+          dessertOptions={dessertOptions}
+          childDessertOptions={childDessertOptions}
+        />
         
         <Card>
           <CardHeader>
@@ -478,8 +534,23 @@ export default function RSVPForm({ params }: { params: { code: string | string[]
                     </div>
                     {/* Always show meal and dessert options, but disable them if not attending */}
                     <div className={responses[`attending-${guest.id}`] === false ? "opacity-50 pointer-events-none" : ""}>
-                      {renderMealOptions(guest)}
-                      {renderDessertOptions(guest)}
+                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="block text-sm font-semibold mb-1">
+                            Meal Preference
+                          </label>
+                          
+                          {renderMealOptions(guest, mealOptions, childMealOptions)}
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="block text-sm font-semibold mb-1">
+                            Dessert Preference
+                          </label>
+                          
+                          {renderDessertOptions(guest, dessertOptions, childDessertOptions)}
+                        </div>
+                      </div>
                     </div>
                     
                     {responses[`attending-${guest.id}`] &&

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
-import { Reload, Eye, EyeOff } from "lucide-react"
+import { RefreshCw, Eye, EyeOff } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 interface Option {
@@ -217,7 +217,7 @@ export default function ChildOptionsDebug({ householdCode }: { householdCode?: s
               onClick={() => setRefreshTrigger(prev => prev + 1)}
               disabled={loading}
             >
-              <Reload className="h-4 w-4 mr-1" />
+              <RefreshCw className="h-4 w-4 mr-1" />
               {loading ? 'Loading...' : 'Refresh'}
             </Button>
             <Button 

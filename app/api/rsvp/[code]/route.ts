@@ -6,15 +6,6 @@ export async function GET(
   { params }: { params: { code: string } }
 ) {
   try {
-    // Check cache first
-    const cacheKey = `rsvp_household_${params.code}`;
-    const cachedData = await caches.default.match(cacheKey);
-    if (cachedData) {
-      const data = await cachedData.json();
-      console.log(`Using cached data for household ${params.code}`);
-      return NextResponse.json(data);
-    }
-
     // Find the household
     const household = await prisma.household.findFirst({
       where: {
@@ -82,8 +73,8 @@ export async function GET(
         ...guest,
         isChild: isChildValue,
         // Also convert other nullable fields to a proper format
-        mealChoice: guest.mealChoiceId,
-        dessertChoice: guest.dessertChoiceId,
+        mealChoice: guest.mealChoiceId || guest.mealChoice?.id,
+        dessertChoice: guest.dessertChoiceId || guest.dessertChoice?.id,
         isAttending: guest.isAttending
       };
     });
@@ -96,12 +87,14 @@ export async function GET(
       questions: transformedQuestions
     };
 
-    // Cache the response for 5 minutes
-    const response = NextResponse.json(responseData);
-    const clonedResponse = response.clone();
-    await caches.default.put(cacheKey, clonedResponse);
-
-    return response;
+    // Return the response with cache control headers to prevent stale data
+    return NextResponse.json(responseData, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
   } catch (error) {
     console.error("Error fetching household data:", error)
     return NextResponse.json(
@@ -113,17 +106,27 @@ export async function GET(
 
 export async function POST(request: Request, { params }: { params: { code: string } }) {
   try {
-    console.log(`Processing RSVP submission for household code: ${params.code}`)
-    const { responses } = await request.json()
+    const responses = await request.json()
+    
+    // Debugging the incoming responses
+    console.log(`Received RSVP responses for household code: ${params.code}`, {
+      responseKeys: Object.keys(responses),
+      sampleValues: Object.entries(responses).slice(0, 5).map(([key, value]) => `${key}: ${value}`)
+    })
+
+    // Find the household with all guest data including meal and dessert choices
     const household = await prisma.household.findFirst({
       where: {
-        code: params.code,
+        code: {
+          equals: params.code,
+          mode: 'insensitive'
+        },
       },
       include: {
         guests: {
           include: {
             mealChoice: true,
-            dessertChoice: true
+            dessertChoice: true,
           }
         },
       },
@@ -138,28 +141,38 @@ export async function POST(request: Request, { params }: { params: { code: strin
     
     // Process responses for each guest
     for (const guest of household.guests) {
+      // Ensure isChild is a boolean
+      const isChildValue = guest.isChild === true;
+      
       const isAttending = responses[`attending-${guest.id}`]
       const mealOptionId = responses[`meal-${guest.id}`]
       const dessertOptionId = responses[`dessert-${guest.id}`]
       
-      console.log(`Guest ${guest.name}: Attending=${isAttending}, Meal=${mealOptionId}, Dessert=${dessertOptionId}, isChild=${guest.isChild === true}`);
+      console.log(`Guest ${guest.name}: Attending=${isAttending}, Meal=${mealOptionId}, Dessert=${dessertOptionId}, isChild=${isChildValue}`);
 
       // Track changes for logging
-      const mealChanged = guest.mealOptionId !== mealOptionId
-      const dessertChanged = guest.dessertOptionId !== dessertOptionId
+      const mealChanged = guest.mealChoiceId !== mealOptionId
+      const dessertChanged = guest.dessertChoiceId !== dessertOptionId
       
-      // Update the guest record, explicitly preserving the isChild status
-      await prisma.guest.update({
-        where: {
-          id: guest.id,
-        },
-        data: {
-          isAttending,
-          mealOptionId: isAttending ? mealOptionId : null,
-          dessertOptionId: isAttending ? dessertOptionId : null,
-          // We're not modifying isChild - it stays as set in the database
-        },
-      })
+      try {
+        // Update the guest record, explicitly preserving the isChild status
+        await prisma.guest.update({
+          where: {
+            id: guest.id,
+          },
+          data: {
+            isAttending,
+            mealChoiceId: isAttending ? mealOptionId : null,
+            dessertChoiceId: isAttending ? dessertOptionId : null,
+            // We're not modifying isChild - it stays as set in the database
+          },
+        })
+        
+        console.log(`Successfully updated guest: ${guest.name} (ID: ${guest.id}), isAttending: ${isAttending}`);
+      } catch (err) {
+        console.error(`Error updating guest ${guest.name} (ID: ${guest.id}):`, err);
+        continue; // Skip activity logging for failed updates
+      }
 
       // Log guest activities for significant changes
       if (isAttending) {
@@ -219,45 +232,53 @@ export async function POST(request: Request, { params }: { params: { code: strin
       }
 
       // Save guest-specific responses
-      const guestResponses = Object.entries(responses)
-        .filter(([key]) => key.endsWith(`-${guest.id}`))
-        .filter(([key]) => !key.startsWith('meal-') && !key.startsWith('dessert-') && !key.startsWith('attending-'))
-        .map(([key, value]) => ({
-          questionId: key.split("-")[0],
-          guestId: guest.id,
-          answer: String(value),
-        }))
+      try {
+        const guestResponses = Object.entries(responses)
+          .filter(([key]) => key.endsWith(`-${guest.id}`))
+          .filter(([key]) => !key.startsWith('meal-') && !key.startsWith('dessert-') && !key.startsWith('attending-'))
+          .map(([key, value]) => ({
+            questionId: key.split("-")[0],
+            guestId: guest.id,
+            answer: String(value),
+          }))
 
-      if (guestResponses.length > 0) {
-        // Delete existing responses first
-        await prisma.questionResponse.deleteMany({
-          where: { guestId: guest.id }
-        })
+        if (guestResponses.length > 0) {
+          // Delete existing responses first
+          await prisma.questionResponse.deleteMany({
+            where: { guestId: guest.id }
+          })
 
-        // Create new responses
-        await prisma.questionResponse.createMany({
-          data: guestResponses,
-        })
-        
-        console.log(`Saved ${guestResponses.length} question responses for ${guest.name}`)
+          // Create new responses
+          await prisma.questionResponse.createMany({
+            data: guestResponses,
+          })
+          
+          console.log(`Saved ${guestResponses.length} question responses for ${guest.name}`)
+        }
+      } catch (err) {
+        console.error(`Error saving responses for guest ${guest.name} (ID: ${guest.id}):`, err);
       }
     }
 
     // Save household-level responses
-    const householdResponses = Object.entries(responses)
-      .filter(([key]) => !key.includes("-"))
-      .map(([questionId, value]) => ({
-        questionId,
-        guestId: household.guests[0].id,
-        answer: String(value),
-      }))
+    try {
+      const householdResponses = Object.entries(responses)
+        .filter(([key]) => !key.includes("-"))
+        .map(([questionId, value]) => ({
+          questionId,
+          guestId: household.guests[0].id,
+          answer: String(value),
+        }))
 
-    if (householdResponses.length > 0) {
-      await prisma.questionResponse.createMany({
-        data: householdResponses,
-      })
-      
-      console.log(`Saved ${householdResponses.length} household-level responses`)
+      if (householdResponses.length > 0) {
+        await prisma.questionResponse.createMany({
+          data: householdResponses,
+        })
+        
+        console.log(`Saved ${householdResponses.length} household-level responses`)
+      }
+    } catch (err) {
+      console.error("Error saving household responses:", err);
     }
 
     console.log(`RSVP submission completed successfully for household: ${household.name}`)
