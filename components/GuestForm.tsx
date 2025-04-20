@@ -85,17 +85,17 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
     if (childGuests.length > 0) {
       console.group('👶 Child Guests Details:');
       childGuests.forEach(guest => {
-        console.group(`Child: ${guest.firstName} ${guest.lastName}`);
+        console.group(`Child: ${guest.name}`);
         
         // Check meal choice validity
-        const mealChoiceValid = guest.mealChoiceId 
-          ? childMealOptions.some(o => o.id === guest.mealChoiceId)
+        const mealChoiceValid = guest.mealChoice 
+          ? childMealOptions.some(o => o.id === guest.mealChoice?.id)
           : null;
         
         console.log(
           'Meal Choice:',
-          guest.mealChoiceId
-            ? `ID: ${guest.mealChoiceId} - ${
+          guest.mealChoice
+            ? `ID: ${guest.mealChoice.id} - ${
                 mealChoiceValid 
                   ? '✓ Valid child meal option'
                   : '❌ INVALID - Not in child meal options!'
@@ -104,14 +104,14 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
         );
         
         // Check dessert choice validity
-        const dessertChoiceValid = guest.dessertChoiceId 
-          ? childDessertOptions.some(o => o.id === guest.dessertChoiceId)
+        const dessertChoiceValid = guest.dessertChoice 
+          ? childDessertOptions.some(o => o.id === guest.dessertChoice?.id)
           : null;
         
         console.log(
           'Dessert Choice:',
-          guest.dessertChoiceId
-            ? `ID: ${guest.dessertChoiceId} - ${
+          guest.dessertChoice
+            ? `ID: ${guest.dessertChoice.id} - ${
                 dessertChoiceValid 
                   ? '✓ Valid child dessert option'
                   : '❌ INVALID - Not in child dessert options!'
@@ -154,11 +154,11 @@ export default function GuestForm({ household, onBack, onSuccess }: GuestFormPro
       if (!data) throw new Error("Failed to load form data");
       
       // Set the meal and dessert options
-      const regularMeals = data.mealOptions.filter(o => !o.childOnly);
-      const childMeals = data.mealOptions.filter(o => o.childOnly);
+      const regularMeals = data.mealOptions.filter((o: { isChildOption?: boolean }) => !o.isChildOption);
+      const childMeals = data.mealOptions.filter((o: { isChildOption?: boolean }) => o.isChildOption);
       
-      const regularDesserts = data.dessertOptions.filter(o => !o.childOnly);
-      const childDesserts = data.dessertOptions.filter(o => o.childOnly);
+      const regularDesserts = data.dessertOptions.filter((o: { isChildOption?: boolean }) => !o.isChildOption);
+      const childDesserts = data.dessertOptions.filter((o: { isChildOption?: boolean }) => o.isChildOption);
       
       setRegularMealOptions(regularMeals);
       setChildMealOptions(childMeals);
