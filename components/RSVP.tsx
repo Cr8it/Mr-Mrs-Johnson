@@ -464,14 +464,14 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
-            <div className="bg-black/30 p-8 rounded-lg border border-white/20">
-            <h3 className="text-2xl font-semibold text-white mb-4">Thank You for Your Response!</h3>
+            <div className="bg-black/30 p-4 sm:p-8 rounded-lg border border-white/20">
+            <h3 className="text-xl sm:text-2xl font-semibold text-white mb-4">Thank You for Your Response!</h3>
             {allNotAttending ? (
-            <p className="text-white mb-6">We're sorry you won't be able to join us, but thank you for letting us know.</p>
+            <p className="text-white mb-6 text-sm sm:text-base">We're sorry you won't be able to join us, but thank you for letting us know.</p>
             ) : (
-            <p className="text-white mb-6">We're excited to celebrate with you! We'll be in touch with more details as the day approaches.</p>
+            <p className="text-white mb-6 text-sm sm:text-base">We're excited to celebrate with you! We'll be in touch with more details as the day approaches.</p>
             )}
-            <p className="text-sm text-gray-300 mb-6">
+            <p className="text-xs sm:text-sm text-gray-300 mb-6">
             You can modify your response anytime before the deadline using your household code:
             <br />
             <span className="font-mono font-bold text-white">{household?.code}</span>
@@ -479,7 +479,7 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
             <div className="space-y-4">
               <Button 
                 onClick={handleModifyResponse}
-                className="bg-white text-black hover:bg-gray-200"
+                className="w-full sm:w-auto bg-white text-black hover:bg-gray-200"
               >
                 Modify Response
               </Button>
@@ -500,7 +500,7 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
                     // Use our reliable close handler
                     handleCloseModal();
                   }}
-                  className="w-full bg-green-600 text-white hover:bg-green-700"
+                  className="w-full bg-green-600 text-black font-medium hover:bg-green-700 hover:text-white"
                 >
                   Close and View Wedding Details
                 </Button>
@@ -511,7 +511,7 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
 
         ) : !household || !showForm ? (
           <div className="max-w-md mx-auto space-y-6">
-            <div className="bg-black/30 p-8 rounded-lg border border-white/20">
+            <div className="bg-black/30 p-4 sm:p-8 rounded-lg border border-white/20">
               <form onSubmit={handleSearch} className="space-y-6">
                 <div className="space-y-2">
                   <Input
@@ -521,7 +521,7 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
                     className="bg-transparent border-white border-opacity-20 text-white placeholder-gray-400 text-center"
                     required
                     />
-                    <p className="text-sm text-gray-400 text-center">
+                    <p className="text-xs sm:text-sm text-gray-400 text-center">
                     Enter your unique code from the invitation or search by your name
                   </p>
                 </div>
@@ -543,14 +543,14 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                 >
-                  <div className="bg-black/30 p-8 rounded-lg border border-white/20">
-                    <h3 className="text-2xl font-semibold text-white mb-4">Thank You for Your Response!</h3>
+                  <div className="bg-black/30 p-4 sm:p-8 rounded-lg border border-white/20">
+                    <h3 className="text-xl sm:text-2xl font-semibold text-white mb-4">Thank You for Your Response!</h3>
                     {allNotAttending ? (
-                    <p className="text-white mb-6">We're sorry you won't be able to join us, but thank you for letting us know.</p>
+                    <p className="text-white mb-6 text-sm sm:text-base">We're sorry you won't be able to join us, but thank you for letting us know.</p>
                     ) : (
-                    <p className="text-white mb-6">We're excited to celebrate with you! We'll be in touch with more details as the day approaches.</p>
+                    <p className="text-white mb-6 text-sm sm:text-base">We're excited to celebrate with you! We'll be in touch with more details as the day approaches.</p>
                     )}
-                    <p className="text-sm text-gray-300 mb-6">
+                    <p className="text-xs sm:text-sm text-gray-300 mb-6">
                     You can modify your response anytime before the deadline using your household code:
                     <br />
                     <span className="font-mono font-bold text-white">{household?.code}</span>
@@ -558,7 +558,7 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
                     <div className="space-y-4">
                       <Button 
                         onClick={handleModifyResponse}
-                        className="bg-white text-black hover:bg-gray-200"
+                        className="w-full sm:w-auto bg-white text-black hover:bg-gray-200"
                       >
                         Modify Response
                       </Button>
@@ -578,7 +578,7 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
                             // Use our reliable close handler
                             handleCloseModal();
                           }}
-                          className="w-full bg-green-600 text-white hover:bg-green-700"
+                          className="w-full bg-green-600 text-black font-medium hover:bg-green-700 hover:text-white"
                         >
                           Close and View Wedding Details
                         </Button>

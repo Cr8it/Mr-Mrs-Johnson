@@ -570,21 +570,21 @@ export default function GuestForm({ household, onBack, onSuccess, parentOnClose 
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
             >
-            <div className="flex items-center justify-between space-x-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between sm:space-x-8 space-y-3 sm:space-y-0">
               <h3 className="text-xl font-semibold text-white">{guest.name}</h3>
-              <div className="flex items-center space-x-8">
-              <span className={`text-sm transition-colors ${guest.isAttending === false ? 'text-white font-medium' : 'text-gray-400'}`}>
-                Not Attending
-              </span>
-              <div className="flex items-center">
-                <Switch
-                checked={guest.isAttending === true}
-                onCheckedChange={(checked) => handleAttendanceChange(guest.id, checked)}
-                />
-              </div>
-              <span className={`text-sm transition-colors ${guest.isAttending === true ? 'text-white font-medium' : 'text-gray-400'}`}>
-                Attending
-              </span>
+              <div className="flex items-center justify-between sm:justify-end space-x-3 sm:space-x-4">
+                <span className={`text-sm transition-colors ${guest.isAttending === false ? 'text-white font-medium' : 'text-gray-400'}`}>
+                  Not Attending
+                </span>
+                <div className="flex items-center">
+                  <Switch
+                    checked={guest.isAttending === true}
+                    onCheckedChange={(checked) => handleAttendanceChange(guest.id, checked)}
+                  />
+                </div>
+                <span className={`text-sm transition-colors ${guest.isAttending === true ? 'text-white font-medium' : 'text-gray-400'}`}>
+                  Attending
+                </span>
               </div>
             </div>
 
@@ -713,7 +713,7 @@ export default function GuestForm({ household, onBack, onSuccess, parentOnClose 
                 ))}
 
                 {/* Then Meal and Dessert Options */}
-                <div>
+                <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                     Meal Preference <span className="text-red-500">*</span>
                     </label>
@@ -722,7 +722,7 @@ export default function GuestForm({ household, onBack, onSuccess, parentOnClose 
                     onValueChange={(value) => handleMealChoice(guest.id, value)}
                     >
                     <SelectTrigger 
-                      className={`bg-transparent border-white border-opacity-20 text-white h-12 ${
+                      className={`w-full bg-transparent border-white border-opacity-20 text-white h-12 ${
                       validationErrors[guest.id]?.includes('Meal choice is required') 
                         ? 'border-red-500' 
                         : ''
@@ -733,7 +733,7 @@ export default function GuestForm({ household, onBack, onSuccess, parentOnClose 
                     {validationErrors[guest.id]?.includes('Meal choice is required') && (
                       <p className="text-red-500 text-sm mt-1">Please select a meal option</p>
                     )}
-                  <SelectContent className="bg-black border border-white border-opacity-20 text-white" sideOffset={5}>
+                  <SelectContent className="bg-black border border-white border-opacity-20 text-white max-h-[50vh] overflow-auto" position="popper" sideOffset={5}>
                     {process.env.NODE_ENV === 'development' && (
                       <div className="p-2 bg-blue-900/30 mb-2 text-xs">
                         <p>Using {guest.isChild ? "child" : "adult"} meal options</p>
@@ -753,7 +753,7 @@ export default function GuestForm({ household, onBack, onSuccess, parentOnClose 
                   </Select>
                 </div>
 
-                <div>
+                <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                     Dessert Choice <span className="text-red-500">*</span>
                     </label>
@@ -762,7 +762,7 @@ export default function GuestForm({ household, onBack, onSuccess, parentOnClose 
                     onValueChange={(value) => handleDessertChoice(guest.id, value)}
                     >
                     <SelectTrigger 
-                      className={`bg-transparent border-white border-opacity-20 text-white h-12 ${
+                      className={`w-full bg-transparent border-white border-opacity-20 text-white h-12 ${
                         validationErrors[guest.id]?.includes('Dessert choice is required') 
                           ? 'border-red-500' 
                           : ''
@@ -773,7 +773,7 @@ export default function GuestForm({ household, onBack, onSuccess, parentOnClose 
                     {validationErrors[guest.id]?.includes('Dessert choice is required') && (
                       <p className="text-red-500 text-sm mt-1">Please select a dessert option</p>
                     )}
-                    <SelectContent className="bg-black border border-white border-opacity-20 text-white" sideOffset={5}>
+                    <SelectContent className="bg-black border border-white border-opacity-20 text-white max-h-[50vh] overflow-auto" position="popper" sideOffset={5}>
                       {process.env.NODE_ENV === 'development' && (
                         <div className="p-2 bg-blue-900/30 mb-2 text-xs">
                           <p>Using {guest.isChild ? "child" : "adult"} dessert options</p>

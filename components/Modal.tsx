@@ -77,7 +77,7 @@ export default function Modal({ isOpen, onClose, children, allowClose = false, a
           exit={{ opacity: 0 }}
           className="fixed inset-0 bg-black/95 z-50 overflow-y-auto"
         >
-          <div className="min-h-screen flex items-center justify-center p-4">
+          <div className="min-h-screen flex items-center justify-center p-2 sm:p-4">
             <MotionDiv
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -88,12 +88,14 @@ export default function Modal({ isOpen, onClose, children, allowClose = false, a
               {onClose && (!allowClose || (allowClose && !allNotAttending)) && (
                 <button
                   onClick={handleClose}
-                  className="fixed top-4 right-4 text-white hover:text-gray-300 z-[60] bg-black/50 px-4 py-2 rounded-lg transition-colors duration-200 hover:bg-black/70"
+                  className="fixed top-2 right-2 sm:top-4 sm:right-4 text-white hover:text-gray-300 z-[60] bg-black/50 px-3 py-1 sm:px-4 sm:py-2 rounded-lg transition-colors duration-200 hover:bg-black/70 text-sm sm:text-base"
                 >
                   Close
                 </button>
               )}
-              {children}
+              <div className="overflow-x-hidden">
+                {children}
+              </div>
             </MotionDiv>
           </div>
         </MotionDiv>
