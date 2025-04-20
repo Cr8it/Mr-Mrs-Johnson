@@ -3,38 +3,65 @@ import { Play, Pause } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 export default function AudioPlayer() {
-  const [isPlaying, setIsPlaying] = useState(true)
+  // Initialize state from localStorage or default to true
+  const [isPlaying, setIsPlaying] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('audioPlayerState')
+      return saved ? JSON.parse(saved) : true
+    }
+    return true
+  })
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
+  // Initialize audio on mount
   useEffect(() => {
-    // Create audio element
-    audioRef.current = new Audio('/background-music.mp3')
-    audioRef.current.loop = true
-    audioRef.current.volume = 0.6
-    
-    // Start playing automatically
-    audioRef.current.play().catch(error => {
-      console.log('Auto-play prevented:', error)
-      setIsPlaying(false)
-    })
+    if (!audioRef.current) {
+      audioRef.current = new Audio('/background-music.mp3')
+      audioRef.current.loop = true
+      audioRef.current.volume = 0.6
+    }
 
+    // Try to play if isPlaying is true
+    if (isPlaying) {
+      const playPromise = audioRef.current.play()
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.log('Auto-play prevented:', error)
+          setIsPlaying(false)
+          localStorage.setItem('audioPlayerState', 'false')
+        })
+      }
+    }
+
+    // Cleanup function
     return () => {
       if (audioRef.current) {
         audioRef.current.pause()
-        audioRef.current = null
       }
     }
-  }, [])
+  }, []) // Empty dependency array for mount only
 
-  const togglePlay = () => {
+  // Handle play state changes
+  useEffect(() => {
     if (audioRef.current) {
       if (isPlaying) {
-        audioRef.current.pause()
+        const playPromise = audioRef.current.play()
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.log('Play prevented:', error)
+            setIsPlaying(false)
+          })
+        }
       } else {
-        audioRef.current.play()
+        audioRef.current.pause()
       }
-      setIsPlaying(!isPlaying)
+      // Save state to localStorage
+      localStorage.setItem('audioPlayerState', JSON.stringify(isPlaying))
     }
+  }, [isPlaying])
+
+  const togglePlay = () => {
+    setIsPlaying(!isPlaying)
   }
 
   return (
