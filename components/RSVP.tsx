@@ -52,12 +52,21 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
   // Create a state to store the onClose function
   const [storedOnClose, setStoredOnClose] = useState<(() => void) | undefined>(onClose);
 
-  // Update the stored function when the prop changes
+  // Store a flag in localStorage to indicate if we have a parent close function
   useEffect(() => {
-    console.log("onClose prop changed:", !!onClose);
+    const hasOnClose = !!onClose;
+    localStorage.setItem('rsvp-has-parent-close', hasOnClose ? 'true' : 'false');
+    console.log("RSVP component mounted, hasOnClose:", hasOnClose);
+    
+    // Update the stored function when the prop changes
     if (onClose) {
       setStoredOnClose(() => onClose);
     }
+    
+    return () => {
+      // Clean up when component unmounts
+      console.log("RSVP component unmounting, cleaning up");
+    };
   }, [onClose]);
 
   // This ensures we always have access to the latest onClose function
@@ -82,9 +91,14 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
     const hasParentClose = localStorage.getItem('rsvp-has-parent-close');
     if (hasParentClose === 'true') {
       console.log("Parent close function exists but can't be accessed directly. Forcing page reload.");
+      // Set a flag to indicate we need to return to home page
+      localStorage.setItem('rsvp-completed', 'true');
+      // Force a reload to the home page
       window.location.href = '/';
     } else {
       console.error("No close function available!");
+      // As a last resort, try to navigate anyway
+      window.location.href = '/';
     }
   };
 
@@ -344,6 +358,9 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
     setAllNotAttending(notAttending);
     localStorage.setItem('rsvp-attendance', JSON.stringify({ allNotAttending: notAttending }));
     
+    // Store that we've completed RSVP
+    localStorage.setItem('rsvp-completed', 'true');
+    
     // Notify parent components about attendance status
     if (onRSVPStatus) {
       onRSVPStatus(notAttending);
@@ -476,7 +493,8 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
                       onCloseType: typeof onClose,
                       storedOnCloseType: typeof storedOnClose,
                       hasOnClose: !!onClose,
-                      hasStoredOnClose: !!storedOnClose 
+                      hasStoredOnClose: !!storedOnClose,
+                      hasLocalStorageFlag: localStorage.getItem('rsvp-has-parent-close') === 'true'
                     });
                     
                     // Use our reliable close handler

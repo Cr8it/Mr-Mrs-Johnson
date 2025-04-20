@@ -15,6 +15,11 @@ const MotionDiv = motion.div
 
 export default function Modal({ isOpen, onClose, children, allowClose = false, allNotAttending = false }: ModalProps) {
   useEffect(() => {
+    // Mark that we have a modal with close functionality
+    if (onClose) {
+      localStorage.setItem('modal-has-close-function', 'true');
+    }
+
     if (isOpen) {
       document.body.style.overflow = 'hidden';
     } else {
@@ -23,20 +28,43 @@ export default function Modal({ isOpen, onClose, children, allowClose = false, a
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen]);
+  }, [isOpen, onClose]);
 
   const handleClose = () => {
     console.log("*** MODAL HANDLE CLOSE CALLED ***");
     console.log("Modal props:", { isOpen, allowClose, allNotAttending, hasOnClose: !!onClose });
     
+    // Force the modal to close by resetting body overflow
+    document.body.style.overflow = 'unset';
+    
     if (onClose) {
       console.log("Calling Modal onClose function");
-      // Force the modal to close regardless of conditions
-      document.body.style.overflow = 'unset';
-      onClose();
-      console.log("Modal onClose function called successfully");
+      try {
+        // Call the provided onClose function
+        onClose();
+        console.log("Modal onClose function called successfully");
+      } catch (error) {
+        console.error("Error calling onClose:", error);
+        
+        // As a fallback, try to redirect to home page
+        try {
+          window.location.href = '/';
+        } catch (navError) {
+          console.error("Navigation fallback also failed:", navError);
+        }
+      }
     } else {
       console.error("Modal onClose function is not defined!");
+      
+      // If we've RSVPed successfully but can't close, try to navigate home
+      if (allowClose && !allNotAttending) {
+        console.log("Attempting to navigate to home as fallback");
+        try {
+          window.location.href = '/';
+        } catch (navError) {
+          console.error("Navigation fallback failed:", navError);
+        }
+      }
     }
   };
 

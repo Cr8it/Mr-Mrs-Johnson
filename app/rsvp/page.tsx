@@ -15,6 +15,14 @@ export default function RsvpPage() {
   // Add debugging for initial state
   useEffect(() => {
     console.log("RsvpPage initial state:", { isConfirmed, hasRSVPed, isOpen, allNotAttending })
+    
+    // Check if we've already completed RSVP
+    const rsvpCompleted = localStorage.getItem('rsvp-completed') === 'true';
+    if (rsvpCompleted) {
+      console.log("RSVP was previously completed, setting state accordingly");
+      setHasRSVPed(true);
+      setIsConfirmed(true);
+    }
   }, [])
 
   useEffect(() => {
@@ -37,6 +45,11 @@ export default function RsvpPage() {
         const { allNotAttending: savedNotAttending } = JSON.parse(savedAttendance)
         console.log("Found saved attendance:", { savedNotAttending })
         setAllNotAttending(savedNotAttending)
+        
+        // If we have saved attendance, we've likely RSVPed
+        if (localStorage.getItem('rsvp-code')) {
+          setHasRSVPed(true)
+        }
       } catch (error) {
         console.error('Error parsing saved attendance:', error)
       }
@@ -76,6 +89,7 @@ export default function RsvpPage() {
       // Use a very short timeout to ensure the state updates
       setTimeout(() => {
         console.log("Timeout complete - navigating to home page");
+        localStorage.setItem('rsvp-completed', 'true'); // Mark as completed
         router.push("/");
       }, 100);
     } else {
@@ -92,7 +106,12 @@ export default function RsvpPage() {
     setAllNotAttending(notAttending);
   }
 
-  if (!isOpen) return null;
+  // If already confirmed or not open, don't show the modal
+  if (!isOpen || (isConfirmed && hasRSVPed && !allNotAttending)) {
+    console.log("Not showing RSVP modal - redirecting to home");
+    router.push("/");
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 z-50">
