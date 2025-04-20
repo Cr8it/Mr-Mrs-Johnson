@@ -8,6 +8,7 @@ import LockedPage from "@/components/LockedPage"
 import { usePathname, useRouter } from "next/navigation"
 import { RSVPProvider } from "@/context/RSVPContext"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import AudioPlayer from "@/components/AudioPlayer"
 
 const cormorant = Cormorant_Garamond({
   subsets: ["latin"],
@@ -114,7 +115,10 @@ export default function RootLayout({
                 <LockedPage onUnlock={handleUnlock} />
                 </div>
               ) : (
-                children
+                <>
+                <AudioPlayer />
+                {children}
+                </>
               )}
               </>
             )}
