@@ -8,6 +8,7 @@ import RSVP from "@/components/RSVP"
 import ModifyRSVP from "@/components/ModifyRSVP"
 import OurStory from "../components/OurStory"
 import Schedule from "../components/Schedule"
+import Registry from "../components/Registry"
 import DreamTeam from "../components/DreamTeam"
 import Footer from "../components/Footer"
 import { CountdownTimer } from "../components/CountdownTimer"
@@ -104,6 +105,7 @@ export default function Home() {
       <div className="container mx-auto px-4">
         <OurStory />
         <Schedule />
+        <Registry />
         <DreamTeam />
         <PhotoGallery />
       </div>
