@@ -622,10 +622,17 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
         <Pagination className="mt-6">
           <PaginationContent>
             <PaginationItem>
-              <PaginationPrevious 
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-              />
+              {currentPage > 1 ? (
+                <PaginationPrevious 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                />
+              ) : (
+                <PaginationPrevious 
+                  className="pointer-events-none opacity-50"
+                  tabIndex={-1}
+                  aria-disabled="true"
+                />
+              )}
             </PaginationItem>
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
               <PaginationItem key={page}>
@@ -638,10 +645,17 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
               </PaginationItem>
             ))}
             <PaginationItem>
-              <PaginationNext
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-              />
+              {currentPage < totalPages ? (
+                <PaginationNext
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                />
+              ) : (
+                <PaginationNext
+                  className="pointer-events-none opacity-50"
+                  tabIndex={-1}
+                  aria-disabled="true"
+                />
+              )}
             </PaginationItem>
           </PaginationContent>
         </Pagination>
