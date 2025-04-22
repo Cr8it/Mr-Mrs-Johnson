@@ -10,6 +10,7 @@ import OurStory from "../components/OurStory"
 import Schedule from "../components/Schedule"
 import Registry from "../components/Registry"
 import DreamTeam from "../components/DreamTeam"
+import QandA from "../components/QandA"
 import Footer from "../components/Footer"
 import { CountdownTimer } from "../components/CountdownTimer"
 import AnimatedBackground from "../components/AnimatedBackground"
@@ -107,6 +108,7 @@ export default function Home() {
         <Schedule />
         <Registry />
         <DreamTeam />
+        <QandA />
         <PhotoGallery />
       </div>
       
