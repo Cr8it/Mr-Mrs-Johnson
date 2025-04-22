@@ -31,8 +31,9 @@ export default function OurStory() {
               <Image
                 src={images.couple.story1 || "/placeholder.svg"}
                 alt="Jermaine and Sarah"
-                width={500}
-                height={700}
+                width={800}
+                height={1067}
+                priority
                 className="rounded-lg shadow-2xl object-cover w-full h-auto mx-auto"
               />
             </div>
