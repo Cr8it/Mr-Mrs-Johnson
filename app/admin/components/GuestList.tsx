@@ -78,6 +78,7 @@ interface Guest {
     name: string
   } | null
   dietaryNotes: string | null
+  isChild?: boolean
   responses: Array<{
     questionId: string
     answer: string
@@ -682,7 +683,17 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
           setSelectedGuest(null)
         }}
         onSubmit={handleGuestSubmit}
-        initialData={selectedGuest || undefined}
+        initialData={selectedGuest ? {
+          id: selectedGuest.id,
+          name: selectedGuest.name,
+          email: selectedGuest.email || "",
+          householdName: selectedGuest.household.name,
+          isAttending: selectedGuest.isAttending,
+          mealChoice: selectedGuest.mealChoice,
+          dessertChoice: selectedGuest.dessertChoice,
+          dietaryNotes: selectedGuest.dietaryNotes || "",
+          isChild: selectedGuest.isChild === true
+        } : undefined}
         mode={selectedGuest ? 'edit' : 'create'}
       />
     </div>
