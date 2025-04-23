@@ -4,20 +4,21 @@ import { motion } from "framer-motion"
 import GuestList from "../components/GuestList"
 import { CsvUploadModal } from "../components/CsvUploadModal"
 import TextImportModal from "../components/TextImportModal"
-import { useState } from "react"
+import GuestForm from "../components/GuestForm"
+import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { FileText, Clipboard, Upload, ChevronDown, PlusCircle, Plus, Users } from "lucide-react"
+import { FileText, Clipboard, Upload, ChevronDown, Plus, Users } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import Link from "next/link"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function GuestsPage() {
-  const [isCsvModalOpen, setIsCsvModalOpen] = useState(false)
-  const [isTextModalOpen, setIsTextModalOpen] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [textImportOpen, setTextImportOpen] = useState(false)
   const [createGuestOpen, setCreateGuestOpen] = useState(false)
   const [guestCount, setGuestCount] = useState(0)
+  const guestListRef = useRef<any>(null)
+  const { toast } = useToast()
 
   const handleUploadSuccess = () => {
     // Refresh the guest list
@@ -26,6 +27,25 @@ export default function GuestsPage() {
 
   const handleGuestCountChange = (count: number) => {
     setGuestCount(count)
+  }
+  
+  const handleGuestSubmit = async (data: any) => {
+    try {
+      toast({
+        title: "Success",
+        description: "Guest added successfully",
+      })
+      
+      // Refresh the guest list
+      window.location.reload()
+    } catch (error) {
+      console.error("Submit error:", error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to add guest",
+      })
+    }
   }
 
   return (
@@ -70,7 +90,10 @@ export default function GuestsPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <GuestList onGuestCountChange={handleGuestCountChange} />
+        <GuestList 
+          onGuestCountChange={handleGuestCountChange}
+          ref={guestListRef}
+        />
       </motion.div>
       
       <TextImportModal 
@@ -83,6 +106,19 @@ export default function GuestsPage() {
         isOpen={uploadOpen}
         onClose={() => setUploadOpen(false)}
         onUpload={handleUploadSuccess}
+      />
+      
+      <GuestForm
+        isOpen={createGuestOpen}
+        onClose={() => setCreateGuestOpen(false)}
+        onSubmit={handleGuestSubmit}
+        mode="create"
+        initialData={{
+          name: "",
+          email: "",
+          householdName: "",
+          isChild: false
+        }}
       />
     </div>
   )

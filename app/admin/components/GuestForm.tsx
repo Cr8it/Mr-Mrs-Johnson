@@ -74,10 +74,11 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
   const { toast } = useToast()
 
   useEffect(() => {
-    if (mode === 'edit') {
+    if (isOpen) {
       fetchOptions()
+      console.log("GuestForm opened, mode:", mode, "initialData:", initialData)
     }
-  }, [mode])
+  }, [isOpen, mode])
 
   useEffect(() => {
     if (initialData) {
@@ -94,12 +95,14 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
 
   const fetchOptions = async () => {
     try {
+      console.log("Fetching meal and dessert options...")
       const response = await fetch('/api/rsvp/options')
       if (!response.ok) throw new Error('Failed to fetch options')
       const data = await response.json()
-      setMealOptions(data.mealOptions)
+      console.log("Options received:", data)
+      setMealOptions(data.mealOptions || [])
       setChildMealOptions(data.childMealOptions || [])
-      setDessertOptions(data.dessertOptions)
+      setDessertOptions(data.dessertOptions || [])
       setChildDessertOptions(data.childDessertOptions || [])
     } catch (error) {
       console.error('Fetch options error:', error)
@@ -224,7 +227,9 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) onClose()
+    }}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold flex items-center gap-2">
