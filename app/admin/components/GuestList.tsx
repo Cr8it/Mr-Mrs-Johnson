@@ -551,6 +551,15 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
           <Button
             variant="outline"
             size="sm"
+            onClick={handleSendToAll}
+            className="flex items-center gap-1"
+          >
+            <Mail className="h-4 w-4" />
+            Send Invites to All
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setIsUploadModalOpen(true)}
             className="flex items-center gap-1"
           >
