@@ -38,7 +38,10 @@ import {
   Users,
   Filter,
   SortAsc,
-  SortDesc
+  SortDesc,
+  Home,
+  MailCheck,
+  MailX
 } from "lucide-react"
 import {
   Select,
@@ -53,6 +56,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card"
 import {
   Pagination,
@@ -63,6 +67,12 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 interface Guest {
   id: string
@@ -79,6 +89,8 @@ interface Guest {
   } | null
   dietaryNotes: string | null
   isChild?: boolean
+  emailSent?: boolean
+  emailSentAt?: string | null
   responses: Array<{
     questionId: string
     answer: string
@@ -121,6 +133,7 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [expandedHouseholds, setExpandedHouseholds] = useState<Set<string>>(new Set())
   const { toast } = useToast()
+  const [openActionMenu, setOpenActionMenu] = useState<string | null>(null)
 
   useEffect(() => {
     fetchGuests()
@@ -340,39 +353,57 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
   };
 
   const handleSendInvite = async (guest: Guest) => {
-    if (!guest.email) {
-      toast({
-        variant: "destructive",
-        title: "❌ Error",
-        description: "Guest has no email address",
-      });
-      return;
-    }
+    setLoading(true);
+    toast.promise(
+      (async () => {
+        try {
+          const response = await fetch(`/api/admin/guests/send-invite`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ guestId: guest.id }),
+          });
 
-    try {
-      const response = await fetch("/api/admin/guests/send-invite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ guestId: guest.id }),
-      });
+          if (!response.ok) {
+            const error = await response.text();
+            throw new Error(`Failed to send invite: ${error}`);
+          }
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to send invite");
+          const result = await response.json();
+          
+          // Update the guest in the guests list with the new email status
+          setHouseholds(prevHouseholds => prevHouseholds.map(h => ({
+            ...h,
+            guests: h.guests.map(g =>
+              g.id === guest.id
+                ? { ...g, emailSent: result.emailSent, emailSentAt: result.emailSentAt }
+                : g
+            )
+          }))))
+          setFilteredHouseholds(prevFilteredHouseholds => prevFilteredHouseholds.map(h => ({
+            ...h,
+            guests: h.guests.map(g =>
+              g.id === guest.id
+                ? { ...g, emailSent: result.emailSent, emailSentAt: result.emailSentAt }
+                : g
+            )
+          }))))
+
+          setLoading(false);
+          return result;
+        } catch (error) {
+          console.error('Error sending invite:', error);
+          setLoading(false);
+          throw error;
+        }
+      })(),
+      {
+        loading: 'Sending invite...',
+        success: 'Invite sent successfully',
+        error: (err) => `Error: ${err.message}`,
       }
-
-      toast({
-        title: "Success",
-        description: `Invite sent to ${guest.name}`,
-      });
-    } catch (error) {
-      console.error("Send invite error:", error);
-      toast({
-        variant: "destructive",
-        title: "❌ Error",
-        description: error instanceof Error ? error.message : "Failed to send invite",
-      });
-    }
+    );
   };
 
   const handleGuestSubmit = async (data: any) => {
@@ -487,7 +518,7 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
 
   return (
     <div className="space-y-6">
-      {/* Search and Filters */}
+      {/* Actions Bar */}
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
         <div className="relative flex-1 w-full sm:max-w-xs">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -498,7 +529,75 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
             className="pl-10"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap justify-end">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button onClick={() => setIsGuestFormOpen(true)} size="sm">
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Add Guest
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Add a new guest</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  onClick={() => setIsUploadModalOpen(true)} 
+                  variant="outline" 
+                  size="sm"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload CSV
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Import guests from CSV file</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  onClick={handleExport} 
+                  variant="outline" 
+                  size="sm"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Export guest list to CSV</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  onClick={handleSendToAll} 
+                  variant="outline" 
+                  size="sm"
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Send All
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Send invites to all guests with emails</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
           <Select value={sortField} onValueChange={(value: any) => handleSort(value)}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Sort by" />
@@ -519,6 +618,13 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
         </div>
       </div>
 
+      {/* Pagination Info */}
+      {filteredHouseholds.length > 0 && (
+        <div className="text-sm text-muted-foreground">
+          Showing {Math.min(filteredHouseholds.length, (currentPage - 1) * GUESTS_PER_PAGE + 1)} to {Math.min(filteredHouseholds.length, currentPage * GUESTS_PER_PAGE)} of {filteredHouseholds.length} households
+        </div>
+      )}
+
       {/* Households List */}
       <AnimatePresence>
         {paginatedHouseholds.map((household) => (
@@ -527,12 +633,13 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="mb-4"
+            className="mb-6"
           >
-            <Card>
-              <CardHeader className="cursor-pointer" onClick={() => toggleHousehold(household.code)}>
+            <Card className="border-l-4 border-l-gold shadow-md">
+              <CardHeader className="cursor-pointer bg-gray-50 pb-3 rounded-t-lg" onClick={() => toggleHousehold(household.code)}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
+                    <Home className="h-5 w-5 text-gold" />
                     <CardTitle className="text-xl">{household.name}</CardTitle>
                     <Badge variant="outline" className="flex items-center gap-1">
                       <Users className="h-3 w-3" />
@@ -550,67 +657,131 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
                     <ChevronDown className="h-5 w-5" />
                   }
                 </div>
-                <CardDescription>Code: {household.code}</CardDescription>
+                <CardDescription className="flex items-center mt-1">
+                  <span className="font-medium mr-2">Code:</span>
+                  <Badge variant="outline" className="font-mono">{household.code}</Badge>
+                </CardDescription>
               </CardHeader>
 
               {expandedHouseholds.has(household.code) && (
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Meal Choice</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {household.guests.map((guest) => (
-                        <TableRow key={guest.id}>
-                          <TableCell>{guest.name}</TableCell>
-                          <TableCell>{guest.email || '-'}</TableCell>
-                          <TableCell>
-                            <RsvpStatus status={guest.isAttending} />
-                          </TableCell>
-                          <TableCell>
-                            {guest.isAttending ? (
-                              guest.mealChoice?.name || 'Not selected'
-                            ) : (
-                              '-'
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleEditGuest(guest)}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              {guest.email && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleSendInvite(guest)}
-                                >
-                                  <Mail className="h-4 w-4" />
-                                </Button>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDeleteGuest(guest.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
+                <CardContent className="pt-4">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader className="bg-gray-50 sticky top-0">
+                        <TableRow>
+                          <TableHead className="w-1/4">Name</TableHead>
+                          <TableHead className="w-1/5">Email</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Meal Choice</TableHead>
+                          <TableHead>Email Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {household.guests.map((guest) => (
+                          <TableRow key={guest.id} className="hover:bg-gray-50">
+                            <TableCell className="font-medium">
+                              {guest.name}
+                              {guest.isChild && (
+                                <Badge variant="outline" className="ml-2 text-xs bg-blue-50">Child</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>{guest.email || '-'}</TableCell>
+                            <TableCell>
+                              <RsvpStatus status={guest.isAttending} />
+                            </TableCell>
+                            <TableCell>
+                              {guest.isAttending ? (
+                                <>
+                                  <div>{guest.mealChoice?.name || 'Not selected'}</div>
+                                  {guest.dessertChoice && (
+                                    <div className="text-xs text-muted-foreground mt-1">
+                                      Dessert: {guest.dessertChoice.name}
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                '-'
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {guest.email ? (
+                                guest.emailSent ? (
+                                  <Badge variant="default" className="bg-green-600 flex items-center gap-1">
+                                    <MailCheck className="h-3 w-3" />
+                                    <span>Sent {guest.emailSentAt ? new Date(guest.emailSentAt).toLocaleDateString() : ''}</span>
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="secondary" className="flex items-center gap-1">
+                                    <MailX className="h-3 w-3" />
+                                    <span>Not sent</span>
+                                  </Badge>
+                                )
+                              ) : (
+                                <Badge variant="outline">No email</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleEditGuest(guest)}
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Edit guest</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                                
+                                {guest.email && !guest.emailSent && (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => handleSendInvite(guest)}
+                                        >
+                                          <Mail className="h-4 w-4" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>Send invite email</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
+                                
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleDeleteGuest(guest.id)}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Delete guest</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </CardContent>
               )}
             </Card>
@@ -618,54 +789,67 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
         ))}
       </AnimatePresence>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <Pagination className="mt-6">
-          <PaginationContent>
-            <PaginationItem>
-              {currentPage > 1 ? (
-                <PaginationPrevious 
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                />
-              ) : (
-                <PaginationPrevious 
-                  className="pointer-events-none opacity-50"
-                  tabIndex={-1}
-                  aria-disabled="true"
-                />
-              )}
-            </PaginationItem>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-              <PaginationItem key={page}>
-                <PaginationLink
-                  onClick={() => setCurrentPage(page)}
-                  isActive={currentPage === page}
-                >
-                  {page}
-                </PaginationLink>
-              </PaginationItem>
-            ))}
-            <PaginationItem>
-              {currentPage < totalPages ? (
-                <PaginationNext
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                />
-              ) : (
-                <PaginationNext
-                  className="pointer-events-none opacity-50"
-                  tabIndex={-1}
-                  aria-disabled="true"
-                />
-              )}
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      )}
-
       {/* No Results */}
       {filteredHouseholds.length === 0 && (
-        <div className="text-center py-8">
-          <p className="text-gray-500">No households found matching your search.</p>
+        <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
+          <Users className="h-12 w-12 mx-auto text-gray-400 mb-3" />
+          <p className="text-gray-500 font-medium">No households found matching your search.</p>
+          <p className="text-gray-400 text-sm mt-1">Try a different search term or add new guests.</p>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-6 flex flex-col items-center">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                {currentPage > 1 ? (
+                  <PaginationPrevious 
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    className="border border-gray-200"
+                  />
+                ) : (
+                  <PaginationPrevious 
+                    className="pointer-events-none opacity-50 border border-gray-200"
+                    tabIndex={-1}
+                    aria-disabled="true"
+                  />
+                )}
+              </PaginationItem>
+              
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <PaginationItem key={page}>
+                  <PaginationLink
+                    onClick={() => setCurrentPage(page)}
+                    isActive={currentPage === page}
+                    className={currentPage === page ? "bg-gold text-white" : "border border-gray-200"}
+                  >
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+              
+              <PaginationItem>
+                {currentPage < totalPages ? (
+                  <PaginationNext
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    className="border border-gray-200"
+                  />
+                ) : (
+                  <PaginationNext
+                    className="pointer-events-none opacity-50 border border-gray-200"
+                    tabIndex={-1}
+                    aria-disabled="true"
+                  />
+                )}
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+          
+          <div className="text-sm text-muted-foreground mt-2">
+            Page {currentPage} of {totalPages}
+          </div>
         </div>
       )}
 
