@@ -5,7 +5,7 @@ import GuestList from "../components/GuestList"
 import { CsvUploadModal } from "../components/CsvUploadModal"
 import TextImportModal from "../components/TextImportModal"
 import GuestForm from "../components/GuestForm"
-import { useState, useRef } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { FileText, Clipboard, Upload, ChevronDown, Plus, Users } from "lucide-react"
@@ -17,7 +17,6 @@ export default function GuestsPage() {
   const [textImportOpen, setTextImportOpen] = useState(false)
   const [createGuestOpen, setCreateGuestOpen] = useState(false)
   const [guestCount, setGuestCount] = useState(0)
-  const guestListRef = useRef<any>(null)
   const { toast } = useToast()
 
   const handleUploadSuccess = () => {
@@ -92,7 +91,6 @@ export default function GuestsPage() {
       >
         <GuestList 
           onGuestCountChange={handleGuestCountChange}
-          ref={guestListRef}
         />
       </motion.div>
       
