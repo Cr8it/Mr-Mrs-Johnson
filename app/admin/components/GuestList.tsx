@@ -106,7 +106,7 @@ interface GuestListProps {
   onGuestCountChange?: (count: number) => void
 }
 
-const GUESTS_PER_PAGE = 5; // Number of households per page
+const GUESTS_PER_PAGE = 8; // Increased from 5 to 8 households per page
 
 export default function GuestList({ onGuestCountChange }: GuestListProps) {
   const [households, setHouseholds] = useState<Household[]>([])
@@ -487,8 +487,8 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
 
   return (
     <div className="space-y-6">
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+      {/* Search, Filters, and Action Buttons */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative flex-1 w-full sm:max-w-xs">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
@@ -498,174 +498,293 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
             className="pl-10"
           />
         </div>
-        <div className="flex gap-2">
-          <Select value={sortField} onValueChange={(value: any) => handleSort(value)}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Sort by" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="name">Household Name</SelectItem>
-              <SelectItem value="guests">Number of Guests</SelectItem>
-              <SelectItem value="responses">Response Rate</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex flex-wrap gap-2 justify-end">
           <Button
             variant="outline"
-            size="icon"
-            onClick={() => handleSort(sortField)}
+            size="sm"
+            onClick={() => setIsGuestFormOpen(true)}
+            className="flex items-center gap-1"
           >
-            {sortDirection === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
+            <UserPlus className="h-4 w-4" />
+            Add Guest
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsUploadModalOpen(true)}
+            className="flex items-center gap-1"
+          >
+            <Upload className="h-4 w-4" />
+            Upload CSV
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            className="flex items-center gap-1"
+          >
+            <Download className="h-4 w-4" />
+            Export
           </Button>
         </div>
       </div>
 
+      {/* Sort Controls */}
+      <div className="flex flex-wrap items-center gap-2 bg-gray-50 dark:bg-gray-900 p-3 rounded-lg">
+        <span className="text-sm font-medium">Sort by:</span>
+        <Select value={sortField} onValueChange={(value: any) => handleSort(value)}>
+          <SelectTrigger className="w-[180px] h-9">
+            <SelectValue placeholder="Sort by" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="name">Household Name</SelectItem>
+            <SelectItem value="guests">Number of Guests</SelectItem>
+            <SelectItem value="responses">Response Rate</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-9 w-9"
+          onClick={() => handleSort(sortField)}
+        >
+          {sortDirection === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
+        </Button>
+        
+        <div className="ml-auto text-sm text-gray-500">
+          Showing {filteredHouseholds.length > 0 ? 
+            `${Math.min((currentPage - 1) * GUESTS_PER_PAGE + 1, filteredHouseholds.length)} - ${Math.min(currentPage * GUESTS_PER_PAGE, filteredHouseholds.length)}` : '0'} 
+          of {filteredHouseholds.length} households
+        </div>
+      </div>
+
       {/* Households List */}
-      <AnimatePresence>
-        {paginatedHouseholds.map((household) => (
-          <motion.div
-            key={household.code}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="mb-4"
-          >
-            <Card>
-              <CardHeader className="cursor-pointer" onClick={() => toggleHousehold(household.code)}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <CardTitle className="text-xl">{household.name}</CardTitle>
-                    <Badge variant="outline" className="flex items-center gap-1">
-                      <Users className="h-3 w-3" />
-                      {household.guests.length}
-                    </Badge>
-                    <Badge 
-                      variant={getResponseBadgeVariant(household)}
-                      className="flex items-center gap-1"
-                    >
-                      {getResponseRate(household)}% Responded
-                    </Badge>
+      <div className="grid gap-4">
+        <AnimatePresence>
+          {paginatedHouseholds.map((household) => (
+            <motion.div
+              key={household.code}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <Card className={`border-l-4 ${
+                getResponseRate(household) === 100 
+                  ? 'border-l-green-500' 
+                  : getResponseRate(household) > 0 
+                    ? 'border-l-amber-500' 
+                    : 'border-l-red-500'
+              } transition-all duration-200 hover:shadow-md`}>
+                <CardHeader className="cursor-pointer" onClick={() => toggleHousehold(household.code)}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                      <CardTitle className="text-xl">{household.name}</CardTitle>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="flex items-center gap-1">
+                          <Users className="h-3 w-3" />
+                          {household.guests.length}
+                        </Badge>
+                        <Badge 
+                          variant={getResponseBadgeVariant(household)}
+                          className="flex items-center gap-1"
+                        >
+                          {getResponseRate(household)}% Responded
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="hidden sm:flex">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const mainGuest = household.guests[0];
+                            if (mainGuest) handleEditGuest(mainGuest);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                        {household.guests.some(g => g.email) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const mainGuest = household.guests.find(g => g.email);
+                              if (mainGuest) handleSendInvite(mainGuest);
+                            }}
+                          >
+                            <Mail className="h-4 w-4 mr-1" />
+                            Send
+                          </Button>
+                        )}
+                      </div>
+                      {expandedHouseholds.has(household.code) ? 
+                        <ChevronUp className="h-5 w-5" /> : 
+                        <ChevronDown className="h-5 w-5" />
+                      }
+                    </div>
                   </div>
-                  {expandedHouseholds.has(household.code) ? 
-                    <ChevronUp className="h-5 w-5" /> : 
-                    <ChevronDown className="h-5 w-5" />
-                  }
-                </div>
-                <CardDescription>Code: {household.code}</CardDescription>
-              </CardHeader>
+                  <CardDescription className="flex items-center gap-2">
+                    <span>Household Code: <span className="font-mono">{household.code}</span></span>
+                  </CardDescription>
+                </CardHeader>
 
-              {expandedHouseholds.has(household.code) && (
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Meal Choice</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {household.guests.map((guest) => (
-                        <TableRow key={guest.id}>
-                          <TableCell>{guest.name}</TableCell>
-                          <TableCell>{guest.email || '-'}</TableCell>
-                          <TableCell>
-                            <RsvpStatus status={guest.isAttending} />
-                          </TableCell>
-                          <TableCell>
-                            {guest.isAttending ? (
-                              guest.mealChoice?.name || 'Not selected'
-                            ) : (
-                              '-'
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleEditGuest(guest)}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              {guest.email && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleSendInvite(guest)}
-                                >
-                                  <Mail className="h-4 w-4" />
-                                </Button>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDeleteGuest(guest.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              )}
-            </Card>
-          </motion.div>
-        ))}
-      </AnimatePresence>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <Pagination className="mt-6">
-          <PaginationContent>
-            <PaginationItem>
-              {currentPage > 1 ? (
-                <PaginationPrevious 
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                />
-              ) : (
-                <PaginationPrevious 
-                  className="pointer-events-none opacity-50"
-                  tabIndex={-1}
-                  aria-disabled="true"
-                />
-              )}
-            </PaginationItem>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-              <PaginationItem key={page}>
-                <PaginationLink
-                  onClick={() => setCurrentPage(page)}
-                  isActive={currentPage === page}
-                >
-                  {page}
-                </PaginationLink>
-              </PaginationItem>
-            ))}
-            <PaginationItem>
-              {currentPage < totalPages ? (
-                <PaginationNext
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                />
-              ) : (
-                <PaginationNext
-                  className="pointer-events-none opacity-50"
-                  tabIndex={-1}
-                  aria-disabled="true"
-                />
-              )}
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      )}
+                {expandedHouseholds.has(household.code) && (
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Meal Choice</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {household.guests.map((guest) => (
+                            <TableRow key={guest.id}>
+                              <TableCell className="font-medium">
+                                {guest.name}
+                                {guest.isChild && (
+                                  <Badge variant="outline" className="ml-2 text-xs">Child</Badge>
+                                )}
+                              </TableCell>
+                              <TableCell>{guest.email || '-'}</TableCell>
+                              <TableCell>
+                                <RsvpStatus status={guest.isAttending} />
+                              </TableCell>
+                              <TableCell>
+                                {guest.isAttending ? (
+                                  <div>
+                                    <div>{guest.mealChoice?.name || 'Not selected'}</div>
+                                    {guest.dessertChoice && (
+                                      <div className="text-xs text-gray-500 mt-1">
+                                        Dessert: {guest.dessertChoice.name}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  '-'
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleEditGuest(guest)}
+                                    title="Edit Guest"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  {guest.email && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleSendInvite(guest)}
+                                      title="Send Invite"
+                                    >
+                                      <Mail className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleDeleteGuest(guest.id)}
+                                    title="Delete Guest"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
 
       {/* No Results */}
       {filteredHouseholds.length === 0 && (
-        <div className="text-center py-8">
+        <div className="text-center py-8 border rounded-lg bg-gray-50 dark:bg-gray-900">
           <p className="text-gray-500">No households found matching your search.</p>
+          <Button 
+            variant="link" 
+            onClick={() => setSearchTerm('')}
+            className="mt-2"
+          >
+            Clear search
+          </Button>
+        </div>
+      )}
+
+      {/* Enhanced Pagination */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-6">
+          <div className="text-sm text-gray-500">
+            Page {currentPage} of {totalPages}
+          </div>
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={() => setCurrentPage(1)}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                  tabIndex={currentPage === 1 ? -1 : undefined}
+                  aria-disabled={currentPage === 1}
+                  title="First Page"
+                />
+              </PaginationItem>
+              
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                // Logic to show pages around current page
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                
+                return (
+                  <PaginationItem key={pageNum}>
+                    <PaginationLink
+                      onClick={() => setCurrentPage(pageNum)}
+                      isActive={currentPage === pageNum}
+                    >
+                      {pageNum}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+              })}
+              
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => setCurrentPage(totalPages)}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                  tabIndex={currentPage === totalPages ? -1 : undefined}
+                  aria-disabled={currentPage === totalPages}
+                  title="Last Page"
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
       )}
 
