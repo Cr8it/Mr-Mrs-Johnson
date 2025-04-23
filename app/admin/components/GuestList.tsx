@@ -275,7 +275,8 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
         household: {
           name: guest.household?.name || "",
           code: guest.household?.code || ""
-        }
+        },
+        responses: guest.responses || []
       };
       
       setSelectedGuest(guestCopy);

@@ -1,14 +1,22 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 
+// Define the Option type to fix type errors
+interface Option {
+	id: string;
+	name: string;
+	isChildOption: boolean;
+}
+
 export async function GET() {
 	try {
 		console.log('Fetching meal and dessert options...')
 		
-		let regularMealOptions = [];
-		let childMealOptions = [];
-		let regularDessertOptions = [];
-		let childDessertOptions = [];
+		// Initialize variables with proper types
+		let regularMealOptions: Option[] = [];
+		let childMealOptions: Option[] = [];
+		let regularDessertOptions: Option[] = [];
+		let childDessertOptions: Option[] = [];
 		
 		try {
 			// Fetch meal options (regular)
@@ -97,10 +105,10 @@ export async function GET() {
 		console.error("GET options error:", error)
 		// Instead of failing with a 500, return empty arrays
 		return NextResponse.json({ 
-			mealOptions: [], 
-			childMealOptions: [],
-			dessertOptions: [],
-			childDessertOptions: [],
+			mealOptions: [] as Option[], 
+			childMealOptions: [] as Option[],
+			dessertOptions: [] as Option[],
+			childDessertOptions: [] as Option[],
 			error: "Failed to fetch options, using empty defaults"
 		}, {
 			status: 200 // Return 200 instead of 500 to prevent form from breaking
