@@ -5,66 +5,74 @@ export async function GET() {
 	try {
 		console.log('Fetching meal and dessert options...')
 		
-		// Fetch meal options (regular)
-		const regularMealOptions = await prisma.mealOption.findMany({
-			where: { 
-				isActive: true,
-				isChildOption: false
-			},
-			orderBy: { createdAt: 'asc' },
-			select: { id: true, name: true, isChildOption: true }
-		})
-		console.log('Found regular meal options:', regularMealOptions)
-
-		// Fetch meal options (children)
-		const childMealOptions = await prisma.mealOption.findMany({
-			where: { 
-				isActive: true,
-				isChildOption: true
-			},
-			orderBy: { createdAt: 'asc' },
-			select: { id: true, name: true, isChildOption: true }
-		})
-		console.log('Found child meal options:', childMealOptions)
-
-		// Fetch regular dessert options
-		const regularDessertOptions = await prisma.dessertOption.findMany({
-			where: { 
-				isActive: true,
-				isChildOption: false
-			},
-			orderBy: { createdAt: 'asc' },
-			select: { id: true, name: true, isChildOption: true }
-		})
-		console.log('Found regular dessert options:', regularDessertOptions)
-
-		// Fetch child dessert options
-		const childDessertOptions = await prisma.dessertOption.findMany({
-			where: { 
-				isActive: true,
-				isChildOption: true
-			},
-			orderBy: { createdAt: 'asc' },
-			select: { id: true, name: true, isChildOption: true }
-		})
-		console.log('Found child dessert options:', childDessertOptions)
-
-		// Debug each option to verify isChildOption flag
-		regularMealOptions.forEach(option => {
-			console.log(`Regular meal option: ${option.name}, isChildOption=${option.isChildOption}`);
-		});
+		let regularMealOptions = [];
+		let childMealOptions = [];
+		let regularDessertOptions = [];
+		let childDessertOptions = [];
 		
-		childMealOptions.forEach(option => {
-			console.log(`Child meal option: ${option.name}, isChildOption=${option.isChildOption}`);
-		});
-		
-		regularDessertOptions.forEach(option => {
-			console.log(`Regular dessert option: ${option.name}, isChildOption=${option.isChildOption}`);
-		});
-		
-		childDessertOptions.forEach(option => {
-			console.log(`Child dessert option: ${option.name}, isChildOption=${option.isChildOption}`);
-		});
+		try {
+			// Fetch meal options (regular)
+			regularMealOptions = await prisma.mealOption.findMany({
+				where: { 
+					isActive: true,
+					isChildOption: false
+				},
+				orderBy: { createdAt: 'asc' },
+				select: { id: true, name: true, isChildOption: true }
+			})
+			console.log('Found regular meal options:', regularMealOptions.length)
+		} catch (error) {
+			console.error("Error fetching regular meal options:", error)
+			regularMealOptions = []
+		}
+
+		try {
+			// Fetch meal options (children)
+			childMealOptions = await prisma.mealOption.findMany({
+				where: { 
+					isActive: true,
+					isChildOption: true
+				},
+				orderBy: { createdAt: 'asc' },
+				select: { id: true, name: true, isChildOption: true }
+			})
+			console.log('Found child meal options:', childMealOptions.length)
+		} catch (error) {
+			console.error("Error fetching child meal options:", error)
+			childMealOptions = []
+		}
+
+		try {
+			// Fetch regular dessert options
+			regularDessertOptions = await prisma.dessertOption.findMany({
+				where: { 
+					isActive: true,
+					isChildOption: false
+				},
+				orderBy: { createdAt: 'asc' },
+				select: { id: true, name: true, isChildOption: true }
+			})
+			console.log('Found regular dessert options:', regularDessertOptions.length)
+		} catch (error) {
+			console.error("Error fetching regular dessert options:", error)
+			regularDessertOptions = []
+		}
+
+		try {
+			// Fetch child dessert options
+			childDessertOptions = await prisma.dessertOption.findMany({
+				where: { 
+					isActive: true,
+					isChildOption: true
+				},
+				orderBy: { createdAt: 'asc' },
+				select: { id: true, name: true, isChildOption: true }
+			})
+			console.log('Found child dessert options:', childDessertOptions.length)
+		} catch (error) {
+			console.error("Error fetching child dessert options:", error)
+			childDessertOptions = []
+		}
 
 		// Debug summary
 		console.log(`RSVP Options Summary:
@@ -79,12 +87,23 @@ export async function GET() {
 			childMealOptions: childMealOptions,
 			dessertOptions: regularDessertOptions,
 			childDessertOptions: childDessertOptions
+		}, {
+			headers: {
+				// Prevent caching to ensure fresh data
+				'Cache-Control': 'no-store, max-age=0'
+			}
 		})
 	} catch (error) {
 		console.error("GET options error:", error)
-		return NextResponse.json(
-			{ error: "Failed to fetch options" },
-			{ status: 500 }
-		)
+		// Instead of failing with a 500, return empty arrays
+		return NextResponse.json({ 
+			mealOptions: [], 
+			childMealOptions: [],
+			dessertOptions: [],
+			childDessertOptions: [],
+			error: "Failed to fetch options, using empty defaults"
+		}, {
+			status: 200 // Return 200 instead of 500 to prevent form from breaking
+		})
 	}
 }

@@ -96,21 +96,46 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
   const fetchOptions = async () => {
     try {
       console.log("Fetching meal and dessert options...")
-      const response = await fetch('/api/rsvp/options')
-      if (!response.ok) throw new Error('Failed to fetch options')
-      const data = await response.json()
-      console.log("Options received:", data)
-      setMealOptions(data.mealOptions || [])
-      setChildMealOptions(data.childMealOptions || [])
-      setDessertOptions(data.dessertOptions || [])
-      setChildDessertOptions(data.childDessertOptions || [])
+      
+      // Add error handling and timeouts
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout
+      
+      const response = await fetch('/api/rsvp/options', {
+        signal: controller.signal,
+        headers: { 'Cache-Control': 'no-cache' }
+      })
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        console.error(`Failed to fetch options: ${response.status} ${response.statusText}`);
+        throw new Error(`Failed to fetch options: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log("Options received:", data);
+      
+      // Use defensive programming with default empty arrays
+      setMealOptions(Array.isArray(data.mealOptions) ? data.mealOptions : []);
+      setChildMealOptions(Array.isArray(data.childMealOptions) ? data.childMealOptions : []);
+      setDessertOptions(Array.isArray(data.dessertOptions) ? data.dessertOptions : []);
+      setChildDessertOptions(Array.isArray(data.childDessertOptions) ? data.childDessertOptions : []);
+      
+      console.log("Options processed successfully");
     } catch (error) {
-      console.error('Fetch options error:', error)
+      console.error('Fetch options error:', error);
+      // Don't fail the form load if options can't be fetched
+      setMealOptions([]);
+      setChildMealOptions([]);
+      setDessertOptions([]);
+      setChildDessertOptions([]);
+      
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to load meal and dessert options",
-      })
+        description: "Failed to load meal options. You can still edit other fields.",
+      });
     }
   }
 
@@ -119,33 +144,57 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
     setLoading(true)
     
     try {
+      // Validate input data
+      if (!formData.name.trim()) {
+        throw new Error("Guest name is required");
+      }
+      
+      if (!formData.householdName.trim()) {
+        throw new Error("Household name is required");
+      }
+      
+      console.log('Submitting form with isChild =', formData.isChild);
+      
       const endpoint = mode === 'create' ? '/api/admin/guests' : `/api/admin/guests/${initialData?.id}`
       const method = mode === 'create' ? 'POST' : 'PUT'
 
-      console.log('Submitting form with isChild =', formData.isChild);
-
+      // Create a clean submission data object with proper defaults
       const submissionData = {
-        name: formData.name,
-        email: formData.email || null,
-        householdName: formData.householdName,
+        name: formData.name.trim(),
+        email: formData.email ? formData.email.trim() : null,
+        householdName: formData.householdName.trim(),
         isAttending: formData.isAttending,
         mealChoice: formData.mealChoice ? { id: formData.mealChoice.id } : null,
         dessertChoice: formData.dessertChoice ? { id: formData.dessertChoice.id } : null,
-        dietaryNotes: formData.dietaryNotes || null,
+        dietaryNotes: formData.dietaryNotes ? formData.dietaryNotes.trim() : null,
         isChild: formData.isChild === true
       }
 
       console.log('Submission data:', submissionData);
 
+      // Add timeout and abort controller for the fetch
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15-second timeout
+      
       const response = await fetch(endpoint, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(submissionData),
+        signal: controller.signal
       })
+      
+      clearTimeout(timeoutId);
 
+      // Handle non-200 responses
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to save guest')
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          errorData = { error: errorText || 'Unknown error occurred' };
+        }
+        throw new Error(errorData.error || `Server returned ${response.status}`);
       }
 
       const responseData = await response.json()

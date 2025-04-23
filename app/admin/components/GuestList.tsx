@@ -248,8 +248,47 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
   }
 
   const handleEditGuest = (guest: Guest) => {
-    setSelectedGuest(guest)
-    setIsGuestFormOpen(true)
+    try {
+      console.log("Editing guest:", guest);
+      
+      // Ensure the guest object has all required properties
+      if (!guest || !guest.id) {
+        console.error("Invalid guest object:", guest);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Could not edit guest: Invalid guest data",
+        });
+        return;
+      }
+      
+      // Make a clean copy of the guest to avoid reference issues
+      const guestCopy = {
+        id: guest.id,
+        name: guest.name || "",
+        email: guest.email || "",
+        isAttending: guest.isAttending,
+        mealChoice: guest.mealChoice,
+        dessertChoice: guest.dessertChoice,
+        dietaryNotes: guest.dietaryNotes || "",
+        isChild: guest.isChild === true,
+        household: {
+          name: guest.household?.name || "",
+          code: guest.household?.code || ""
+        }
+      };
+      
+      setSelectedGuest(guestCopy);
+      setIsGuestFormOpen(true);
+      console.log("Edit guest modal opened for:", guestCopy.name);
+    } catch (error) {
+      console.error("Error opening edit form:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Could not open edit form. Please try again.",
+      });
+    }
   }
 
   const handleDeleteGuest = async (guestId: string) => {
