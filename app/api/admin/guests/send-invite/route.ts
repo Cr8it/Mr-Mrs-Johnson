@@ -49,45 +49,19 @@ export async function POST(request: Request) {
 
 		const emailHtml = generateInviteEmailTemplate(guest)
 
-		// For development/testing, we'll simulate sending by just marking the email as sent
-		// without actually sending it, unless SEND_ACTUAL_EMAILS is set to true
-		const shouldSendEmail = process.env.SEND_ACTUAL_EMAILS === "true"
-		
-		if (shouldSendEmail) {
-			await transporter.sendMail({
-				from: process.env.SMTP_FROM,
-				to: guest.email,
-				bcc: isBccEnabled() ? process.env.SMTP_FROM : undefined,
-				subject: "You're Invited to Sarah & Jermaine's Wedding!",
-				html: emailHtml
-			})
-			
-			// Log success with BCC information
-			const bccStatus = isBccEnabled() ? "with BCC to admin" : "without BCC"
-			console.log(`Invitation email sent to ${guest.email} ${bccStatus}`)
-		} else {
-			console.log(`[TEST MODE] Email would have been sent to ${guest.email} (but wasn't)`)
-		}
-		
-		// Update guest record to mark email as sent
-		const updatedGuest = await prisma.guest.update({
-			where: { id: guestId },
-			data: {
-				emailSent: true,
-				emailSentAt: new Date()
-			}
-		})
-		
-		// Log this activity
-		await prisma.guestActivity.create({
-			data: {
-				guestId: guestId,
-				action: "EMAIL_SENT",
-				details: shouldSendEmail ? "Email sent" : "Email marked as sent (test mode)"
-			}
+		await transporter.sendMail({
+			from: process.env.SMTP_FROM,
+			to: guest.email,
+			bcc: isBccEnabled() ? process.env.SMTP_FROM : undefined,
+			subject: "You're Invited to Sarah & Jermaine's Wedding!",
+			html: emailHtml
 		})
 
-		return NextResponse.json({ success: true, emailSent: updatedGuest.emailSent, emailSentAt: updatedGuest.emailSentAt })
+		// Log success with BCC information
+		const bccStatus = isBccEnabled() ? "with BCC to admin" : "without BCC"
+		console.log(`Invitation email sent to ${guest.email} ${bccStatus}`)
+
+		return NextResponse.json({ success: true })
 	} catch (error) {
 		console.error("Send invite error:", error)
 		return NextResponse.json(

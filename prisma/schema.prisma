@@ -52,8 +52,6 @@ model Guest {
   householdId     String
   isChild         Boolean            @default(false)
   isTeenager      Boolean            @default(false)
-  emailSent       Boolean            @default(false)
-  emailSentAt     DateTime?
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   dessertChoice   DessertOption?     @relation("GuestDessert", fields: [dessertOptionId], references: [id])
