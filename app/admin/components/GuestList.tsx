@@ -354,56 +354,61 @@ export default function GuestList({ onGuestCountChange }: GuestListProps) {
 
   const handleSendInvite = async (guest: Guest) => {
     setLoading(true);
-    toast.promise(
-      (async () => {
-        try {
-          const response = await fetch(`/api/admin/guests/send-invite`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ guestId: guest.id }),
-          });
+    try {
+      const response = await fetch(`/api/admin/guests/send-invite`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ guestId: guest.id }),
+      });
 
-          if (!response.ok) {
-            const error = await response.text();
-            throw new Error(`Failed to send invite: ${error}`);
-          }
-
-          const result = await response.json();
-          
-          // Update the guest in the guests list with the new email status
-          setHouseholds(prevHouseholds => prevHouseholds.map(h => ({
-            ...h,
-            guests: h.guests.map(g =>
-              g.id === guest.id
-                ? { ...g, emailSent: result.emailSent, emailSentAt: result.emailSentAt }
-                : g
-            )
-          }))))
-          setFilteredHouseholds(prevFilteredHouseholds => prevFilteredHouseholds.map(h => ({
-            ...h,
-            guests: h.guests.map(g =>
-              g.id === guest.id
-                ? { ...g, emailSent: result.emailSent, emailSentAt: result.emailSentAt }
-                : g
-            )
-          }))))
-
-          setLoading(false);
-          return result;
-        } catch (error) {
-          console.error('Error sending invite:', error);
-          setLoading(false);
-          throw error;
-        }
-      })(),
-      {
-        loading: 'Sending invite...',
-        success: 'Invite sent successfully',
-        error: (err) => `Error: ${err.message}`,
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Failed to send invite: ${error}`);
       }
-    );
+
+      const result = await response.json();
+      
+      // Update the guest in the guests list with the new email status
+      setHouseholds(prevHouseholds => prevHouseholds.map(h => ({
+        ...h,
+        guests: h.guests.map(g =>
+          g.id === guest.id
+            ? { ...g, emailSent: result.emailSent, emailSentAt: result.emailSentAt }
+            : g
+        )
+      })));
+      
+      setFilteredHouseholds(prevFilteredHouseholds => prevFilteredHouseholds.map(h => ({
+        ...h,
+        guests: h.guests.map(g =>
+          g.id === guest.id
+            ? { ...g, emailSent: result.emailSent, emailSentAt: result.emailSentAt }
+            : g
+        )
+      })));
+
+      setLoading(false);
+      
+      toast({
+        title: "Success",
+        description: "Invite sent successfully",
+      });
+      
+      return result;
+    } catch (error) {
+      console.error('Error sending invite:', error);
+      setLoading(false);
+      
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to send invite",
+      });
+      
+      throw error;
+    }
   };
 
   const handleGuestSubmit = async (data: any) => {
