@@ -22,25 +22,29 @@ interface Option {
   isChildOption?: boolean
 }
 
+// Define the form data interface
+interface GuestFormData {
+  id?: string
+  name: string
+  email: string
+  householdName: string
+  household: {
+    name: string
+    code: string
+  }
+  isAttending: boolean | null
+  mealChoice: Option | null
+  dessertChoice: Option | null
+  dietaryNotes: string
+  isChild: boolean
+  responses?: any[]
+}
+
 interface GuestFormProps {
   isOpen: boolean
   onClose: () => void
   onSubmit: (data: any) => void
-  initialData?: {
-    id?: string
-    name: string
-    email: string
-    householdName?: string
-    household?: {
-      name: string
-      code: string
-    }
-    isAttending?: boolean | null
-    mealChoice?: Option | null
-    dessertChoice?: Option | null
-    dietaryNotes?: string | null
-    isChild?: boolean
-  }
+  initialData?: Partial<GuestFormData>
   mode?: 'create' | 'edit'
 }
 
@@ -60,15 +64,19 @@ interface GuestResponse {
 }
 
 const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: GuestFormProps) => {
-  const [formData, setFormData] = useState(initialData || {
-    name: "",
-    email: "",
-    householdName: "",
-    isAttending: null,
-    mealChoice: null,
-    dessertChoice: null,
-    dietaryNotes: "",
-    isChild: false
+  const [formData, setFormData] = useState<GuestFormData>({
+    name: initialData?.name || "",
+    email: initialData?.email || "",
+    householdName: initialData?.householdName || 
+                   (initialData?.household?.name) || 
+                   "",
+    household: initialData?.household || { name: "", code: "" },
+    isAttending: initialData?.isAttending || null,
+    mealChoice: initialData?.mealChoice || null,
+    dessertChoice: initialData?.dessertChoice || null,
+    dietaryNotes: initialData?.dietaryNotes || "",
+    isChild: initialData?.isChild === true,
+    responses: initialData?.responses || []
   })
   const [loading, setLoading] = useState(false)
   const [mealOptions, setMealOptions] = useState<Option[]>([])
@@ -86,30 +94,21 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
 
   useEffect(() => {
     if (initialData) {
-      // Force isChild to be a boolean by using strict comparison
-      const isChildValue = initialData.isChild === true;
-      
-      // Ensure household name is properly populated from the initialData
-      const householdName = initialData.householdName || 
-                          (initialData.household && initialData.household.name) || 
-                          "";
-      
-      const householdCode = initialData.household?.code || "";
-      
-      console.log(`Initializing form for ${initialData.name}:`, {
-        householdName,
-        householdFromInitialData: initialData.household,
-        isChild: isChildValue
-      });
+      console.log(`Refreshing form for ${initialData.name || 'new guest'}:`, initialData);
       
       setFormData({
-        ...initialData,
-        isChild: isChildValue,
-        householdName: householdName,
-        household: initialData.household || { 
-          name: householdName, 
-          code: householdCode 
-        }
+        name: initialData.name || "",
+        email: initialData.email || "",
+        householdName: initialData.householdName || 
+                      (initialData.household?.name) || 
+                      "",
+        household: initialData.household || { name: "", code: "" },
+        isAttending: initialData.isAttending || null,
+        mealChoice: initialData.mealChoice || null,
+        dessertChoice: initialData.dessertChoice || null,
+        dietaryNotes: initialData.dietaryNotes || "",
+        isChild: initialData.isChild === true,
+        responses: initialData.responses || []
       });
     }
   }, [initialData])
@@ -170,7 +169,9 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
         throw new Error("Guest name is required");
       }
       
-      if (!formData.householdName.trim()) {
+      // Make sure householdName is defined before calling trim()
+      const householdName = formData.householdName || '';
+      if (!householdName.trim()) {
         throw new Error("Household name is required");
       }
       
@@ -183,9 +184,9 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
       const submissionData = {
         name: formData.name.trim(),
         email: formData.email ? formData.email.trim() : null,
-        householdName: formData.householdName.trim(),
+        householdName: householdName.trim(),
         household: {
-          name: formData.householdName.trim(),
+          name: householdName.trim(),
           code: formData.household?.code || null
         },
         isAttending: formData.isAttending,
@@ -254,7 +255,7 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
     }
   }
 
-  // Direct fix for Niyah Dublin or any other child guest showing wrong options
+  // Direct fix for child guest showing wrong options
   const fixIsChildStatus = async (guestId: string, correctValue: boolean) => {
     try {
       setLoading(true);
@@ -264,14 +265,17 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
         throw new Error('Guest ID is required');
       }
       
+      // Prepare submission data with the corrected isChild status
+      const updatedData = {
+        ...formData,
+        isChild: correctValue
+      };
+      
       // Direct database update to fix the issue
       const response = await fetch(`/api/admin/guests/${guestId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          isChild: correctValue
-        }),
+        body: JSON.stringify(updatedData),
       });
       
       if (!response.ok) {
