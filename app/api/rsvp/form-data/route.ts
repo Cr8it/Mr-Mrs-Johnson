@@ -49,13 +49,14 @@ export async function GET() {
 			// Questions
 			prisma.question.findMany({
 				where: { isActive: true },
-				orderBy: { createdAt: 'asc' },
+				orderBy: { order: 'asc' },
 				select: {
 					id: true,
 					question: true,
 					type: true,
 					options: true,
-					isRequired: true
+					isRequired: true,
+					order: true
 				}
 			})
 		])
@@ -63,6 +64,10 @@ export async function GET() {
 		// Debug logs to verify options
 		console.log(`Found ${regularMealOptions.length} regular meal options, ${childMealOptions.length} child meal options`);
 		console.log(`Found ${regularDessertOptions.length} regular dessert options, ${childDessertOptions.length} child dessert options`);
+		
+		// Log the order to help debugging
+		console.log("Regular meal options order:", regularMealOptions.map(o => o.name));
+		console.log("Regular dessert options order:", regularDessertOptions.map(o => o.name));
 
 		// Transform questions to parse options for multiple choice questions
 		const transformedQuestions = questions.map(question => ({
