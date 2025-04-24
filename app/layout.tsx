@@ -117,13 +117,12 @@ export default function RootLayout({
           <div className="relative z-0">
           <TooltipProvider>
             <RSVPProvider>
+            <AudioPlayer />
             {isAdminRoute ? (
               children
             ) : (
               <>
               <VideoHeader isLocked={!isUnlocked} onUnlock={handleUnlock} />
-              {/* Always render the AudioPlayer regardless of locked state */}
-              <AudioPlayer />
               {!isUnlocked ? (
                 <div className="fixed inset-0 z-50">
                 <LockedPage onUnlock={handleUnlock} />
