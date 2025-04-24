@@ -30,7 +30,11 @@ interface GuestFormProps {
     id?: string
     name: string
     email: string
-    householdName: string
+    householdName?: string
+    household?: {
+      name: string
+      code: string
+    }
     isAttending?: boolean | null
     mealChoice?: Option | null
     dessertChoice?: Option | null
@@ -84,11 +88,28 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
     if (initialData) {
       // Force isChild to be a boolean by using strict comparison
       const isChildValue = initialData.isChild === true;
-      console.log(`Initializing form for ${initialData.name} with isChild=${initialData.isChild} (${typeof initialData.isChild}), processed to: ${isChildValue}`);
+      
+      // Ensure household name is properly populated from the initialData
+      const householdName = initialData.householdName || 
+                          (initialData.household && initialData.household.name) || 
+                          "";
+      
+      const householdCode = initialData.household?.code || "";
+      
+      console.log(`Initializing form for ${initialData.name}:`, {
+        householdName,
+        householdFromInitialData: initialData.household,
+        isChild: isChildValue
+      });
       
       setFormData({
         ...initialData,
-        isChild: isChildValue
+        isChild: isChildValue,
+        householdName: householdName,
+        household: initialData.household || { 
+          name: householdName, 
+          code: householdCode 
+        }
       });
     }
   }, [initialData])
@@ -163,6 +184,10 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
         name: formData.name.trim(),
         email: formData.email ? formData.email.trim() : null,
         householdName: formData.householdName.trim(),
+        household: {
+          name: formData.householdName.trim(),
+          code: formData.household?.code || null
+        },
         isAttending: formData.isAttending,
         mealChoice: formData.mealChoice ? { id: formData.mealChoice.id } : null,
         dessertChoice: formData.dessertChoice ? { id: formData.dessertChoice.id } : null,
@@ -170,7 +195,11 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
         isChild: formData.isChild === true
       }
 
-      console.log('Submission data:', submissionData);
+      console.log('Submission data:', {
+        ...submissionData,
+        mode,
+        endpoint
+      });
 
       // Add timeout and abort controller for the fetch
       const controller = new AbortController();
