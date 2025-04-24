@@ -83,13 +83,21 @@ export default function LockedPage({ onUnlock }: LockedPageProps) {
           <p className="text-xl font-montserrat text-center mb-6">Friday 24th October 2025</p>
           <div className="relative w-full h-64 mb-6">
             <Image
-              src={images.couple.story3 || "/placeholder.svg"}
+              src={images.couple.story3 || "/placeholder.jpg"}
               alt="Sarah and Jermaine"
               fill
+              sizes="(max-width: 768px) 100vw, 500px"
+              priority
               className="object-cover rounded-lg"
+              onError={(e) => {
+                // Fallback to placeholder on error
+                const target = e.target as HTMLImageElement;
+                target.onerror = null; // Prevent infinite error loop
+                target.src = "/placeholder.jpg";
+              }}
             />
           </div>
-          <p className="text-lg font-montserrat text-center mb-6">RSVP by Sunday 22nd June '25</p>
+          <p className="text-lg font-montserrat text-center mb-6">RSVP by Sunday 22nd June '25</p>
           <p className="text-sm font-montserrat text-center mb-6">
             Unfortunately, we cannot accommodate any children. Only named guests will be permitted entry.
           </p>

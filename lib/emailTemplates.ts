@@ -112,7 +112,7 @@ export function generateInviteEmailTemplate(guest: { name: string, household: { 
 		<body>
 			<div class="container">
 				<div class="header">
-					<img src="https://i.postimg.cc/CLFcd38q/RINGWATCH.png" alt="Sarah and Jermaine" />
+					<img src="https://i.ibb.co/YPMCFPj/couple-placeholder.jpg" alt="Sarah and Jermaine" />
 				</div>
 				<div class="content">
 					<h1 class="title">Sarah & Jermaine's Wedding</h1>
