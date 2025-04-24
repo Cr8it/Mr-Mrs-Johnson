@@ -1,7 +1,7 @@
 export const images = {
   couple: {
     story1: "https://i.postimg.cc/Z5MGLzMw/Whats-App-Image-2025-04-22-at-22-42-15-047b76d2.jpg",
-    story3: "/placeholder.jpg",    
+    story3: "/gallery/7912c935-4cfe-40a7-b22a-c6f01205b1aa.jpg",    
   },
   dreamTeam: {
     stefanie: "https://i.postimg.cc/Dwjy0zpB/Steffie.jpg",

@@ -5,6 +5,9 @@ import { motion } from "framer-motion"
 import Image from "next/image"
 import { images } from "../config/images"
 import { useRouter } from "next/navigation"
+// Define fallback paths
+const FALLBACK_IMAGE_PATH = "/uploads/1739743879848-57035993-Wedding-Background.png"
+const PLACEHOLDER_IMAGE_PATH = "/placeholder.jpg"
 
 interface LockedPageProps {
   onUnlock: () => void
@@ -13,6 +16,7 @@ interface LockedPageProps {
 export default function LockedPage({ onUnlock }: LockedPageProps) {
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+  const [imgError, setImgError] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -70,35 +74,49 @@ export default function LockedPage({ onUnlock }: LockedPageProps) {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <div className="flex-grow flex items-center justify-center bg-black bg-opacity-50">
+      <div className="flex-grow flex items-center justify-center bg-black bg-opacity-70 p-4">
         <motion.div
-          className="max-w-md w-full mx-auto p-8 bg-white bg-opacity-10 backdrop-blur-md rounded-lg shadow-xl"
+          className="max-w-md w-full mx-auto p-6 sm:p-8 bg-black bg-opacity-70 backdrop-blur-md rounded-lg shadow-xl border border-white/10"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
         >
-          <h1 className="text-4xl font-cormorant font-bold text-center mb-4">
+          <h1 className="text-3xl sm:text-4xl font-cormorant font-bold text-center mb-4 text-white">
             <em>Sarah and Jermaine</em>
           </h1>
-          <p className="text-xl font-montserrat text-center mb-6">Friday 24th October 2025</p>
-          <div className="relative w-full h-64 mb-6">
-            <Image
-              src={images.couple.story3 || "/placeholder.jpg"}
-              alt="Sarah and Jermaine"
-              fill
-              sizes="(max-width: 768px) 100vw, 500px"
-              priority
-              className="object-cover rounded-lg"
-              onError={(e) => {
-                // Fallback to placeholder on error
-                const target = e.target as HTMLImageElement;
-                target.onerror = null; // Prevent infinite error loop
-                target.src = "/placeholder.jpg";
-              }}
-            />
+          <p className="text-lg sm:text-xl font-montserrat text-center mb-6 text-white/90">Friday 24th October 2025</p>
+          <div className="relative w-full h-52 sm:h-64 mb-6 shadow-lg">
+            {!imgError ? (
+              <Image
+                src={images.couple.story3}
+                alt="Sarah and Jermaine"
+                fill
+                sizes="(max-width: 768px) 100vw, 500px"
+                priority
+                unoptimized={true}
+                className="object-cover rounded-lg"
+                onError={(e) => {
+                  console.log('Image failed to load, switching to fallback');
+                  setImgError(true);
+                }}
+              />
+            ) : (
+              // Fallback to standard HTML img tag for maximum compatibility
+              <img 
+                src={FALLBACK_IMAGE_PATH} 
+                alt="Sarah and Jermaine"
+                className="w-full h-full object-cover rounded-lg"
+                onError={(e) => {
+                  // If even this fails, try the placeholder
+                  const target = e.target as HTMLImageElement;
+                  target.onerror = null; // Prevent infinite error loop
+                  target.src = PLACEHOLDER_IMAGE_PATH;
+                }}
+              />
+            )}
           </div>
-          <p className="text-lg font-montserrat text-center mb-6">RSVP by Sunday 22nd June '25</p>
-          <p className="text-sm font-montserrat text-center mb-6">
+          <p className="text-base sm:text-lg font-montserrat text-center mb-4 text-white/90">RSVP by Sunday 22nd June '25</p>
+          <p className="text-xs sm:text-sm font-montserrat text-center mb-6 text-white/80">
             Unfortunately, we cannot accommodate any children. Only named guests will be permitted entry.
           </p>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -107,9 +125,9 @@ export default function LockedPage({ onUnlock }: LockedPageProps) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter password to unlock"
-              className="w-full px-4 py-2 bg-white bg-opacity-20 border border-white border-opacity-20 rounded-lg focus:outline-none focus:border-gold transition-colors"
+              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-gold transition-colors text-white placeholder:text-white/50"
             />
-            {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
             <button
               type="submit"
               className="w-full bg-gold text-black font-montserrat font-bold py-3 px-6 rounded-lg hover:bg-opacity-90 transition-colors"
