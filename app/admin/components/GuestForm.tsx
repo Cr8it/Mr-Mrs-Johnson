@@ -279,7 +279,7 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
     <Dialog open={isOpen} onOpenChange={(open) => {
       if (!open) onClose()
     }}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] text-black">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold flex items-center gap-2">
             {mode === 'create' ? (
@@ -305,7 +305,7 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="h-9"
+                className="h-9 text-black"
                 required
               />
             </div>
@@ -318,19 +318,19 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="h-9"
+                className="h-9 text-black"
                 placeholder="guest@example.com"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="household" className="text-sm font-medium">
+              <Label htmlFor="householdName" className="text-sm font-medium">
                 Household Name
               </Label>
               <Input
-                id="household"
+                id="householdName"
                 value={formData.householdName}
                 onChange={(e) => setFormData({ ...formData, householdName: e.target.value })}
-                className="h-9"
+                className="h-9 text-black"
                 required
               />
             </div>
@@ -347,10 +347,10 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
                     setFormData({ ...formData, isChild: newValue });
                   }}
                 >
-                  <SelectTrigger className="h-9">
+                  <SelectTrigger className="h-9 text-black">
                     <SelectValue placeholder="Is this a child?" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="text-black">
                     <SelectItem value="true">Yes</SelectItem>
                     <SelectItem value="false">No</SelectItem>
                   </SelectContent>
@@ -394,10 +394,10 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
                     value={formData.isAttending?.toString() || ""}
                     onValueChange={(value) => setFormData({ ...formData, isAttending: value === "true" })}
                   >
-                    <SelectTrigger className="h-9">
+                    <SelectTrigger className="h-9 text-black">
                       <SelectValue placeholder="Select attendance" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="text-black">
                       <SelectItem value="true">Yes</SelectItem>
                       <SelectItem value="false">No</SelectItem>
                     </SelectContent>
@@ -416,10 +416,10 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
                           mealChoice: (formData.isChild ? childMealOptions : mealOptions).find(option => option.id === value) || null 
                         })}
                       >
-                        <SelectTrigger className="h-9">
+                        <SelectTrigger className="h-9 text-black">
                           <SelectValue placeholder="Select meal" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="text-black">
                           {(formData.isChild ? childMealOptions : mealOptions).map((option) => (
                             <SelectItem key={option.id} value={option.id}>
                               {option.name}
@@ -439,10 +439,10 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
                           dessertChoice: (formData.isChild ? childDessertOptions : dessertOptions).find(option => option.id === value) || null 
                         })}
                       >
-                        <SelectTrigger className="h-9">
+                        <SelectTrigger className="h-9 text-black">
                           <SelectValue placeholder="Select dessert" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="text-black">
                           {(formData.isChild ? childDessertOptions : dessertOptions).map((option) => (
                             <SelectItem key={option.id} value={option.id}>
                               {option.name}
@@ -459,8 +459,8 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
                         id="dietaryNotes"
                         value={formData.dietaryNotes || ""}
                         onChange={(e) => setFormData({ ...formData, dietaryNotes: e.target.value })}
-                        className="min-h-[80px] resize-none"
-                        placeholder="Any dietary requirements or allergies..."
+                        placeholder="Any dietary requirements or allergies"
+                        className="min-h-[80px] text-black"
                       />
                     </div>
                   </>
