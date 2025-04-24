@@ -99,6 +99,16 @@ export default function RootLayout({
           } : undefined}
           suppressHydrationWarning
         >
+          {/* Hidden audio element to help with autoplay policies */}
+          <audio 
+            id="backgroundMusicHelper" 
+            src="/background-music.mp3" 
+            loop 
+            autoPlay 
+            playsInline 
+            style={{ display: 'none' }} 
+          />
+          
           {settings.backgroundImage && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-[2px] -z-10" />
           )}

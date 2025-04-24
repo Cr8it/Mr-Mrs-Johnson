@@ -6,24 +6,49 @@ export default function AudioPlayer() {
   const [isPlaying, setIsPlaying] = useState(true)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const hasInteracted = useRef(false)
+  const helperAudioRef = useRef<HTMLAudioElement | null>(null)
 
   // Initialize audio and attempt autoplay
   useEffect(() => {
+    // Try to get the helper audio element from the DOM
+    helperAudioRef.current = document.getElementById('backgroundMusicHelper') as HTMLAudioElement
+    
     const initializeAudio = () => {
       if (!audioRef.current) {
-        audioRef.current = new Audio('/background-music.mp3')
-        audioRef.current.loop = true
-        audioRef.current.volume = 0.6
+        // Use the helper audio if available, otherwise create a new Audio object
+        if (helperAudioRef.current) {
+          audioRef.current = helperAudioRef.current
+        } else {
+          audioRef.current = new Audio('/background-music.mp3')
+          audioRef.current.loop = true
+          audioRef.current.volume = 0.6
+          audioRef.current.autoplay = true
+          audioRef.current.muted = false
+        }
       }
 
       const attemptPlay = async () => {
         try {
           if (audioRef.current) {
-            await audioRef.current.play()
-            setIsPlaying(true)
+            // Small delay before attempting to play
+            setTimeout(async () => {
+              try {
+                if (audioRef.current) {
+                  // Try playing both audio elements for redundancy
+                  await audioRef.current.play()
+                  if (helperAudioRef.current && helperAudioRef.current !== audioRef.current) {
+                    await helperAudioRef.current.play()
+                  }
+                  setIsPlaying(true)
+                }
+              } catch (error) {
+                console.log('Delayed autoplay prevented:', error)
+                setIsPlaying(false)
+              }
+            }, 1000)
           }
         } catch (error) {
-          console.log('Autoplay prevented, waiting for interaction')
+          console.log('Autoplay prevented, waiting for interaction:', error)
           setIsPlaying(false)
         }
       }
@@ -37,23 +62,37 @@ export default function AudioPlayer() {
     const handleInteraction = () => {
       if (!hasInteracted.current && audioRef.current) {
         hasInteracted.current = true
+        audioRef.current.muted = false
+        
+        // Try to play both audio elements for redundancy
         audioRef.current.play()
-          .then(() => setIsPlaying(true))
+          .then(() => {
+            setIsPlaying(true)
+            // If we have a separate helper audio, make sure it's playing too
+            if (helperAudioRef.current && helperAudioRef.current !== audioRef.current) {
+              helperAudioRef.current.play().catch(err => console.log('Helper audio play failed', err))
+            }
+          })
           .catch(error => console.log('Play failed after interaction:', error))
       }
     }
 
     // Listen for any user interaction
-    window.addEventListener('click', handleInteraction)
-    window.addEventListener('touchstart', handleInteraction)
-    window.addEventListener('keydown', handleInteraction)
+    window.addEventListener('click', handleInteraction, { once: true })
+    window.addEventListener('touchstart', handleInteraction, { once: true })
+    window.addEventListener('keydown', handleInteraction, { once: true })
+    window.addEventListener('scroll', handleInteraction, { once: true })
 
     return () => {
       window.removeEventListener('click', handleInteraction)
       window.removeEventListener('touchstart', handleInteraction)
       window.removeEventListener('keydown', handleInteraction)
+      window.removeEventListener('scroll', handleInteraction)
       if (audioRef.current) {
         audioRef.current.pause()
+      }
+      if (helperAudioRef.current && helperAudioRef.current !== audioRef.current) {
+        helperAudioRef.current.pause()
       }
     }
   }, [])
@@ -70,9 +109,18 @@ export default function AudioPlayer() {
               setIsPlaying(false)
             }
           })
+          
+          // Also play the helper audio if it's a separate element
+          if (helperAudioRef.current && helperAudioRef.current !== audioRef.current) {
+            helperAudioRef.current.play().catch(err => console.log('Helper toggle failed', err))
+          }
         }
       } else {
         audioRef.current.pause()
+        // Also pause the helper audio if it's a separate element
+        if (helperAudioRef.current && helperAudioRef.current !== audioRef.current) {
+          helperAudioRef.current.pause()
+        }
       }
     }
   }, [isPlaying])
