@@ -99,13 +99,15 @@ export default function RootLayout({
           } : undefined}
           suppressHydrationWarning
         >
-          {/* Hidden audio element to help with autoplay policies */}
+          {/* Hidden audio element to help with autoplay policies - always present regardless of locked state */}
           <audio 
             id="backgroundMusicHelper" 
             src="/background-music.mp3" 
             loop 
             autoPlay 
             playsInline 
+            preload="auto"
+            muted={false}
             style={{ display: 'none' }} 
           />
           
@@ -120,13 +122,14 @@ export default function RootLayout({
             ) : (
               <>
               <VideoHeader isLocked={!isUnlocked} onUnlock={handleUnlock} />
+              {/* Always render the AudioPlayer regardless of locked state */}
+              <AudioPlayer />
               {!isUnlocked ? (
                 <div className="fixed inset-0 z-50">
                 <LockedPage onUnlock={handleUnlock} />
                 </div>
               ) : (
                 <>
-                <AudioPlayer />
                 {children}
                 </>
               )}
