@@ -6,7 +6,7 @@ import Image from "next/image"
 import { images } from "../config/images"
 import { useRouter } from "next/navigation"
 // Define fallback paths
-const FALLBACK_IMAGE_PATH = "/uploads/1739743879848-57035993-Wedding-Background.png"
+const FALLBACK_IMAGE_PATH = "/uploads/RINGWATCH.PNG"
 const PLACEHOLDER_IMAGE_PATH = "/placeholder.jpg"
 
 interface LockedPageProps {
@@ -86,34 +86,22 @@ export default function LockedPage({ onUnlock }: LockedPageProps) {
           </h1>
           <p className="text-lg sm:text-xl font-montserrat text-center mb-6 text-white/90">Friday 24th October 2025</p>
           <div className="relative w-full h-52 sm:h-64 mb-6 shadow-lg">
-            {!imgError ? (
-              <Image
-                src={images.couple.story3}
-                alt="Sarah and Jermaine"
-                fill
-                sizes="(max-width: 768px) 100vw, 500px"
-                priority
-                unoptimized={true}
-                className="object-cover rounded-lg"
-                onError={(e) => {
-                  console.log('Image failed to load, switching to fallback');
-                  setImgError(true);
-                }}
-              />
-            ) : (
-              // Fallback to standard HTML img tag for maximum compatibility
-              <img 
-                src={FALLBACK_IMAGE_PATH} 
-                alt="Sarah and Jermaine"
-                className="w-full h-full object-cover rounded-lg"
-                onError={(e) => {
-                  // If even this fails, try the placeholder
-                  const target = e.target as HTMLImageElement;
-                  target.onerror = null; // Prevent infinite error loop
-                  target.src = PLACEHOLDER_IMAGE_PATH;
-                }}
-              />
-            )}
+            <Image
+              src="/uploads/RINGWATCH.PNG"
+              alt="Sarah and Jermaine"
+              fill
+              sizes="(max-width: 768px) 100vw, 500px"
+              priority
+              unoptimized={true}
+              className="object-cover rounded-lg"
+              onError={(e) => {
+                // Fallback to standard HTML img tag for better compatibility
+                console.log('Image failed to load, switching to fallback');
+                const target = e.target as HTMLImageElement;
+                target.onerror = null; // Prevent infinite error loop
+                target.src = PLACEHOLDER_IMAGE_PATH;
+              }}
+            />
           </div>
           <p className="text-base sm:text-lg font-montserrat text-center mb-4 text-white/90">RSVP by Sunday 22nd June '25</p>
           <p className="text-xs sm:text-sm font-montserrat text-center mb-6 text-white/80">
