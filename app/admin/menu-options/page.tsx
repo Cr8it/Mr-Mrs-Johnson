@@ -207,6 +207,7 @@ export default function MenuOptionsPage() {
 			const options = type === 'meal' ? mealOptions : dessertOptions
 			const reorderedOptions = arrayMove(options, oldIndex, newIndex)
 
+			// Update local state immediately for a responsive UI
 			if (type === 'meal') {
 				setMealOptions(reorderedOptions)
 			} else {
@@ -219,10 +220,23 @@ export default function MenuOptionsPage() {
 				body: JSON.stringify({ options: reorderedOptions })
 			})
 
-			if (!response.ok) throw new Error(`Failed to reorder ${type} options`)
-
-			await fetchStatistics()
+			if (!response.ok) {
+				throw new Error(`Failed to reorder ${type} options`)
+			}
+			
+			// Refresh options from the server to ensure UI reflects current state
+			await fetchOptions()
 		} catch (error) {
+			console.error(`Error reordering ${type} options:`, error)
+			// Revert to original order if there was an error
+			if (type === 'meal') {
+				const originalOptions = [...mealOptions]
+				setMealOptions(originalOptions)
+			} else {
+				const originalOptions = [...dessertOptions]
+				setDessertOptions(originalOptions)
+			}
+			
 			toast({
 				variant: "destructive",
 				title: "Error",
