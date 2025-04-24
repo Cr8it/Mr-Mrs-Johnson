@@ -236,11 +236,13 @@ const GuestForm = ({ isOpen, onClose, onSubmit, initialData, mode = 'create' }: 
           name: "",
           email: "",
           householdName: "",
+          household: { name: "", code: "" },
           isAttending: null,
           mealChoice: null,
           dessertChoice: null,
           dietaryNotes: "",
-          isChild: false
+          isChild: false,
+          responses: []
         })
       }
     } catch (error) {
