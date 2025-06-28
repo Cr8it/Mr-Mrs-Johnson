@@ -54,9 +54,9 @@ export default function AudioPlayer() {
         if (helperAudioRef.current) {
           audioRef.current = helperAudioRef.current
         } else {
-          audioRef.current = new Audio('/background-music.mp3')
-          audioRef.current.loop = true
-          audioRef.current.volume = 0.6
+        audioRef.current = new Audio('/background-music.mp3')
+        audioRef.current.loop = true
+        audioRef.current.volume = 0.6
           audioRef.current.autoplay = true
           audioRef.current.muted = false
           document.body.appendChild(audioRef.current) // Attach to DOM
@@ -81,7 +81,7 @@ export default function AudioPlayer() {
                 if (audioRef.current && isPlaying) {
                   // Try with muted first (more likely to succeed)
                   audioRef.current.muted = true
-                  await audioRef.current.play()
+            await audioRef.current.play()
                   
                   // Then quickly unmute
                   setTimeout(() => {
@@ -173,7 +173,7 @@ export default function AudioPlayer() {
           .catch(err => console.log('Resume on visibility change failed:', err))
       }
     }
-    
+
     document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {

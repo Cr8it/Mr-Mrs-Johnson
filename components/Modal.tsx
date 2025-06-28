@@ -9,11 +9,12 @@ interface ModalProps {
   children: React.ReactNode;
   allowClose?: boolean;
   allNotAttending?: boolean;
+  forceAllowClose?: boolean;
 }
 
 const MotionDiv = motion.div
 
-export default function Modal({ isOpen, onClose, children, allowClose = false, allNotAttending = false }: ModalProps) {
+export default function Modal({ isOpen, onClose, children, allowClose = false, allNotAttending = false, forceAllowClose = false }: ModalProps) {
   useEffect(() => {
     // Mark that we have a modal with close functionality
     if (onClose) {
@@ -84,8 +85,8 @@ export default function Modal({ isOpen, onClose, children, allowClose = false, a
               exit={{ opacity: 0, scale: 0.8 }}
               className="w-full max-w-4xl relative"
             >
-              {/* Always show close button if onClose is provided and either not RSVPed or has RSVPed with attending guests */}
-              {onClose && (!allowClose || (allowClose && !allNotAttending)) && (
+              {/* Always show close button if onClose is provided and either not RSVPed or has RSVPed with attending guests, or if forceAllowClose is true */}
+              {onClose && (forceAllowClose || !allowClose || (allowClose && !allNotAttending)) && (
                 <button
                   onClick={handleClose}
                   className="fixed top-2 right-2 sm:top-4 sm:right-4 text-white hover:text-gray-300 z-[60] bg-black/50 px-3 py-1 sm:px-4 sm:py-2 rounded-lg transition-colors duration-200 hover:bg-black/70 text-sm sm:text-base"

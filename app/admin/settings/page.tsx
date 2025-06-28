@@ -20,7 +20,8 @@ export default function SettingsPage() {
 		primaryColor: "#d4af37", // Default gold color
 		accentColor: "#000000",
 		backgroundImage: "",
-		showGallery: true
+		showGallery: true,
+		rsvpBlocked: false
 	})
 	const [loading, setLoading] = useState(false)
 	const [isUploading, setIsUploading] = useState(false)
@@ -185,6 +186,20 @@ export default function SettingsPage() {
 									checked={settings.showGallery}
 									onCheckedChange={(checked) => setSettings({ ...settings, showGallery: checked })}
 									className="data-[state=checked]:bg-gold"
+								/>
+							</div>
+
+							<div className="flex items-center justify-between border-t pt-4">
+								<div className="space-y-0.5">
+									<Label>Block RSVP Submissions</Label>
+									<p className="text-sm text-muted-foreground">
+										When enabled, guests will not be able to submit RSVPs and will see a message instead
+									</p>
+								</div>
+								<Switch
+									checked={settings.rsvpBlocked}
+									onCheckedChange={(checked) => setSettings({ ...settings, rsvpBlocked: checked })}
+									className="data-[state=checked]:bg-red-500"
 								/>
 							</div>
 						</CardContent>

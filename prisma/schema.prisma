@@ -113,6 +113,7 @@ model Settings {
   accentColor     String    @default("#000000")
   backgroundImage String?
   showGallery     Boolean   @default(true)
+  rsvpBlocked     Boolean   @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 }

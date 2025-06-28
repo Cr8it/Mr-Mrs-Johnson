@@ -56,7 +56,8 @@ export async function POST(req: Request) {
 				primaryColor: data.primaryColor || '#d4af37',
 				accentColor: data.accentColor || '#000000',
 				backgroundImage: data.backgroundImage || '',
-				showGallery: typeof data.showGallery === 'boolean' ? data.showGallery : true
+				showGallery: typeof data.showGallery === 'boolean' ? data.showGallery : true,
+				rsvpBlocked: typeof data.rsvpBlocked === 'boolean' ? data.rsvpBlocked : false
 			}
 		})
 		console.log('Updated settings:', settings)

@@ -120,6 +120,7 @@ export default function RsvpPage() {
         onClose={handleClose}
         allowClose={hasRSVPed}
         allNotAttending={allNotAttending}
+        forceAllowClose={true}
       >
         <RSVP 
           onComplete={handleRSVPComplete} 

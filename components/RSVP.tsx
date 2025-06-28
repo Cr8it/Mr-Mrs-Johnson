@@ -6,12 +6,13 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import GuestForm from "./GuestForm"
+import NameSearch from "./NameSearch"
 import { Response, Question, Guest, Household } from "@/components/types"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Label } from '@/components/ui/label'
 import Image from 'next/image'
-import { LoaderCircle } from 'lucide-react'
+import { LoaderCircle, X } from 'lucide-react'
 
 interface RSVPProps {
   onClose?: () => void;
@@ -19,35 +20,18 @@ interface RSVPProps {
   onRSVPStatus?: (notAttending: boolean) => void;
 }
 
-// Add debugging component
-const DebugInfo = ({ data, title }: { data: any, title: string }) => {
-  const [showDebug, setShowDebug] = useState(false);
-  return (
-    <div className="mt-2 p-2 border border-dashed border-gray-500 rounded">
-      <button 
-        className="text-sm text-gray-400 underline"
-        onClick={() => setShowDebug(!showDebug)}
-      >
-        {showDebug ? 'Hide' : 'Show'} {title}
-      </button>
-      {showDebug && (
-        <pre className="mt-2 p-2 bg-gray-800 text-xs text-gray-300 overflow-auto max-h-40">
-          {JSON.stringify(data, null, 2)}
-        </pre>
-      )}
-    </div>
-  );
-};
-
 export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
   const [code, setCode] = useState("")
-  const [loading, setLoading] = useState(false)
   const [household, setHousehold] = useState<Household | null>(null)
-  const [showSuccess, setShowSuccess] = useState(false)
+  const [guests, setGuests] = useState<Guest[]>([])
+  const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const [showSuccess, setShowSuccess] = useState(false)
   const [allNotAttending, setAllNotAttending] = useState(false)
+  const [rsvpBlocked, setRsvpBlocked] = useState(false)
   const { toast } = useToast()
   const [tab, setTab] = useState('search')
+  const [showBlockedMessage, setShowBlockedMessage] = useState(false)
 
   // Create a state to store the onClose function
   const [storedOnClose, setStoredOnClose] = useState<(() => void) | undefined>(onClose);
@@ -149,6 +133,18 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Check if RSVPs are blocked before allowing search
+    if (rsvpBlocked) {
+      setShowBlockedMessage(true);
+      toast({
+        variant: "destructive",
+        title: "RSVP Submissions Closed",
+        description: "RSVP submissions are currently closed. Please contact Sarah and Jermaine directly if you have urgent questions.",
+      })
+      return
+    }
+    
     setLoading(true)
     setShowSuccess(false)
 
@@ -443,174 +439,168 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
     setLoading(false);
   }
 
+  const handleHouseholdFound = (data: any) => {
+    console.log('Household found via name search:', data);
+    
+    // Ensure isChild is a boolean for each guest
+    if (data && data.guests) {
+      data.guests = data.guests.map((guest: { name: string; isChild?: boolean }) => ({
+        ...guest,
+        isChild: guest.isChild === true
+      }));
+    }
+    
+    setHousehold(data);
+    setShowForm(true);
+    setLoading(false);
+    
+    toast({
+      title: "Welcome back!",
+      description: `Found ${data.name}`,
+    });
+  }
+
+  // Check if RSVPs are blocked on component mount
+  useEffect(() => {
+    const checkRsvpBlocked = async () => {
+      try {
+        const response = await fetch('/api/rsvp/blocked')
+        const data = await response.json()
+        setRsvpBlocked(data.rsvpBlocked || false)
+        setShowBlockedMessage(data.rsvpBlocked || false)
+      } catch (error) {
+        console.error('Error checking RSVP blocked status:', error)
+        setRsvpBlocked(false)
+        setShowBlockedMessage(false)
+      }
+    }
+    
+    checkRsvpBlocked()
+  }, [])
+
   return (
-    <section id="rsvp" className="py-12">
-        <MotionDiv
-          className="space-y-8"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-        <h2 className="text-5xl font-cormorant font-bold text-center text-white mb-4">
-          RSVP
-        </h2>
-        <p className="text-center text-gold font-montserrat text-lg mb-8">
-          Please respond by Sunday 22nd June
-        </p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/50" onClick={onClose}></div>
+      <div className="relative bg-black text-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-6 border-b">
+          <h2 className="text-2xl font-semibold">RSVP</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <X className="h-6 w-6" />
+          </button>
+        </div>
 
-        {showSuccess ? (
-            <MotionDiv
-              className="max-w-md mx-auto text-center space-y-6"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-            <div className="bg-black/30 p-4 sm:p-8 rounded-lg border border-white/20">
-            <h3 className="text-xl sm:text-2xl font-semibold text-white mb-4">Thank You for Your Response!</h3>
-            {allNotAttending ? (
-            <p className="text-white mb-6 text-sm sm:text-base">We're sorry you won't be able to join us, but thank you for letting us know.</p>
-            ) : (
-            <p className="text-white mb-6 text-sm sm:text-base">We're excited to celebrate with you! We'll be in touch with more details as the day approaches.</p>
-            )}
-            <p className="text-xs sm:text-sm text-gray-300 mb-6">
-            You can modify your response anytime before the deadline using your household code:
-            <br />
-            <span className="font-mono font-bold text-white">{household?.code}</span>
-            </p>
-            <div className="space-y-4">
+        {showBlockedMessage ? (
+          <div className="flex justify-center items-center min-h-[400px]">
+            <div className="bg-black/80 border-2 border-[#d4af37] rounded-xl shadow-lg p-10 max-w-xl w-full mx-auto flex flex-col items-center">
+              <X className="h-16 w-16 text-red-500 mb-4" />
+              <h3 className="text-3xl font-bold text-[#d4af37] mb-2 text-center drop-shadow">RSVP Submissions Temporarily Closed</h3>
+              <p className="text-lg font-semibold text-white mb-2 text-center">We're sorry, but RSVP submissions are currently closed.</p>
+              <p className="text-base text-gray-100 mb-4 text-center">The deadline for RSVPs has passed, and we're finalizing our guest list and arrangements.</p>
+              <p className="text-base text-gray-200 mb-6 text-center">If you have any urgent questions, please contact Sarah and Jermaine directly.</p>
               <Button 
-                onClick={handleModifyResponse}
-                className="w-full sm:w-auto bg-white text-black hover:bg-gray-200"
+                onClick={() => setShowBlockedMessage(false)}
+                className="bg-gold hover:bg-[#c19b2f] text-white font-bold px-8 py-2 mt-2"
               >
-                Modify Response
+                Close
               </Button>
-              {!allNotAttending && (
-                <Button 
-                  onClick={() => {
-                    console.log("*** CLOSE BUTTON CLICKED ***");
-                    console.log("Current state:", { 
-                      showSuccess, 
-                      allNotAttending,
-                      onCloseType: typeof onClose,
-                      storedOnCloseType: typeof storedOnClose,
-                      hasOnClose: !!onClose,
-                      hasStoredOnClose: !!storedOnClose,
-                      hasLocalStorageFlag: localStorage.getItem('rsvp-has-parent-close') === 'true'
-                    });
-                    
-                    // Use our reliable close handler
-                    handleCloseModal();
-                  }}
-                  className="w-full bg-green-600 text-black font-medium hover:bg-green-700 hover:text-white"
-                >
-                  Close and View Wedding Details
-                </Button>
-              )}
-            </div>
-          </div>
-            </MotionDiv>
-
-        ) : !household || !showForm ? (
-          <div className="max-w-md mx-auto space-y-6">
-            <div className="bg-black/30 p-4 sm:p-8 rounded-lg border border-white/20">
-              <form onSubmit={handleSearch} className="space-y-6">
-                <div className="space-y-2">
-                  <Input
-                    placeholder="Enter your RSVP code or name"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    className="bg-transparent border-white border-opacity-20 text-white placeholder-gray-400 text-center"
-                    required
-                    />
-                    <p className="text-xs sm:text-sm text-gray-400 text-center">
-                    Enter your unique code from the invitation or search by your name
-                  </p>
-                </div>
-                <Button 
-                  type="submit" 
-                  className="w-full bg-white text-black hover:bg-gray-200" 
-                  disabled={loading}
-                >
-                  {loading ? "Searching..." : "Find My Invitation"}
-                </Button>
-              </form>
             </div>
           </div>
         ) : (
-            <div className="relative">
-              {showSuccess ? (
-                <MotionDiv
-                  className="max-w-md mx-auto text-center space-y-6"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                >
-                  <div className="bg-black/30 p-4 sm:p-8 rounded-lg border border-white/20">
-                    <h3 className="text-xl sm:text-2xl font-semibold text-white mb-4">Thank You for Your Response!</h3>
-                    {allNotAttending ? (
-                    <p className="text-white mb-6 text-sm sm:text-base">We're sorry you won't be able to join us, but thank you for letting us know.</p>
-                    ) : (
-                    <p className="text-white mb-6 text-sm sm:text-base">We're excited to celebrate with you! We'll be in touch with more details as the day approaches.</p>
-                    )}
-                    <p className="text-xs sm:text-sm text-gray-300 mb-6">
-                    You can modify your response anytime before the deadline using your household code:
-                    <br />
-                    <span className="font-mono font-bold text-white">{household?.code}</span>
-                    </p>
-                    <div className="space-y-4">
-                      <Button 
-                        onClick={handleModifyResponse}
-                        className="w-full sm:w-auto bg-white text-black hover:bg-gray-200"
-                      >
-                        Modify Response
-                      </Button>
-                      {!allNotAttending && (
+          <div className="p-6">
+            <Tabs value={tab} onValueChange={setTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="search">Search by Code</TabsTrigger>
+                <TabsTrigger value="name">Search by Name</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="search">
+                {!household || !showForm ? (
+                  <div className="max-w-md mx-auto space-y-6">
+                    <div className="bg-black/30 p-4 sm:p-8 rounded-lg border border-white/20">
+                      <form onSubmit={handleSearch} className="space-y-6">
+                        <div className="space-y-2">
+                          <Input
+                            placeholder="Enter your RSVP code or name"
+                            value={code}
+                            onChange={(e) => setCode(e.target.value)}
+                            className="bg-transparent border-white border-opacity-20 text-white placeholder-gray-400 text-center"
+                            required
+                            />
+                            <p className="text-xs sm:text-sm text-gray-400 text-center">
+                            Enter your unique code from the invitation or search by your name
+                          </p>
+                        </div>
                         <Button 
-                          onClick={() => {
-                            console.log("*** SECOND CLOSE BUTTON CLICKED ***");
-                            console.log("Current state:", { 
-                              showSuccess, 
-                              allNotAttending,
-                              onCloseType: typeof onClose,
-                              storedOnCloseType: typeof storedOnClose,
-                              hasOnClose: !!onClose,
-                              hasStoredOnClose: !!storedOnClose 
-                            });
-                            
-                            // Use our reliable close handler
-                            handleCloseModal();
-                          }}
-                          className="w-full bg-green-600 text-black font-medium hover:bg-green-700 hover:text-white"
+                          type="submit" 
+                          className="w-full bg-white text-black hover:bg-gray-200" 
+                          disabled={loading}
                         >
-                          Close and View Wedding Details
+                          {loading ? "Searching..." : "Find My Invitation"}
                         </Button>
-                      )}
+                      </form>
                     </div>
                   </div>
-                </MotionDiv>
-              ) : (
-                <>
-                  <GuestForm
-                    household={household}
-                    onBack={handleBackToSearch}
-                    onSuccess={handleRsvpSuccess}
-                    parentOnClose={storedOnClose || onClose}
-                  />
-                  
-                  {/* Add debugging info */}
-                  {process.env.NODE_ENV === 'development' && (
-                    <DebugInfo 
-                      title="Household Child Status" 
-                      data={household.guests.map((g: any) => ({ 
-                        name: g.name, 
-                        isChild: g.isChild 
-                      }))} 
-                    />
-                  )}
-                </>
-              )}
-            </div>
+                ) : (
+                  <div className="relative">
+                    {showSuccess ? (
+                      <MotionDiv
+                        className="max-w-md mx-auto text-center space-y-6"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                      >
+                        <div className="bg-black/30 p-4 sm:p-8 rounded-lg border border-white/20">
+                          <h3 className="text-xl sm:text-2xl font-semibold text-white mb-4">Thank You for Your Response!</h3>
+                          {allNotAttending ? (
+                          <p className="text-white mb-6 text-sm sm:text-base">We're sorry you won't be able to join us, but thank you for letting us know.</p>
+                          ) : (
+                          <p className="text-white mb-6 text-sm sm:text-base">We're excited to celebrate with you! We'll be in touch with more details as the day approaches.</p>
+                          )}
+                          <p className="text-xs sm:text-sm text-gray-300 mb-6">
+                          You can modify your response anytime before the deadline using your household code:
+                          <br />
+                          <span className="font-mono font-bold text-white">{household?.code}</span>
+                          </p>
+                          <Button 
+                            onClick={onClose}
+                            className="w-full bg-white text-black hover:bg-gray-200"
+                          >
+                            Close
+                          </Button>
+                        </div>
+                      </MotionDiv>
+                    ) : (
+                      <GuestForm
+                        household={household!}
+                        onBack={() => {
+                          setShowForm(false)
+                          setHousehold(null)
+                        }}
+                        onSuccess={(updatedGuests) => {
+                          setGuests(updatedGuests)
+                          setShowSuccess(true)
+                          setAllNotAttending(updatedGuests.every(g => g.isAttending === false))
+                          if (onRSVPStatus) {
+                            onRSVPStatus(updatedGuests.some(g => g.isAttending === true))
+                          }
+                        }}
+                        parentOnClose={onClose}
+                      />
+                    )}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="name">
+                <NameSearch onFound={handleHouseholdFound} />
+              </TabsContent>
+            </Tabs>
+          </div>
         )}
-        </MotionDiv>
-    </section>
+      </div>
+    </div>
   )
 }
 

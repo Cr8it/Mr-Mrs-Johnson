@@ -223,7 +223,7 @@ export default function MenuOptionsPage() {
 			if (!response.ok) {
 				throw new Error(`Failed to reorder ${type} options`)
 			}
-			
+
 			// Refresh options from the server to ensure UI reflects current state
 			await fetchOptions()
 		} catch (error) {
