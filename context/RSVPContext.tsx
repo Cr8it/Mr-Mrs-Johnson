@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import * as React from 'react';
 
 interface RSVPContextType {
 	isModifying: boolean;
@@ -18,6 +19,21 @@ export function RSVPProvider({ children }: { children: ReactNode }) {
 	const [hasRSVPed, setHasRSVPed] = useState(false);
 	const [showRSVP, setShowRSVP] = useState(false);
 	const [isUnlocked, setIsUnlocked] = useState(false);
+	const [rsvpBlocked, setRsvpBlocked] = useState(false);
+
+	// Fetch RSVP blocked status on mount
+	useEffect(() => {
+		const fetchRsvpBlocked = async () => {
+			try {
+				const response = await fetch('/api/rsvp/blocked');
+				const data = await response.json();
+				setRsvpBlocked(data.rsvpBlocked || false);
+			} catch (error) {
+				setRsvpBlocked(false);
+			}
+		};
+		fetchRsvpBlocked();
+	}, []);
 
 	// Effect to handle initial state and storage changes
 	useEffect(() => {
@@ -32,11 +48,13 @@ export function RSVPProvider({ children }: { children: ReactNode }) {
 			setIsModifying(modifying);
 
 			// Show RSVP modal if:
-			// 1. User is modifying their RSVP
-			// 2. Page is unlocked and user hasn't RSVPed yet
-			// 3. User has RSVPed but all guests are not attending
-			if (modifying || (unlocked && !hasRSVPed) || (hasRSVPed && savedAttendance && JSON.parse(savedAttendance).allNotAttending)) {
+			// 1. User is modifying their RSVP (modification always allowed)
+			// 2. Page is unlocked and user hasn't RSVPed yet, and RSVPs are NOT blocked
+			// 3. User has RSVPed but all guests are not attending (allow them to see the modal to update)
+			if (modifying || (unlocked && !hasRSVPed && !rsvpBlocked) || (hasRSVPed && savedAttendance && JSON.parse(savedAttendance).allNotAttending)) {
 				setShowRSVP(true);
+			} else {
+				setShowRSVP(false);
 			}
 		};
 
@@ -56,7 +74,7 @@ export function RSVPProvider({ children }: { children: ReactNode }) {
 			document.removeEventListener('storage', handleStorage);
 		};
 
-	}, []);
+	}, [rsvpBlocked]);
 
 	const startModification = () => {
 		const rsvpCode = localStorage.getItem('rsvp-code');
