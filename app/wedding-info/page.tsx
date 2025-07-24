@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { useRouter } from 'next/navigation'
@@ -107,6 +108,7 @@ export default function WeddingInfoPage() {
       const savedAttendance = localStorage.getItem('rsvp-attendance');
       const rsvpCode = localStorage.getItem('rsvp-code');
       
+      // Only require RSVP completion and at least one attending
       if (!unlocked || !rsvpStatus || !rsvpCode || !savedAttendance) {
         router.push('/');
         return;
@@ -116,6 +118,7 @@ export default function WeddingInfoPage() {
         const { allNotAttending: savedNotAttending } = JSON.parse(savedAttendance);
         setAllNotAttending(savedNotAttending);
         
+        // If all guests are not attending, redirect
         if (savedNotAttending) {
           router.push('/');
           return;
@@ -176,15 +179,15 @@ export default function WeddingInfoPage() {
       </div>
 
       <Modal 
-      isOpen={showRSVP} 
-      onClose={handleModalClose}
-      allowClose={hasRSVPed}
-      allNotAttending={allNotAttending}
+        isOpen={showRSVP} 
+        onClose={handleModalClose}
+        allowClose={hasRSVPed}
+        allNotAttending={allNotAttending}
       >
-      <RSVP 
-        onComplete={handleRSVPComplete}
-        onRSVPStatus={handleRSVPStatus}
-      />
+        <RSVP 
+          onComplete={handleRSVPComplete}
+          onRSVPStatus={handleRSVPStatus}
+        />
       </Modal>
     </motion.main>
   )

@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import Image from "next/image"
@@ -27,9 +28,8 @@ export default function LockedPage({ onUnlock }: LockedPageProps) {
       const rsvpCode = localStorage.getItem('rsvp-code');
       const pathname = window.location.pathname;
 
-      // Only perform attendance checks for wedding-info page
+      // For wedding-info page, only require RSVP completion and at least one attending
       if (pathname === '/wedding-info') {
-        // Redirect if any required data is missing
         if (!isUnlocked || !rsvpStatus || !rsvpCode || !savedAttendance) {
           router.push('/');
           return;
@@ -42,7 +42,6 @@ export default function LockedPage({ onUnlock }: LockedPageProps) {
             return;
           }
         } catch (error) {
-          // If there's any error parsing attendance data, redirect for security
           router.push('/');
           return;
         }
@@ -54,7 +53,6 @@ export default function LockedPage({ onUnlock }: LockedPageProps) {
       }
     };
 
-    // Run the check immediately and set up interval
     checkAccess();
     const securityInterval = setInterval(checkAccess, 1000);
     return () => clearInterval(securityInterval);
