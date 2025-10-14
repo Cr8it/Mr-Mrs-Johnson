@@ -73,6 +73,8 @@ export default function WeddingInfoPage() {
   const handleRSVPComplete = (code: string) => {
     localStorage.setItem('has-rsvped', 'true');
     localStorage.setItem('isUnlocked', 'true');
+    // Dispatch storage event to notify other components
+    window.dispatchEvent(new Event('storage'));
   };
 
   const handleRSVPStatus = (notAttending: boolean) => {
@@ -134,6 +136,14 @@ export default function WeddingInfoPage() {
   }, [router]);
 
   const handleModalClose = () => {
+    // If all guests are not attending, redirect to home page
+    if (hasRSVPed && allNotAttending) {
+      setShowRSVP(false);
+      router.push('/');
+      return;
+    }
+    
+    // If at least one guest is attending, just close the modal
     if (hasRSVPed && !allNotAttending) {
       setShowRSVP(false);
     }

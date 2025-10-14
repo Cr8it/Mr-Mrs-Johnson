@@ -77,7 +77,8 @@ export default function Home() {
   const handleRSVPComplete = (code: string) => {
     localStorage.setItem('has-rsvped', 'true');
     localStorage.setItem('isUnlocked', 'true');
-    // Remove the setShowRSVP(false) call to allow the thank you message to show
+    // Dispatch storage event to notify other components
+    window.dispatchEvent(new Event('storage'));
   };
 
   const handleRSVPStatus = (notAttending: boolean) => {
@@ -87,6 +88,7 @@ export default function Home() {
 
 
   const handleModalClose = () => {
+    // Allow closing the modal if user has completed RSVP
     if (hasRSVPed) {
       setShowRSVP(false);
     }
