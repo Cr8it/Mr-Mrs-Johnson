@@ -121,10 +121,10 @@ export default function Home() {
         allNotAttending={allNotAttending}
       >
         <RSVP 
+          onClose={handleModalClose}
           onComplete={handleRSVPComplete}
           onRSVPStatus={handleRSVPStatus}
         />
-
       </Modal>
     </motion.main>
   )

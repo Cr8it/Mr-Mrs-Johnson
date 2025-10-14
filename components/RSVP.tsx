@@ -479,18 +479,10 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
   }, [])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-black/50" onClick={onClose}></div>
-      <div className="relative bg-black text-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-2xl font-semibold">RSVP</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X className="h-6 w-6" />
-          </button>
-        </div>
+    <div className="relative bg-black text-white rounded-lg shadow-xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="flex items-center justify-between p-6 border-b">
+        <h2 className="text-2xl font-semibold">RSVP</h2>
+      </div>
 
         {showBlockedMessage ? (
           <div className="flex justify-center items-center min-h-[400px]">

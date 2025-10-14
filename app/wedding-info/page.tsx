@@ -185,6 +185,7 @@ export default function WeddingInfoPage() {
         allNotAttending={allNotAttending}
       >
         <RSVP 
+          onClose={handleModalClose}
           onComplete={handleRSVPComplete}
           onRSVPStatus={handleRSVPStatus}
         />
