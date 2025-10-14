@@ -556,7 +556,25 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
                           <span className="font-mono font-bold text-white">{household?.code}</span>
                           </p>
                           <Button 
-                            onClick={onClose}
+                            onClick={() => {
+                              // Force close by navigating or reloading
+                              if (allNotAttending) {
+                                window.location.href = '/';
+                              } else {
+                                // Force update localStorage and close
+                                localStorage.setItem('has-rsvped', 'true');
+                                localStorage.setItem('rsvp-completed', 'true');
+                                window.dispatchEvent(new Event('storage'));
+                                
+                                // Try to close via onClose
+                                if (onClose) {
+                                  onClose();
+                                } else {
+                                  // If onClose doesn't work, force page refresh to wedding-info
+                                  window.location.href = '/wedding-info';
+                                }
+                              }
+                            }}
                             className="w-full bg-white text-black hover:bg-gray-200"
                           >
                             Close

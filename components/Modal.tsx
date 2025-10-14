@@ -33,7 +33,31 @@ export default function Modal({ isOpen, onClose, children, allowClose = false, a
 
   const handleClose = () => {
     console.log("*** MODAL HANDLE CLOSE CALLED ***");
-    console.log("Modal props:", { isOpen, allowClose, allNotAttending, hasOnClose: !!onClose });
+    
+    // Check localStorage directly for RSVP completion
+    const hasCompletedRSVP = localStorage.getItem('has-rsvped') === 'true';
+    const rsvpCompleted = localStorage.getItem('rsvp-completed') === 'true';
+    const savedAttendance = localStorage.getItem('rsvp-attendance');
+    
+    let actualAllNotAttending = allNotAttending;
+    if (savedAttendance) {
+      try {
+        const parsed = JSON.parse(savedAttendance);
+        actualAllNotAttending = parsed.allNotAttending || false;
+      } catch (e) {
+        // ignore
+      }
+    }
+    
+    console.log("Modal close check:", { 
+      isOpen, 
+      allowClose, 
+      allNotAttending, 
+      hasOnClose: !!onClose,
+      hasCompletedRSVP,
+      rsvpCompleted,
+      actualAllNotAttending
+    });
     
     // Force the modal to close by resetting body overflow
     document.body.style.overflow = 'unset';
@@ -47,9 +71,15 @@ export default function Modal({ isOpen, onClose, children, allowClose = false, a
       } catch (error) {
         console.error("Error calling onClose:", error);
         
-        // As a fallback, try to redirect to home page
+        // As a fallback, redirect based on attendance
         try {
-          window.location.href = '/';
+          if (actualAllNotAttending) {
+            window.location.href = '/';
+          } else if (hasCompletedRSVP || rsvpCompleted) {
+            window.location.href = '/wedding-info';
+          } else {
+            window.location.href = '/';
+          }
         } catch (navError) {
           console.error("Navigation fallback also failed:", navError);
         }
@@ -57,14 +87,17 @@ export default function Modal({ isOpen, onClose, children, allowClose = false, a
     } else {
       console.error("Modal onClose function is not defined!");
       
-      // If we've RSVPed successfully but can't close, try to navigate home
-      if (allowClose && !allNotAttending) {
-        console.log("Attempting to navigate to home as fallback");
-        try {
+      // Navigate based on RSVP status
+      try {
+        if (actualAllNotAttending) {
           window.location.href = '/';
-        } catch (navError) {
-          console.error("Navigation fallback failed:", navError);
+        } else if (hasCompletedRSVP || rsvpCompleted) {
+          window.location.href = '/wedding-info';
+        } else {
+          window.location.href = '/';
         }
+      } catch (navError) {
+        console.error("Navigation fallback failed:", navError);
       }
     }
   };
@@ -85,15 +118,21 @@ export default function Modal({ isOpen, onClose, children, allowClose = false, a
               exit={{ opacity: 0, scale: 0.8 }}
               className="w-full max-w-4xl relative"
             >
-              {/* Always show close button if onClose is provided and either not RSVPed or has RSVPed with attending guests, or if forceAllowClose is true */}
-              {onClose && (forceAllowClose || !allowClose || (allowClose && !allNotAttending)) && (
-                <button
-                  onClick={handleClose}
-                  className="fixed top-2 right-2 sm:top-4 sm:right-4 text-white hover:text-gray-300 z-[60] bg-black/50 px-3 py-1 sm:px-4 sm:py-2 rounded-lg transition-colors duration-200 hover:bg-black/70 text-sm sm:text-base"
-                >
-                  Close
-                </button>
-              )}
+              {/* Show close button based on RSVP completion status */}
+              {(() => {
+                const hasCompletedRSVP = typeof window !== 'undefined' && localStorage.getItem('has-rsvped') === 'true';
+                const rsvpCompleted = typeof window !== 'undefined' && localStorage.getItem('rsvp-completed') === 'true';
+                const shouldShowClose = onClose && (forceAllowClose || hasCompletedRSVP || rsvpCompleted || allowClose);
+                
+                return shouldShowClose && (
+                  <button
+                    onClick={handleClose}
+                    className="fixed top-2 right-2 sm:top-4 sm:right-4 text-white hover:text-gray-300 z-[60] bg-black/50 px-3 py-1 sm:px-4 sm:py-2 rounded-lg transition-colors duration-200 hover:bg-black/70 text-sm sm:text-base"
+                  >
+                    Close
+                  </button>
+                );
+              })()}
               <div className="overflow-x-hidden">
                 {children}
               </div>
