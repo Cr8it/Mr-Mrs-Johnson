@@ -592,7 +592,6 @@ export default function RSVP({ onClose, onComplete, onRSVPStatus }: RSVPProps) {
           </div>
         )}
       </div>
-    </div>
   )
 }
 
